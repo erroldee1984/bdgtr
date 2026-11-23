@@ -436,7 +436,7 @@ The message is about the **whole household's** spending, not the person reading 
 |---|---|---|
 | `bg` | `#12152B` | |
 | `surface` / `surfaceRaised` | `#1B1F3A` / `#242949` | |
-| `primary` | `#4F8CFF` → `#7FB8FF` gradient | |
+| `primary` | `#5A94FF` → `#7FB8FF` gradient | The template's `#4F8CFF` is 4.39:1 on `surfaceRaised`, so it was nudged lighter to pass 4.5:1 |
 | `textPrimary` / `textSecondary` | `#FFFFFF` / `#A9B0D0` | Secondary is lightened from the template's grey so it meets 4.5:1 |
 | `success` / `danger` | `#4ADE80` / `#FF6B6B` | Both 4.5:1 or better on `bg` and `surface` |
 | Fonts | Poppins (headings), Inter (body) | |
@@ -539,10 +539,10 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 
 | Layer | Tool | Focus |
 |---|---|---|
-| Shared logic | Jest | budget resolution, thresholds, date clamping, filter/sort/pin ordering, PHP formatting, daily-summary computation, role→permission matrix |
-| API | Jest + Supertest + `mongodb-memory-server` | routes, auth, membership and role checks (whole §3 matrix, table-driven), validation, invites, cron idempotency |
-| Device storage | Jest with mocked AsyncStorage / `localStorage` | pin store per user and household, pruning, clearing on sign-out, Zod validation of stored values (corrupt → default), storage version migration, no token or secret ever written |
-| UI components | Jest + React Native Testing Library | forms, lists, accessibility roles and labels |
+| Shared logic | Vitest | budget resolution, thresholds, date clamping, filter/sort/pin ordering, PHP formatting, daily-summary computation, role→permission matrix |
+| API | Vitest + Hono's built-in test client (`app.request`) + `mongodb-memory-server` | routes, auth, membership and role checks (whole §3 matrix, table-driven), validation, invites, cron idempotency |
+| Device storage | Jest (`jest-expo`) with mocked AsyncStorage / `localStorage` | pin store per user and household, pruning, clearing on sign-out, Zod validation of stored values (corrupt → default), storage version migration, no token or secret ever written |
+| UI components | Jest (`jest-expo`) + React Native Testing Library + `expo-router/testing-library` | forms, lists, accessibility roles and labels |
 | Web E2E + a11y | Playwright + axe-core | main flows and zero axe violations |
 | Android E2E | Maestro | main flows on the phone and foldable emulator profiles |
 

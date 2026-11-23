@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# env files: secrets live here, NEVER commit them (see docs/PLAN.md §10)
+.env
+.env.*
+!.env.example
+
+# Vercel / Cloudflare local state
+.vercel/
+.wrangler/
+
+# personal Claude Code settings
+.claude/settings.local.json
+
+# editor / OS
+.DS_Store
+*.log
