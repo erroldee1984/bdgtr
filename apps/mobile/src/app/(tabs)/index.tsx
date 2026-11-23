@@ -6,6 +6,7 @@ import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { type ApiStatus, checkApiHealth } from '@/lib/api-health';
+import { useHydrated } from '@/layout/use-hydrated';
 import { usesNavRail, windowClassFor } from '@/layout/window-class';
 import { API_URL } from '@/lib/config';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
@@ -39,6 +40,7 @@ export default function DashboardScreen() {
   // Live screen size: helps confirm the layout on foldables (updates on fold/unfold).
   const { width, height } = useWindowDimensions();
   const windowClass = windowClassFor(width);
+  const hydrated = useHydrated(); // size isn't known in the pre-built web HTML
 
   const copy = STATUS_COPY[status];
   const iconColor =
@@ -58,9 +60,11 @@ export default function DashboardScreen() {
         <AppText variant="caption" tone="secondary" selectable>
           {API_URL}
         </AppText>
-        <AppText variant="caption" tone="secondary">
-          {`Screen ${Math.round(width)} × ${Math.round(height)} dp · ${windowClass} layout · ${usesNavRail(windowClass) ? 'side menu' : 'bottom bar'}`}
-        </AppText>
+        {hydrated ? (
+          <AppText variant="caption" tone="secondary">
+            {`Screen ${Math.round(width)} × ${Math.round(height)} dp · ${windowClass} layout · ${usesNavRail(windowClass) ? 'side menu' : 'bottom bar'}`}
+          </AppText>
+        ) : null}
         {status !== 'checking' && status !== 'connected' ? (
           <Pressable
             role="button"

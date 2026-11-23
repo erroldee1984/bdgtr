@@ -58,6 +58,11 @@ function renderNav(initialUrl = '/') {
 
 afterEach(() => jest.restoreAllMocks());
 
+/** Merges a React Native style prop (arrays, nested arrays, falsy entries) into one object. */
+function flatten(style: unknown): Record<string, unknown> {
+  return [style].flat(Infinity).reduce<Record<string, unknown>>((acc, s) => ({ ...acc, ...((s as object) || {}) }), {});
+}
+
 describe('AppNav', () => {
   it('shows the four destinations as accessible tabs with Home selected', async () => {
     mockWidth(384); // Galaxy S24 FE
@@ -133,6 +138,18 @@ describe('AppNav', () => {
     expect(screen.queryByText('bdgtr')).toBeNull();
     expect(screen.getByText('Count 2')).toBeTruthy();
     expect(mounts).toBe(1); // the screen was never remounted
+  });
+
+  it.each([
+    [384, 'row'], // phone: bottom bar lays tabs out side by side
+    [707, 'column'], // unfolded Fold 6: rail stacks tabs vertically
+  ])('at %i dp the tab list lays out as a %s', async (width, direction) => {
+    mockWidth(width);
+    await renderNav();
+
+    const style = flatten(screen.getByTestId('main-nav').props.style);
+    expect(style.flexDirection).toBe(direction);
+    if (direction === 'column') expect(style.justifyContent).toBe('flex-start');
   });
 
   it('opens the Add spend screen from the floating button', async () => {

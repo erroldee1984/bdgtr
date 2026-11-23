@@ -1,5 +1,7 @@
 import { useWindowDimensions } from 'react-native';
 
+import { useHydrated } from './use-hydrated';
+
 /**
  * Material 3 window size classes (docs/PLAN.md §8).
  * - compact  (< 600dp):  phones, Galaxy S24 FE, Fold 6 cover screen     → bottom tabs
@@ -29,5 +31,7 @@ export function usesNavRail(windowClass: WindowClass): boolean {
 /** Re-renders live when the window changes: folding/unfolding, rotation, browser resize. */
 export function useWindowClass(): WindowClass {
   const { width } = useWindowDimensions();
-  return windowClassFor(width);
+  const hydrated = useHydrated();
+  // The static web HTML is built as "compact"; match it while hydrating.
+  return hydrated ? windowClassFor(width) : 'compact';
 }
