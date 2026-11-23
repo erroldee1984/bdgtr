@@ -26,6 +26,17 @@ function htmlFiles(dir) {
   });
 }
 
+// Guard: a page that renders but never loads its JavaScript looks fine in a
+// quick check yet is dead in the browser (happened once with a custom +html.tsx).
+const indexHtml = readFileSync(join(distDir, 'index.html'), 'utf8');
+if (!/<script[^>]+src="\/_expo\/static\/js\//.test(indexHtml)) {
+  console.error(
+    'write-web-headers: FAILED, dist/index.html does not load any app JavaScript. ' +
+      'Check src/app/+html.tsx renders headNodes/bodyNodes from useServerDocumentContext().',
+  );
+  process.exit(1);
+}
+
 const hashes = new Set();
 for (const file of htmlFiles(distDir)) {
   const html = readFileSync(file, 'utf8');
