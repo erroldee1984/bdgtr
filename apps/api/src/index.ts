@@ -4,9 +4,9 @@
  */
 import { Hono } from 'hono';
 
-import { createApp } from './app';
-import { pingDb } from './db';
-import { loadEnv } from './env';
+import { createApp } from './create-app.js';
+import { pingDb } from './db.js';
+import { loadEnv } from './env.js';
 
 function buildApp() {
   try {

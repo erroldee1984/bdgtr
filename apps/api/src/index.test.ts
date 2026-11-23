@@ -4,7 +4,7 @@ const VALID_URI = 'mongodb+srv://bdgtr_app:s3cretPass@bdgtr-cluster.abcde.mongod
 
 async function importEntry() {
   vi.resetModules();
-  return (await import('./index')).default;
+  return (await import('./index.js')).default;
 }
 
 afterEach(() => {

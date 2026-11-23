@@ -43,6 +43,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: API loads the way Vercel runs it
+        run: pnpm --filter @bdgtr/api verify:deploy
+
       - name: Build web
         env:
           EXPO_PUBLIC_API_URL: https://bdgtr-api.erroldee.com
