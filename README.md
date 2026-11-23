@@ -56,10 +56,15 @@ device toolbar (Ctrl+Shift+M), choose "Responsive" and enter:
 | Fold 6 unfolded, portrait | 707 × 760 |
 | Fold 6 unfolded, landscape | 823 × 680 |
 
-**Phone (Expo Go):** install Expo Go from the Play Store, run `pnpm dev:phone`
-(first time: `npx eas-cli@latest login`), and scan the QR code with Expo Go. Saved
-changes reload on the phone. The tunnel goes through Expo's servers, so it works
-even though WSL isn't reachable from your Wi-Fi.
+**Phone (Expo Go):** install Expo Go from the Play Store, then run `pnpm dev:phone`
+and scan the QR code with Expo Go. It starts the local API (development database and
+Clerk development sign-in), opens a temporary Cloudflare tunnel so the phone can reach
+it, and starts Expo with its own tunnel. Saved changes reload on the phone.
+
+One-time setup for `pnpm dev:phone`:
+- `npx eas-cli@latest login` (Expo's tunnel uses your Expo account)
+- install [cloudflared](https://github.com/cloudflare/cloudflared/releases) into `~/.local/bin`
+  (no Cloudflare account needed for quick tunnels)
 
 Cloud APK builds (`npx eas-cli@latest build -p android --profile preview`) are only
 needed when a library with its own native Android code is added, or to share the app.

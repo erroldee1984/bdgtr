@@ -4,6 +4,8 @@
  */
 import { Hono } from 'hono';
 
+import { getAppDb } from './app-db.js';
+import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
 import { pingDb } from './db.js';
 import { loadEnv } from './env.js';
@@ -14,6 +16,8 @@ function buildApp() {
     return createApp({
       allowedOrigins: env.ALLOWED_ORIGINS,
       pingDb: () => pingDb(env.MONGODB_URI, env.MONGODB_DB),
+      getDb: () => getAppDb(env.MONGODB_URI, env.MONGODB_DB),
+      verifyToken: env.CLERK_JWT_KEY ? createClerkVerifier(env.CLERK_JWT_KEY) : null,
     });
   } catch (err) {
     // Misconfigured deployment: log the reason (EnvError never contains secret

@@ -24,3 +24,22 @@ export function resolveApiUrl(envValue: string | undefined, platform: string): s
 }
 
 export const API_URL: string = resolveApiUrl(process.env.EXPO_PUBLIC_API_URL, Platform.OS);
+
+/**
+ * Clerk publishable key. PUBLIC by design (it's in every copy of the app).
+ * - Development (`pnpm dev:web`, `pnpm dev:phone`): the Clerk *development*
+ *   instance key below, so test sign-ins never touch production users.
+ * - Real builds set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to the production key
+ *   (Cloudflare Pages env, eas.json).
+ */
+export const DEV_CLERK_PUBLISHABLE_KEY = '';
+
+export function resolveClerkKey(envValue: string | undefined, isDev: boolean): string | null {
+  const value = envValue?.trim() || (isDev ? DEV_CLERK_PUBLISHABLE_KEY : '');
+  return /^pk_(test|live)_[A-Za-z0-9+/=_-]+$/.test(value) ? value : null;
+}
+
+export const CLERK_PUBLISHABLE_KEY: string | null = resolveClerkKey(
+  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  __DEV__,
+);

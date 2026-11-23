@@ -10,6 +10,10 @@ function makeApp(overrides: Partial<AppDeps> = {}) {
   return createApp({
     allowedOrigins: [WEB_ORIGIN],
     pingDb: async () => true,
+    getDb: async () => {
+      throw new Error('database not used in this test');
+    },
+    verifyToken: null,
     now: () => FIXED_NOW,
     logError: () => {},
     ...overrides,

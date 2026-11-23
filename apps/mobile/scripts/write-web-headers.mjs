@@ -8,6 +8,7 @@
  * Usage: node scripts/write-web-headers.mjs [distDir]
  * Reads EXPO_PUBLIC_API_URL to allow the API origin in connect-src.
  */
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -49,18 +50,48 @@ for (const file of htmlFiles(distDir)) {
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 const connectSrc = ["'self'"];
 if (apiUrl) connectSrc.push(new URL(apiUrl).origin);
-// Added when sign-in is set up in M1: Clerk's frontend API origin.
 if (process.env.CSP_EXTRA_CONNECT) connectSrc.push(...process.env.CSP_EXTRA_CONNECT.split(/\s+/).filter(Boolean));
+
+/**
+ * Clerk (sign-in) needs its Frontend API host, which is base64-encoded inside the
+ * publishable key: pk_live_<base64("clerk.example.com$")>. Deriving it here keeps
+ * the CSP in step with whichever Clerk instance the build uses.
+ * See https://clerk.com/docs/security/clerk-csp
+ */
+export function clerkFrontendApiOrigin(publishableKey) {
+  const m = /^pk_(test|live)_([A-Za-z0-9+/=_-]+)$/.exec(publishableKey ?? '');
+  if (!m) return null;
+  const decoded = Buffer.from(m[2], 'base64').toString('utf8');
+  const host = decoded.replace(/\$$/, '');
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host) ? `https://${host}` : null;
+}
+
+const clerkOrigin = clerkFrontendApiOrigin(process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY);
+const CLOUDFLARE_CHALLENGES = 'https://challenges.cloudflare.com'; // Clerk bot protection (sign-up)
+const scriptExtra = [];
+const frameSrc = [];
+const imgExtra = [];
+if (clerkOrigin) {
+  connectSrc.push(clerkOrigin);
+  scriptExtra.push(clerkOrigin, CLOUDFLARE_CHALLENGES);
+  frameSrc.push(CLOUDFLARE_CHALLENGES);
+  imgExtra.push('https://img.clerk.com'); // profile pictures
+} else if (process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  console.error('write-web-headers: FAILED, EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not a valid Clerk publishable key');
+  process.exit(1);
+}
 
 const csp = [
   "default-src 'self'",
-  `script-src 'self' ${[...hashes].join(' ')}`.trim(),
+  `script-src 'self' ${[...hashes, ...scriptExtra].join(' ')}`.trim(),
   // react-native-web writes component styles inline; scripts stay locked down.
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${imgExtra.join(' ')}`.trim(),
   "font-src 'self' data:",
   `connect-src ${connectSrc.join(' ')}`,
-  "worker-src 'self'",
+  // Clerk runs a token-refresh worker from a blob: URL.
+  "worker-src 'self' blob:",
+  `frame-src ${frameSrc.length ? frameSrc.join(' ') : "'none'"}`,
   "manifest-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -90,4 +121,4 @@ writeFileSync(join(distDir, '_headers'), headers);
 const notFound = join(distDir, '+not-found.html');
 if (existsSync(notFound)) copyFileSync(notFound, join(distDir, '404.html'));
 
-console.log(`write-web-headers: wrote _headers (${hashes.size} inline script hash(es), connect-src ${connectSrc.join(' ')})`);
+console.log(`write-web-headers: wrote _headers (${hashes.size} inline script hash(es), connect-src ${connectSrc.join(' ')}${clerkOrigin ? '' : ', no Clerk key'})`);

@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { AccountStatus } from '@/components/account-status';
 import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
@@ -50,6 +51,7 @@ export default function DashboardScreen() {
     <Screen title="Hi there!" subtitle="Your household dashboard arrives in milestone M2.">
       <Card>
         <AppText variant="title">Setup check</AppText>
+        <AccountStatus />
         {/* Icon + text, never colour alone (WCAG 1.4.1). Announced when it changes (4.1.3). */}
         <View style={styles.statusRow} aria-live="polite">
           <MaterialCommunityIcons name={copy.icon} size={22} color={iconColor} aria-hidden />
