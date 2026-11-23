@@ -1,7 +1,7 @@
 import { HealthResponseSchema } from '@bdgtr/shared';
 import { describe, expect, it, vi } from 'vitest';
 
-import { type AppDeps, createApp } from './app';
+import { type AppDeps, createApp } from './create-app.js';
 
 const FIXED_NOW = new Date('2026-11-23T05:00:00.000Z');
 const WEB_ORIGIN = 'https://bdgtr.erroldee.com';

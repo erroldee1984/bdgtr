@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { EnvError, loadEnv } from './env';
+import { EnvError, loadEnv } from './env.js';
 
 const VALID_URI = 'mongodb+srv://bdgtr_app:s3cretPass@bdgtr-cluster.abcde.mongodb.net/?retryWrites=true';
 
