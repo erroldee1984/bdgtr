@@ -12,7 +12,9 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "dev:api": "pnpm --filter @bdgtr/api dev",
     "dev:mobile": "pnpm --filter @bdgtr/mobile start",
-    "build:web": "pnpm --filter @bdgtr/mobile build:web"
+    "build:web": "pnpm --filter @bdgtr/mobile build:web",
+    "dev:web": "pnpm --filter @bdgtr/mobile dev:web",
+    "dev:phone": "pnpm --filter @bdgtr/mobile dev:phone"
   },
   "packageManager": "pnpm@12.21.0"
 }

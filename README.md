@@ -28,19 +28,41 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 #   then edit apps/api/.env and paste your Atlas connection string into MONGODB_URI
 
-# App config (public values only)
-cp apps/mobile/.env.example apps/mobile/.env.local
 ```
+
+The app needs no env file in development: it picks the right API on its own
+(see `apps/mobile/.env.example` to override).
 
 ## Everyday commands (run from the repo root)
 
 | Command | Does |
 |---|---|
 | `pnpm dev:api` | Starts the API on http://localhost:8787 (reloads on change) |
-| `pnpm dev:mobile` | Starts Expo. Press `w` for web, `a` for an Android emulator/device |
+| `pnpm dev:web` | The app in your browser at http://localhost:8081, using the local API (run `pnpm dev:api` too) |
+| `pnpm dev:phone` | The app on your phone in **Expo Go**, using the live API. Scan the QR code |
 | `pnpm check` | Typecheck + lint + all unit tests (same as CI) |
 | `pnpm test` | Unit tests only |
 | `pnpm build:web` | Static website into `apps/mobile/dist` (plus Cloudflare `_headers`) |
+
+## Testing on screens of different sizes
+
+**Browser:** run `pnpm dev:api` and `pnpm dev:web`, then resize the window. The side
+menu appears at 600px and wider. For exact sizes, open DevTools (F12), turn on the
+device toolbar (Ctrl+Shift+M), choose "Responsive" and enter:
+
+| Device | Size |
+|---|---|
+| Galaxy S24 FE / Fold 6 cover screen | 384 × 800 |
+| Fold 6 unfolded, portrait | 707 × 760 |
+| Fold 6 unfolded, landscape | 823 × 680 |
+
+**Phone (Expo Go):** install Expo Go from the Play Store, run `pnpm dev:phone`
+(first time: `npx eas-cli@latest login`), and scan the QR code with Expo Go. Saved
+changes reload on the phone. The tunnel goes through Expo's servers, so it works
+even though WSL isn't reachable from your Wi-Fi.
+
+Cloud APK builds (`npx eas-cli@latest build -p android --profile preview`) are only
+needed when a library with its own native Android code is added, or to share the app.
 
 Check the API can reach Atlas: open http://localhost:8787/health/ready. It should show
 `{"status":"ok","database":"ok"}`.

@@ -45,7 +45,9 @@
     "build:web": "expo export -p web && node scripts/write-web-headers.mjs dist",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "dev:web": "expo start --web",
+    "dev:phone": "expo start --tunnel"
   },
   "private": true,
   "description": "bdgtr app for Android and web (Expo / React Native)",
