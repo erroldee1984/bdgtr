@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
-import { useWindowClass } from '@/layout/window-class';
+import { usesNavRail, useWindowClass } from '@/layout/window-class';
 import { colors, MAX_CONTENT_WIDTH, spacing } from '@/theme/tokens';
 
 interface ScreenProps {
@@ -30,7 +30,7 @@ export function Screen({ title, subtitle, children }: ScreenProps) {
           paddingTop: insets.top + spacing.xl,
           paddingHorizontal: horizontal,
           // leave room for the bottom bar + floating button on compact layouts
-          paddingBottom: windowClass === 'expanded' ? spacing.xxl : 160,
+          paddingBottom: usesNavRail(windowClass) ? spacing.xxl : 160,
         },
       ]}
     >

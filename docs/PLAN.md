@@ -322,8 +322,8 @@ POST   /internal/cron/daily-digest           (Authorization: Bearer CRON_SECRET)
 ## 6. Screens & behaviour
 
 ### Navigation
-- **Phones and folded Fold 6 (< 840dp):** bottom tabs **Home · Spend · Alerts · More**, as in the template, plus a floating **+** button.
-- **Unfolded Fold 6, tablets and desktop web (≥ 840dp):** a **side navigation rail** with the same items plus the household switcher. **+ Add spend** sits as a primary button at the top of the rail.
+- **Phones and folded Fold 6 (< 600dp):** bottom tabs **Home · Spend · Alerts · More**, as in the template, plus a floating **+** button.
+- **Unfolded Fold 6, tablets and desktop web (≥ 600dp):** a **side navigation rail** with the same items plus the household switcher. **+ Add spend** sits as a primary button at the top of the rail.
 - **More** contains: Budgets, Categories, Fixed Transactions, Household & Members, Settings (enable notifications on this device, mute alerts and toggle the daily 7 AM summary for this household, my devices, sign out). House Members see Budgets, Categories and Fixed Transactions read-only.
 
 ### 6.1 Welcome / sign-in (template screen 1)
@@ -452,10 +452,13 @@ v1 ships dark mode only, matching the template.
 |---|---|---|
 | Fold 6 cover screen | ~360–375 | compact |
 | Galaxy S24 FE | ~384–412 | compact |
-| Fold 6 unfolded / tablet | ~840–880 | expanded: side rail, two panes |
+| Fold 6 unfolded, portrait | ~700 | medium: side rail, single pane |
+| Fold 6 unfolded, landscape / tablet | ~820 | medium: side rail, single pane |
+| Large tablet | ≥ 840 | expanded: side rail, two panes |
 | Desktop browser | ≥ 1024 | expanded, content capped at about 1200 px wide |
 
-- Material 3 window size classes from `useWindowDimensions()`: compact < 600, medium 600–839, expanded ≥ 840. Layout reacts live to folding, unfolding and browser resizing without losing state.
+- Material 3 window size classes from `useWindowDimensions()`: compact < 600, medium 600–839, expanded ≥ 840. **The side rail starts at medium (600dp)**, as Material 3 recommends. The unfolded Fold 6 is about 700dp wide (1856px at Android's ~2.6× scaling), so it never reaches 840; an earlier 840dp threshold left it on bottom tabs. Layout reacts live to folding, unfolding and browser resizing without losing state.
+- **Two-pane layouts start at medium too when the content fits** (to be decided per screen in M2–M4). The unfolded Fold 6 should get the dashboard summary beside its chart, not just a wider single column.
 - **Two-pane layouts on expanded widths:**
   - Dashboard: summary beside the chart
   - Breakdown: list beside filters and detail

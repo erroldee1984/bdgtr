@@ -1,20 +1,45 @@
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
-import { Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, Text } from 'react-native';
 
 import { windowClassFor } from '@/layout/window-class';
 
 import { AppNav } from '../app-nav';
 
+// A tiny live store so changing the simulated width re-renders like a real fold/unfold.
 let mockClass = windowClassFor(384);
+const mockListeners = new Set<() => void>();
 jest.mock('@/layout/window-class', () => ({
   ...jest.requireActual('@/layout/window-class'),
-  useWindowClass: () => mockClass,
+  useWindowClass: () =>
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories can't use imports
+    require('react').useSyncExternalStore(
+      (cb: () => void) => {
+        mockListeners.add(cb);
+        return () => mockListeners.delete(cb);
+      },
+      () => mockClass,
+    ),
 }));
 
 /** Simulates the screen width; the width→class mapping itself is tested in window-class-test. */
 function mockWidth(width: number) {
   mockClass = windowClassFor(width);
+  mockListeners.forEach((cb) => cb());
+}
+
+let mounts = 0;
+function CounterScreen() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    mounts += 1;
+  }, []);
+  return (
+    <Pressable role="button" aria-label="Increment" onPress={() => setCount((c) => c + 1)}>
+      <Text>Count {count}</Text>
+    </Pressable>
+  );
 }
 
 function renderNav(initialUrl = '/') {
@@ -66,13 +91,48 @@ describe('AppNav', () => {
     expect(screen.queryByText('bdgtr')).toBeNull(); // rail header only on wide screens
   });
 
-  it('unfolded Fold 6 / desktop gets the side rail with its own Add spend button', async () => {
-    mockWidth(880);
+  it.each([
+    [707, 'unfolded Fold 6, portrait'],
+    [823, 'unfolded Fold 6, landscape'],
+    [1440, 'desktop browser'],
+  ])('%i dp (%s) gets the side rail with its own Add spend button', async (width) => {
+    mockWidth(width);
     await renderNav();
 
     expect(screen.getByText('bdgtr')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Add spend' })).toHaveLength(1);
     expect(screen.getAllByRole('tab')).toHaveLength(4);
+  });
+
+  it('folding and unfolding switches bar ↔ rail live without losing screen state', async () => {
+    mockWidth(360); // folded: cover screen
+    mounts = 0;
+    await renderRouter(
+      {
+        '(tabs)/_layout': () => <AppNav />,
+        '(tabs)/index': CounterScreen,
+        '(tabs)/spend': () => <Text>Spend screen</Text>,
+        '(tabs)/alerts': () => <Text>Alerts screen</Text>,
+        '(tabs)/more': () => <Text>More screen</Text>,
+      },
+      { initialUrl: '/' },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByRole('button', { name: 'Increment' }));
+      fireEvent.press(screen.getByRole('button', { name: 'Increment' }));
+    });
+    expect(screen.getByText('Count 2')).toBeTruthy();
+    expect(screen.queryByText('bdgtr')).toBeNull();
+
+    await act(async () => mockWidth(707)); // unfold
+    expect(screen.getByText('bdgtr')).toBeTruthy(); // rail header appeared
+    expect(screen.getByText('Count 2')).toBeTruthy(); // state kept
+
+    await act(async () => mockWidth(360)); // fold again
+    expect(screen.queryByText('bdgtr')).toBeNull();
+    expect(screen.getByText('Count 2')).toBeTruthy();
+    expect(mounts).toBe(1); // the screen was never remounted
   });
 
   it('opens the Add spend screen from the floating button', async () => {

@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
-import { useWindowClass } from '@/layout/window-class';
+import { usesNavRail, useWindowClass } from '@/layout/window-class';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -21,17 +21,18 @@ export const NAV_ITEMS = [
 
 /**
  * Responsive navigation:
- * - compact/medium: bottom tab bar + floating "Add spend" button
- * - expanded (unfolded Fold 6, desktop web): side rail with the add button on top
+ * - compact (phones, Fold 6 cover screen): bottom tab bar + floating "Add spend" button
+ * - medium/expanded (unfolded Fold 6, tablets, desktop web): side rail with the add button on top
  * Re-renders live on fold/unfold or browser resize without losing tab state.
  */
 export function AppNav() {
   const windowClass = useWindowClass();
-  const rail = windowClass === 'expanded';
+  const rail = usesNavRail(windowClass);
   const insets = useSafeAreaInsets();
 
   const tabList = (
     <TabList
+      key="tablist"
       role="tablist"
       aria-label="Main navigation"
       style={
@@ -49,10 +50,13 @@ export function AppNav() {
     </TabList>
   );
 
+  // The keys let React MOVE the tab list and content when switching layouts
+  // (fold/unfold, browser resize) instead of remounting them, so screen state such
+  // as a half-typed spend survives the switch.
   return (
     <Tabs style={[styles.root, { flexDirection: rail ? 'row' : 'column' }]}>
       {rail ? tabList : null}
-      <View style={styles.slot}>
+      <View key="content" style={styles.slot}>
         <TabSlot style={styles.slot} />
         {rail ? null : <AddSpendFab />}
       </View>
