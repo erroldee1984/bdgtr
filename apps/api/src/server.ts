@@ -6,9 +6,9 @@ import { existsSync } from 'node:fs';
 
 import { serve } from '@hono/node-server';
 
-import { createApp } from './app';
-import { closeDb, pingDb } from './db';
-import { EnvError, loadEnv } from './env';
+import { createApp } from './create-app.js';
+import { closeDb, pingDb } from './db.js';
+import { EnvError, loadEnv } from './env.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 
