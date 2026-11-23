@@ -1,13 +1,19 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
+import { ScrollViewStyleReset, useServerDocumentContext } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
 
 /**
  * Root HTML for the static web build only (never runs on Android).
  * Sets the page language and title (WCAG 3.1.1, 2.4.2) and lets users zoom.
+ *
+ * IMPORTANT (Expo SDK 58): `headNodes` and `bodyNodes` carry the app's <script>,
+ * stylesheet and font tags. Leaving them out produces a page that renders but
+ * never loads its JavaScript. scripts/write-web-headers.mjs fails the build if
+ * the exported HTML references no scripts.
  */
 export default function Root({ children }: PropsWithChildren) {
+  const { htmlAttributes, bodyAttributes, headNodes, bodyNodes } = useServerDocumentContext();
   return (
-    <html lang="en-PH">
+    <html {...htmlAttributes} lang="en-PH">
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -19,8 +25,12 @@ export default function Root({ children }: PropsWithChildren) {
         <title>bdgtr</title>
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: 'html,body{background-color:#12152B;}' }} />
+        {headNodes}
       </head>
-      <body>{children}</body>
+      <body {...bodyAttributes}>
+        {children}
+        {bodyNodes}
+      </body>
     </html>
   );
 }
