@@ -1,10 +1,15 @@
 import { useWindowDimensions } from 'react-native';
 
+import { useHydrated } from './use-hydrated';
+
 /**
  * Material 3 window size classes (docs/PLAN.md §8).
- * - compact  (< 600dp):  phones, Galaxy S24 FE, Fold 6 cover screen → bottom tabs
- * - medium   (600–839):  small tablets, landscape phones           → bottom tabs, wider content
- * - expanded (≥ 840):    unfolded Fold 6, tablets, desktop web     → side rail, two panes
+ * - compact  (< 600dp):  phones, Galaxy S24 FE, Fold 6 cover screen     → bottom tabs
+ * - medium   (600–839):  unfolded Fold 6 (~700dp portrait, ~820 land.) → side rail
+ * - expanded (≥ 840):    tablets, desktop web                          → side rail, two panes
+ *
+ * Material 3 recommends a navigation rail from "medium" up. The unfolded Fold 6
+ * never reaches 840dp, so tying the rail to "expanded" left it on bottom tabs.
  */
 export type WindowClass = 'compact' | 'medium' | 'expanded';
 
@@ -18,8 +23,15 @@ export function windowClassFor(width: number): WindowClass {
   return 'compact';
 }
 
+/** Side rail instead of bottom tabs + floating button. */
+export function usesNavRail(windowClass: WindowClass): boolean {
+  return windowClass !== 'compact';
+}
+
 /** Re-renders live when the window changes: folding/unfolding, rotation, browser resize. */
 export function useWindowClass(): WindowClass {
   const { width } = useWindowDimensions();
-  return windowClassFor(width);
+  const hydrated = useHydrated();
+  // The static web HTML is built as "compact"; match it while hydrating.
+  return hydrated ? windowClassFor(width) : 'compact';
 }

@@ -1,12 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, type TabTriggerSlotProps, Tabs } from 'expo-router/ui';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
-import { useWindowClass } from '@/layout/window-class';
+import { usesNavRail, useWindowClass } from '@/layout/window-class';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -21,17 +21,19 @@ export const NAV_ITEMS = [
 
 /**
  * Responsive navigation:
- * - compact/medium: bottom tab bar + floating "Add spend" button
- * - expanded (unfolded Fold 6, desktop web): side rail with the add button on top
+ * - compact (phones, Fold 6 cover screen): bottom tab bar + floating "Add spend" button
+ * - medium/expanded (unfolded Fold 6, tablets, desktop web): side rail with the add button on top
  * Re-renders live on fold/unfold or browser resize without losing tab state.
  */
 export function AppNav() {
   const windowClass = useWindowClass();
-  const rail = windowClass === 'expanded';
+  const rail = usesNavRail(windowClass);
   const insets = useSafeAreaInsets();
 
   const tabList = (
     <TabList
+      key="tablist"
+      testID="main-nav"
       role="tablist"
       aria-label="Main navigation"
       style={
@@ -49,10 +51,13 @@ export function AppNav() {
     </TabList>
   );
 
+  // The keys let React MOVE the tab list and content when switching layouts
+  // (fold/unfold, browser resize) instead of remounting them, so screen state such
+  // as a half-typed spend survives the switch.
   return (
     <Tabs style={[styles.root, { flexDirection: rail ? 'row' : 'column' }]}>
       {rail ? tabList : null}
-      <View style={styles.slot}>
+      <View key="content" style={styles.slot}>
         <TabSlot style={styles.slot} />
         {rail ? null : <AddSpendFab />}
       </View>
@@ -94,39 +99,46 @@ function NavButton({ icon, label, orientation, isFocused, ref, ...props }: NavBu
   );
 }
 
+/**
+ * Plain buttons + router.push rather than <Link asChild>: Link's slot merges
+ * styles in a way that drops a Pressable's function style ({ pressed }) => ...,
+ * which left both Add spend buttons unstyled (no blue background, FAB unpositioned).
+ */
+function openAddSpend() {
+  router.push('/add');
+}
+
 function RailHeader() {
   return (
     <View style={styles.railHeader}>
       <AppText variant="title" role="none">
         bdgtr
       </AppText>
-      <Link href="/add" asChild>
-        <Pressable
-          role="button"
-          accessibilityLabel="Add spend"
-          style={({ pressed }) => [styles.railAdd, pressed && styles.pressed]}
-        >
-          <MaterialCommunityIcons name="plus" size={22} color={colors.onPrimary} aria-hidden />
-          <AppText variant="bodyStrong" style={{ color: colors.onPrimary }}>
-            Add spend
-          </AppText>
-        </Pressable>
-      </Link>
+      <Pressable
+        role="button"
+        accessibilityLabel="Add spend"
+        onPress={openAddSpend}
+        style={({ pressed }) => [styles.railAdd, pressed && styles.pressed]}
+      >
+        <MaterialCommunityIcons name="plus" size={24} color={colors.onPrimary} aria-hidden />
+        <AppText variant="caption" style={{ color: colors.onPrimary, textAlign: 'center' }}>
+          Add spend
+        </AppText>
+      </Pressable>
     </View>
   );
 }
 
 function AddSpendFab() {
   return (
-    <Link href="/add" asChild>
-      <Pressable
-        role="button"
-        accessibilityLabel="Add spend"
-        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons name="plus" size={28} color={colors.onPrimary} aria-hidden />
-      </Pressable>
-    </Link>
+    <Pressable
+      role="button"
+      accessibilityLabel="Add spend"
+      onPress={openAddSpend}
+      style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+    >
+      <MaterialCommunityIcons name="plus" size={28} color={colors.onPrimary} aria-hidden />
+    </Pressable>
   );
 }
 
@@ -141,8 +153,12 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingTop: spacing.xs,
   },
+  // TabList defaults to flexDirection 'row' + space-between (right for the bottom
+  // bar); the rail must override both or everything squeezes into one row.
   rail: {
     width: 120,
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
     backgroundColor: colors.surface,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: colors.border,
@@ -151,14 +167,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   railHeader: { alignItems: 'center', gap: spacing.lg, marginBottom: spacing.lg },
+  // Icon above label (like the rail's tabs) so it fits the 120dp rail at any font size.
   railAdd: {
     minHeight: MIN_TOUCH,
     alignSelf: 'stretch',
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    gap: 2,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
     borderRadius: radius.button,
     backgroundColor: colors.primary,
   },
