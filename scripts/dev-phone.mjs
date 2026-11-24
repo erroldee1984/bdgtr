@@ -106,7 +106,7 @@ for (let i = 0; i < 30; i++) {
 console.log(`[dev-phone] Phone will use the API at ${apiUrl}`);
 
 // 3. Expo Go via Expo's tunnel. --clear so the new API URL is baked into the bundle.
-start('Expo', 'pnpm', ['--filter', '@bdgtr/mobile', 'exec', 'expo', 'start', '--tunnel', '--clear'], {
+start('Expo', 'pnpm', ['--filter', '@bdgtr/mobile', 'exec', 'expo', 'start', '--dev-client', '--tunnel', '--clear'], {
   stdio: 'inherit',
   env: { ...process.env, EXPO_PUBLIC_API_URL: apiUrl },
 });
