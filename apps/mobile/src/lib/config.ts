@@ -32,7 +32,8 @@ export const API_URL: string = resolveApiUrl(process.env.EXPO_PUBLIC_API_URL, Pl
  * - Real builds set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to the production key
  *   (Cloudflare Pages env, eas.json).
  */
-export const DEV_CLERK_PUBLISHABLE_KEY = '';
+// Development instance: wise-swift-3855.clerk.accounts.dev
+export const DEV_CLERK_PUBLISHABLE_KEY = 'pk_test_d2lzZS1zd2lmdC0zODU1LmNsZXJrLmFjY291bnRzLmRldiQ';
 
 export function resolveClerkKey(envValue: string | undefined, isDev: boolean): string | null {
   const value = envValue?.trim() || (isDev ? DEV_CLERK_PUBLISHABLE_KEY : '');
