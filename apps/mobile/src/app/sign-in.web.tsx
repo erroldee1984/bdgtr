@@ -19,7 +19,7 @@ export default function SignInScreen() {
   if (isLoaded && isSignedIn) return <Redirect href="/" />;
 
   return (
-    <WelcomeHero>
+    <WelcomeHero placement="center">
       <View style={styles.form}>
         {hydrated ? (
           <SignIn
