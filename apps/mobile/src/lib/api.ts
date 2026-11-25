@@ -2,17 +2,11 @@ import { useAuth } from '@clerk/expo';
 import { MeResponseSchema, type MeResponse } from '@bdgtr/shared';
 import { useCallback } from 'react';
 
+import { ApiError } from './api-error';
 import { API_URL } from './config';
+import { withNetworkRetry } from './retry';
 
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly code: string,
-  ) {
-    super(`API ${status}: ${code}`);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError };
 
 type GetToken = () => Promise<string | null>;
 
@@ -45,8 +39,8 @@ export async function fetchMe(getToken: GetToken, fetchImpl: typeof fetch = fetc
   return MeResponseSchema.parse(await apiFetch('/me', getToken, {}, fetchImpl));
 }
 
-/** Hook form: `const loadMe = useFetchMe(); await loadMe()`. */
+/** Hook form: `const loadMe = useFetchMe(); await loadMe()`. Retries network failures. */
 export function useFetchMe() {
   const { getToken } = useAuth();
-  return useCallback(() => fetchMe(() => getToken()), [getToken]);
+  return useCallback(() => withNetworkRetry(() => fetchMe(() => getToken())), [getToken]);
 }

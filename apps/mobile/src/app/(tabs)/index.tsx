@@ -6,7 +6,7 @@ import { AccountStatus } from '@/components/account-status';
 import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
-import { type ApiStatus, checkApiHealth } from '@/lib/api-health';
+import { type ApiStatus, checkApiHealthWithRetry } from '@/lib/api-health';
 import { useHydrated } from '@/layout/use-hydrated';
 import { usesNavRail, windowClassFor } from '@/layout/window-class';
 import { API_URL } from '@/lib/config';
@@ -25,7 +25,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     let active = true;
-    void checkApiHealth(API_URL).then((result) => {
+    void checkApiHealthWithRetry(API_URL).then((result) => {
       if (active) setStatus(result); // ignore results after unmount / a newer retry
     });
     return () => {

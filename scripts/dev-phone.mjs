@@ -12,6 +12,7 @@
  * Requires `cloudflared` (see README). No Cloudflare account is needed.
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { Resolver } from 'node:dns/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -97,12 +98,32 @@ const apiUrl = await new Promise((resolveUrl, reject) => {
 });
 if (!apiUrl) process.exit(1);
 
-for (let i = 0; i < 30; i++) {
+// A brand-new quick-tunnel hostname takes a few seconds to appear in DNS. If the
+// phone asks too early it fails (and may cache the failure), so wait until public
+// DNS resolves it and a request through it succeeds before starting Expo.
+// Ask Cloudflare's resolver directly: WSL's local resolver caches "not found".
+const host = new URL(apiUrl).hostname;
+const publicDns = new Resolver();
+publicDns.setServers(['1.1.1.1', '1.0.0.1']);
+let ready = false;
+process.stdout.write('[dev-phone] Waiting for the tunnel address to go live');
+for (let i = 0; i < 40 && !ready; i++) {
   try {
-    if ((await fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(3000) })).ok) break;
-  } catch {}
-  await new Promise((r) => setTimeout(r, 1000));
+    const [ip] = await publicDns.resolve4(host);
+    // Public DNS has it. Also try a request; if WSL's resolver cached an early
+    // "not found" that request fails locally even though the phone is fine, so
+    // after a few attempts public DNS alone is enough.
+    const res = await fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(4000) }).catch(() => null);
+    ready = Boolean(ip) && (res === null ? i >= 3 : res.ok);
+  } catch {
+    /* not in DNS yet */
+  }
+  if (!ready) {
+    process.stdout.write('.');
+    await new Promise((r) => setTimeout(r, 1500));
+  }
 }
+console.log(ready ? ' live.' : ' (still not confirmed; continuing anyway)');
 console.log(`[dev-phone] Phone will use the API at ${apiUrl}`);
 
 // 3. Expo Go via Expo's tunnel. --clear so the new API URL is baked into the bundle.
