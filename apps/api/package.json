@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "pnpm --filter @bdgtr/shared build && tsx watch src/server.ts",
     "start": "pnpm --filter @bdgtr/shared build && tsx src/server.ts",
-    "test": "pnpm --filter @bdgtr/shared build && vitest run",
+    "test": "pnpm --filter @bdgtr/shared build && vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "verify:deploy": "pnpm --filter @bdgtr/shared build && node scripts/verify-deploy-build.mjs"
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "5.1.1",
     "mongodb-memory-server": "^11.4.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",

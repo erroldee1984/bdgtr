@@ -549,7 +549,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | Web E2E + a11y | Playwright + axe-core | main flows and zero axe violations |
 | Android E2E | Maestro | main flows on the phone and foldable emulator profiles |
 
-**Coverage targets:** shared ≥ 90%, API ≥ 80%.
+**Coverage targets:** shared ≥ 90%, API ≥ 85% (branches ≥ 80%), app ≥ 85% (see "Coverage is enforced" below).
 
 **Every bug gets a regression test (standing rule).** When testing finds a bug:
 1. First write a test that reproduces it through the same path the user took (e.g. render the real screens, not just a helper), and run it against the unfixed code to confirm it **fails**.
@@ -559,6 +559,13 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | Found | Symptom | Regression tests |
 |---|---|---|
 | M1b | Dashboard kept the old monthly budget after it was changed under More → Household (each screen held its own copy of the household details) | `apps/mobile/src/household/__tests__/household-details-sync-test.tsx`, `use-active-household-test.tsx` |
+| M1b audit | Deleted households still counted toward the 20-household limit, so creating and deleting test households eventually locked a person out | `apps/api/src/households.test.ts` ("deleted households do not count toward the limit") |
+| M1b audit | Household screen showed one vague budget error ("Enter an amount like…") for every mistake, unlike Create household | `household-screen-test.tsx` (specific messages) |
+| M1b audit | A failed sign-out did nothing and showed nothing | `household-switcher-test.tsx` (More screen) |
+| M1b prod | Android sign-in only said "Sign-in didn't complete" when Clerk rejected the app's return link (`resource_missmatch`), so the cause had to be found by hand. Now Clerk's reason code is shown | `apps/mobile/src/components/__tests__/sign-in-test.tsx` |
+| M1a prod | Web CSP blocked Clerk Protect, then its probe hosts, and new sign-ups were rejected (PRs #8, #9); a custom `+html.tsx` once shipped pages without their JavaScript | `apps/mobile/scripts/__tests__/write-web-headers-test.ts` |
+
+**Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
 **Writing app (Jest) tests:**
 - Mocked hooks must return the **same** functions and objects on every render, like the real ones (Clerk's `useAuth`, `useFetchMe`). A new function per render makes effects refetch forever and the test hangs.

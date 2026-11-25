@@ -1,11 +1,4 @@
-import {
-  can,
-  formatPHP,
-  type Household,
-  parseAmountInput,
-  ROLE_LABELS,
-  UpdateHouseholdInputSchema,
-} from '@bdgtr/shared';
+import { can, formatPHP, type Household, ROLE_LABELS } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -17,6 +10,7 @@ import { RequireSignIn } from '@/components/require-sign-in';
 import { Screen } from '@/components/screen';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
+import { type HouseholdFormErrors, validateHouseholdForm } from '@/household/household-form';
 import { RequireHousehold } from '@/household/require-household';
 import { useActiveHouseholdDetails } from '@/household/use-active-household';
 import { deleteHousehold, updateHousehold } from '@/lib/api';
@@ -66,7 +60,7 @@ function HouseholdEditor({ household, onSaved }: { household: Household; onSaved
   const { refresh } = useHousehold();
   const [name, setName] = useState(household.name);
   const [budget, setBudget] = useState((household.defaultMonthlyBudgetMinor / 100).toFixed(2));
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; budget?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<HouseholdFormErrors>({});
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmName, setConfirmName] = useState('');
@@ -77,22 +71,16 @@ function HouseholdEditor({ household, onSaved }: { household: Household; onSaved
 
   async function save() {
     setStatus(null);
-    const amount = parseAmountInput(budget);
-    const errs: typeof fieldErrors = {};
-    if (!amount.ok) errs.budget = 'Enter an amount like 40,000 or 40000.50';
-    const parsed = UpdateHouseholdInputSchema.safeParse({
-      name,
-      defaultMonthlyBudgetMinor: amount.ok ? amount.amountMinor : household.defaultMonthlyBudgetMinor,
-    });
-    if (!parsed.success) {
-      const nameIssue = parsed.error.issues.find((i) => i.path[0] === 'name');
-      if (nameIssue) errs.name = nameIssue.message;
+    // Same checks and messages as "Create your household".
+    const result = validateHouseholdForm({ name, budget });
+    if (!result.ok) {
+      setFieldErrors(result.errors);
+      return;
     }
-    setFieldErrors(errs);
-    if (errs.name || errs.budget || !parsed.success) return;
+    setFieldErrors({});
     setSaving(true);
     try {
-      const updated = await updateHousehold(() => getToken(), household.id, parsed.data);
+      const updated = await updateHousehold(() => getToken(), household.id, result.input);
       onSaved(updated);
       await refresh(updated.id); // the switcher shows the new name
       setStatus('Saved.');

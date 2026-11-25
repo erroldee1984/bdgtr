@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
-import { ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js';
+import { createHouseholdWithOwner, ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureUserIndexes, USERS } from './users.js';
 
@@ -131,6 +131,45 @@ describe('POST /households', () => {
     const res = await app.request('/households', { method: 'POST', body: '{}' });
     expect(res.status).toBe(401);
   });
+
+  // Regression (test audit): deleted households still counted toward the limit,
+  // so someone who created and deleted test households was eventually locked out.
+  it('deleted households do not count toward the limit', async () => {
+    const made = [];
+    for (let i = 0; i < MAX_HOUSEHOLDS_PER_USER; i++) made.push(await createHousehold('user_ana', `H${i}`));
+    expect((await call('user_ana', 'DELETE', '/household', { householdId: made[0]!.id })).status).toBe(204);
+    const res = await call('user_ana', 'POST', '/households', { body: { name: 'Replacement', defaultMonthlyBudgetMinor: 1 } });
+    expect(res.status).toBe(201);
+  });
+
+  it('households you were removed from or left do not count toward the limit', async () => {
+    for (let i = 0; i < MAX_HOUSEHOLDS_PER_USER - 1; i++) await createHousehold('user_ana', `H${i}`);
+    const other = await createHousehold('user_ben', 'Ben home');
+    await addMember('user_ana', other.id, 'member', 'left');
+    expect((await call('user_ana', 'POST', '/households', { body: { name: 'Last one', defaultMonthlyBudgetMinor: 1 } })).status).toBe(201);
+  });
+
+  it('households you are only a member of DO count toward the limit', async () => {
+    for (let i = 0; i < MAX_HOUSEHOLDS_PER_USER - 1; i++) await createHousehold('user_ana', `H${i}`);
+    const other = await createHousehold('user_ben', 'Ben home');
+    await addMember('user_ana', other.id, 'member');
+    expect((await call('user_ana', 'POST', '/households', { body: { name: 'Too many', defaultMonthlyBudgetMinor: 1 } })).status).toBe(409);
+  });
+
+  it('if adding the owner fails, the half-created household is removed (no orphan)', async () => {
+    await call('user_ana', 'GET', '/me');
+    const user = await db.collection(USERS).findOne({ clerkUserId: 'user_ana' });
+    const failingDb = {
+      collection: (name: string) =>
+        name === MEMBERSHIPS
+          ? { insertOne: async () => Promise.reject(new Error('write failed')) }
+          : db.collection(name),
+    } as unknown as Db;
+    await expect(
+      createHouseholdWithOwner(failingDb, user!._id, { name: 'Orphan', defaultMonthlyBudgetMinor: 1 }),
+    ).rejects.toThrow('write failed');
+    expect(await db.collection(HOUSEHOLDS).countDocuments()).toBe(0);
+  });
 });
 
 describe('household access (X-Household-Id)', () => {
@@ -202,6 +241,37 @@ describe('PATCH /household', () => {
     expect(res.status).toBe(400);
   });
 
+  it('a partial update changes only the fields sent', async () => {
+    const h = await createHousehold('user_owner');
+    const res = await call('user_owner', 'PATCH', '/household', { householdId: h.id, body: { defaultMonthlyBudgetMinor: 123 } });
+    expect(res.status).toBe(200);
+    expect(HouseholdResponseSchema.parse(await res.json()).household).toMatchObject({ name: 'Dela Cruz', defaultMonthlyBudgetMinor: 123 });
+  });
+
+  it('400 for a body that is not JSON, and nothing changes', async () => {
+    const h = await createHousehold('user_owner');
+    const res = await call('user_owner', 'PATCH', '/household', { householdId: h.id, body: '{"name":' });
+    expect(res.status).toBe(400);
+    expect((await db.collection(HOUSEHOLDS).findOne({ _id: new ObjectId(h.id) }))!.name).toBe('Dela Cruz');
+  });
+
+  it('401 without a valid sign-in', async () => {
+    const h = await createHousehold('user_owner');
+    const res = await app.request('/household', {
+      method: 'PATCH',
+      headers: { 'X-Household-Id': h.id, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Anon' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('404 once the household has been deleted', async () => {
+    const h = await createHousehold('user_owner');
+    await call('user_owner', 'DELETE', '/household', { householdId: h.id });
+    const res = await call('user_owner', 'PATCH', '/household', { householdId: h.id, body: { name: 'Back from the dead' } });
+    expect(res.status).toBe(404);
+  });
+
   it('only changes the household named in the header, never another one', async () => {
     const mine = await createHousehold('user_owner', 'Mine');
     const theirs = await createHousehold('user_other', 'Theirs');
@@ -230,6 +300,25 @@ describe('DELETE /household', () => {
     await addMember(who, h.id, role);
     expect((await call(who, 'DELETE', '/household', { householdId: h.id })).status).toBe(403);
     expect((await call('user_owner', 'GET', '/household', { householdId: h.id })).status).toBe(200);
+  });
+});
+
+describe('DELETE /household (negative cases)', () => {
+  it("404 for someone else's household, which stays", async () => {
+    const h = await createHousehold('user_owner');
+    expect((await call('user_mallory', 'DELETE', '/household', { householdId: h.id })).status).toBe(404);
+    expect((await call('user_owner', 'GET', '/household', { householdId: h.id })).status).toBe(200);
+  });
+
+  it('404 when deleting the same household twice', async () => {
+    const h = await createHousehold('user_owner');
+    expect((await call('user_owner', 'DELETE', '/household', { householdId: h.id })).status).toBe(204);
+    expect((await call('user_owner', 'DELETE', '/household', { householdId: h.id })).status).toBe(404);
+  });
+
+  it('401 without a valid sign-in', async () => {
+    const h = await createHousehold('user_owner');
+    expect((await app.request('/household', { method: 'DELETE', headers: { 'X-Household-Id': h.id } })).status).toBe(401);
   });
 });
 

@@ -14,6 +14,7 @@ const SECTIONS = ['Budgets', 'Categories', 'Fixed transactions', 'Settings'] as 
 export default function MoreScreen() {
   const { signOut } = useClerk();
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
 
   return (
     <Screen title="More">
@@ -46,8 +47,11 @@ export default function MoreScreen() {
         disabled={signingOut}
         onPress={async () => {
           setSigningOut(true);
+          setSignOutError(false);
           try {
             await signOut(); // RequireSignIn then redirects to /sign-in
+          } catch {
+            setSignOutError(true);
           } finally {
             setSigningOut(false);
           }
@@ -59,6 +63,11 @@ export default function MoreScreen() {
           {signingOut ? 'Signing out…' : 'Sign out'}
         </AppText>
       </Pressable>
+      {signOutError ? (
+        <AppText tone="danger" role="alert">
+          Couldn&apos;t sign out. Check your connection and try again.
+        </AppText>
+      ) : null}
     </Screen>
   );
 }
