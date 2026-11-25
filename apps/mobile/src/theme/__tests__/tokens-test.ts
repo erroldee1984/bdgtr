@@ -1,4 +1,6 @@
 import { contrastRatio, relativeLuminance } from '../contrast';
+import { CATEGORY_COLOURS } from '@bdgtr/shared';
+
 import { colors, MIN_TOUCH } from '../tokens';
 
 const backgrounds = ['bg', 'surface', 'surfaceRaised'] as const;
@@ -43,6 +45,19 @@ describe('WCAG 2.2 AA: non-text contrast ≥ 3:1 (focus ring, borders of control
       expect(contrastRatio(colors.focusRing, colors[bg])).toBeGreaterThanOrEqual(3);
     });
   }
+});
+
+describe('category colours (chart bars, icons): ≥ 3:1 on every surface (WCAG 1.4.11)', () => {
+  for (const c of CATEGORY_COLOURS) {
+    for (const bg of backgrounds) {
+      it(`${c} on ${bg}`, () => {
+        expect(contrastRatio(c, colors[bg])).toBeGreaterThanOrEqual(3);
+      });
+    }
+  }
+  it('the check mark on a chosen colour swatch is legible (onPrimary ≥ 3:1 on each colour)', () => {
+    for (const c of CATEGORY_COLOURS) expect(contrastRatio(colors.onPrimary, c)).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe('touch targets', () => {

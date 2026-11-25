@@ -13,6 +13,8 @@ jest.mock('@/household/household-context', () => ({
 }));
 const mockSignOut = jest.fn();
 jest.mock('@clerk/expo', () => ({ useClerk: () => ({ signOut: mockSignOut }) }));
+// The Setup check card on More has its own tests (account-status-test.tsx).
+jest.mock('@/components/setup-check', () => ({ SetupCheck: () => null }));
 
 const HOME = { householdId: 'h1', householdName: 'Home', role: 'owner' };
 const PARENTS = { householdId: 'h2', householdName: 'Parents', role: 'member' };

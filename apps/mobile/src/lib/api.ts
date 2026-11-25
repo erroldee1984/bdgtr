@@ -1,5 +1,15 @@
 import { useAuth } from '@clerk/expo';
 import {
+  type Category,
+  CategoriesResponseSchema,
+  CategoryResponseSchema,
+  type CreateCategoryInput,
+  type CreateTransactionInput,
+  type Dashboard,
+  DashboardSchema,
+  type Transaction,
+  TransactionResponseSchema,
+  type UpdateCategoryInput,
   type AcceptInviteResponse,
   AcceptInviteResponseSchema,
   type AssignableRole,
@@ -145,4 +155,56 @@ export async function revokeInvite(getToken: GetToken, householdId: string, invi
 
 export async function acceptInvite(getToken: GetToken, token: string): Promise<AcceptInviteResponse> {
   return AcceptInviteResponseSchema.parse(await apiFetch('/invites/accept', getToken, json('POST', { token })));
+}
+
+// --- Categories, transactions, dashboard (docs/PLAN.md §6.2–6.4) ---
+
+export async function fetchCategories(getToken: GetToken, householdId: string): Promise<Category[]> {
+  return CategoriesResponseSchema.parse(await apiFetch('/categories', getToken, inHousehold(householdId))).categories;
+}
+
+export async function createCategory(getToken: GetToken, householdId: string, input: CreateCategoryInput): Promise<Category> {
+  return CategoryResponseSchema.parse(await apiFetch('/categories', getToken, inHousehold(householdId, json('POST', input)))).category;
+}
+
+export async function updateCategory(
+  getToken: GetToken,
+  householdId: string,
+  id: string,
+  input: UpdateCategoryInput,
+): Promise<Category> {
+  return CategoryResponseSchema.parse(
+    await apiFetch(`/categories/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, json('PATCH', input))),
+  ).category;
+}
+
+/** Soft remove: past spending keeps the category. */
+export async function removeCategory(getToken: GetToken, householdId: string, id: string): Promise<void> {
+  await apiFetch(`/categories/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, { method: 'DELETE' }));
+}
+
+export async function restoreCategory(getToken: GetToken, householdId: string, id: string): Promise<void> {
+  await apiFetch(`/categories/${encodeURIComponent(id)}/restore`, getToken, inHousehold(householdId, { method: 'POST' }));
+}
+
+export async function addStarterCategories(getToken: GetToken, householdId: string): Promise<Category[]> {
+  return CategoriesResponseSchema.parse(
+    await apiFetch('/categories/starter', getToken, inHousehold(householdId, { method: 'POST' })),
+  ).categories;
+}
+
+/** Saves a spend. Sending the same clientId again returns the original (safe to retry). */
+export async function createTransaction(
+  getToken: GetToken,
+  householdId: string,
+  input: CreateTransactionInput,
+): Promise<Transaction> {
+  return TransactionResponseSchema.parse(
+    await apiFetch('/transactions', getToken, inHousehold(householdId, json('POST', input))),
+  ).transaction;
+}
+
+export async function fetchDashboard(getToken: GetToken, householdId: string, month?: string): Promise<Dashboard> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : '';
+  return DashboardSchema.parse(await apiFetch(`/dashboard${query}`, getToken, inHousehold(householdId)));
 }

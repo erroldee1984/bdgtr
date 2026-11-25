@@ -70,6 +70,16 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="categories"
+              options={{
+                headerShown: true,
+                title: 'Categories',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.textPrimary,
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
+            <Stack.Screen
               name="add"
               options={{
                 presentation: 'modal',
