@@ -40,10 +40,10 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *   (`azp` claim). Native Android tokens have no `azp` and are allowed.
  * - 503 if the server has no Clerk key configured (deployment mistake).
  */
-export function requireAuth(options: {
+export function requireAuth<E extends { Variables: AuthVariables } = { Variables: AuthVariables }>(options: {
   verify: VerifyToken | null;
   authorizedParties: string[];
-}): MiddlewareHandler<{ Variables: AuthVariables }> {
+}): MiddlewareHandler<E> {
   return async (c, next) => {
     if (!options.verify) return c.json({ error: 'auth_not_configured' }, 503);
 
