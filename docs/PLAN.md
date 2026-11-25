@@ -344,7 +344,7 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 - After saving, the API works out threshold crossings, saves `alerts` and **fans them out to every active household member's registered devices** (Android push plus browser Web Push), skipping members who muted this household. The person who entered the spend also sees an in-app toast straight away. Delivery rules are in §2b.
 
 **Threshold rule** (pure function, heavily tested):
-> For the transaction's category and for the household total: reaching 90% or more fires **"near"**; going above 100% fires **"over"**. Each fires once per month per scope (a unique index enforces it). A spend that jumps past both sends only "over", "near" never follows "over" in the same month, and a budget of zero or no budget never fires.
+> For the transaction's category and for the household total: reaching 90% or more fires **"near"**; going above 100% fires **"over"**. **For a category, every new spend while it's at 90% or more sends its current alert again** ("near" or "over", with the updated percentage or amount; a repeated "over" is titled "Still over budget · {category}"). **The household total fires each level once a month** (a unique index enforces the first alert per crossing). A spend that jumps past both sends only "over", and a budget of zero or no budget never fires.
 >
 > The check is "what level has spending reached, and has this household had that alert yet this month?" rather than "did this one spend cross the line?", so simultaneous spends that only together cross a line still produce exactly one alert. Only new spends set off alerts (not edits or deletes).
 

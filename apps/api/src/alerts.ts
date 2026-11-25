@@ -7,7 +7,10 @@ import { MEMBERSHIPS } from './households.js';
 import { TRANSACTIONS, type TransactionDoc } from './transactions.js';
 import { USERS, type UserDoc } from './users.js';
 
-/** docs/PLAN.md §4: one alert per household, month, scope and level. */
+/**
+ * docs/PLAN.md §4: the first alert per household, month, scope and level is
+ * unique; "repeat" ones (further spends in a category already at 90%+) aren't.
+ */
 export interface AlertDoc {
   _id: ObjectId;
   householdId: ObjectId;
@@ -22,14 +25,28 @@ export interface AlertDoc {
   spentMinor: number;
   triggeredBy: ObjectId;
   transactionId: ObjectId;
+  /** True for a further alert in a category already at that level this month. */
+  repeat: boolean;
   createdAt: Date;
 }
 
 export const ALERTS = 'alerts';
 
 export async function ensureAlertIndexes(db: Db): Promise<void> {
-  await db.collection<AlertDoc>(ALERTS).createIndexes([
-    { key: { householdId: 1, yearMonth: 1, scope: 1, level: 1 }, unique: true, name: 'one_per_crossing' },
+  const alerts = db.collection<AlertDoc>(ALERTS);
+  // Upgrade from the first version (every alert unique per month): mark existing
+  // alerts as firsts, then swap the index for one that ignores repeats. Safe to rerun.
+  await alerts.updateMany({ repeat: { $exists: false } }, { $set: { repeat: false } });
+  await alerts.dropIndex('one_per_crossing').catch((err: unknown) => {
+    if (!(err instanceof MongoServerError && (err.code === 27 || err.codeName === 'IndexNotFound' || err.codeName === 'NamespaceNotFound'))) throw err;
+  });
+  await alerts.createIndexes([
+    {
+      key: { householdId: 1, yearMonth: 1, scope: 1, level: 1 },
+      unique: true,
+      name: 'first_per_crossing',
+      partialFilterExpression: { repeat: false },
+    },
     { key: { householdId: 1, createdAt: -1 }, name: 'household_recent' },
   ]);
 }
@@ -71,37 +88,38 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
   candidates.push({ scope: 'total', categoryId: null, categoryName: null, budget: household.defaultMonthlyBudgetMinor, after: totalSpent });
 
   const created: AlertDoc[] = [];
+  const insert = async (doc: AlertDoc): Promise<boolean> => {
+    try {
+      await db.collection<AlertDoc>(ALERTS).insertOne(doc);
+      created.push(doc);
+      return true;
+    } catch (err) {
+      if (err instanceof MongoServerError && err.code === 11000) return false; // already recorded this month
+      throw err;
+    }
+  };
   for (const c of candidates) {
     const level = levelReached(c.after, c.budget);
     if (!level) continue;
-    // "Nearly there" after "over" this month would be confusing (e.g. after a delete brings it back down).
-    if (
-      level === 'near' &&
-      (await db.collection<AlertDoc>(ALERTS).countDocuments({ householdId: household._id, yearMonth: tx.yearMonth, scope: c.scope, level: 'over' })) > 0
-    ) {
-      continue;
-    }
-    const text = formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after });
-    const doc: AlertDoc = {
+    const make = (repeat: boolean): AlertDoc => ({
       _id: new ObjectId(),
       householdId: household._id,
       yearMonth: tx.yearMonth,
       scope: c.scope,
       level,
       categoryId: c.categoryId,
-      ...text,
+      ...formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after, repeat }),
       budgetMinor: c.budget,
       spentMinor: c.after,
       triggeredBy: tx.createdBy,
       transactionId: tx._id,
+      repeat,
       createdAt: now,
-    };
-    try {
-      await db.collection<AlertDoc>(ALERTS).insertOne(doc);
-      created.push(doc);
-    } catch (err) {
-      if (!(err instanceof MongoServerError && err.code === 11000)) throw err; // already recorded this month
-    }
+    });
+    // A category at 90%+: every further spend in it sends its current alert again
+    // (updated numbers; a repeated "over" says "Still over budget"). The household
+    // total stays once a month per level.
+    if (!(await insert(make(false))) && c.categoryId) await insert(make(true));
   }
   return created;
 }
