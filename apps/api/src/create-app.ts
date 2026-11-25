@@ -9,6 +9,7 @@ import type { Db } from 'mongodb';
 import { requireAuth, type VerifyToken } from './auth.js';
 import { type AppVariables, registerHouseholdRoutes } from './household-routes.js';
 import { listMembershipsForUser } from './households.js';
+import { registerMemberRoutes } from './member-routes.js';
 
 export interface AppDeps {
   /** Browser origins allowed by CORS. Native Android requests send no Origin and are unaffected. */
@@ -79,6 +80,7 @@ export function createApp(deps: AppDeps) {
   });
 
   const { loadUser } = registerHouseholdRoutes(app, auth, { getDb: deps.getDb, now });
+  registerMemberRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
 
   // Signed-in user and their households. Creates the user record on first sign-in.
   app.get('/me', auth, loadUser, async (c) => {

@@ -6,6 +6,8 @@ export interface UserDoc {
   clerkUserId: string;
   /** Lower-cased primary email from the session token, if available. */
   email: string | null;
+  /** Display name from the session token, if the `name` claim is configured. */
+  displayName?: string | null;
   lastHouseholdId: ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,12 +27,13 @@ export async function ensureUserIndexes(db: Db): Promise<void> {
  */
 export async function upsertUserFromAuth(
   db: Db,
-  input: { clerkUserId: string; email: string | null },
+  input: { clerkUserId: string; email: string | null; name?: string | null },
   now: Date = new Date(),
 ): Promise<UserDoc> {
   const set: Partial<UserDoc> = { lastSeenAt: now, updatedAt: now };
   // Never wipe a known email just because one token lacked the claim.
   if (input.email) set.email = input.email;
+  if (input.name) set.displayName = input.name;
 
   const doc = await db.collection<UserDoc>(USERS).findOneAndUpdate(
     { clerkUserId: input.clerkUserId },

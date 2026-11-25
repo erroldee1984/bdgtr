@@ -18,6 +18,7 @@ export function createClerkVerifier(jwtKeyPem: string): VerifyToken {
       sid: typeof payload.sid === 'string' ? payload.sid : undefined,
       azp: typeof payload.azp === 'string' ? payload.azp : undefined,
       email: (payload as Record<string, unknown>).email,
+      name: (payload as Record<string, unknown>).name,
     };
   };
 }

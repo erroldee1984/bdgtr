@@ -50,9 +50,9 @@ function toHousehold(h: HouseholdDoc, m: MembershipDoc): Household {
 /** Loads (or on first contact creates) the signed-in user's record. Needs requireAuth first. */
 export function loadUser(deps: Deps): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const { userId, email } = c.get('auth');
+    const { userId, email, name } = c.get('auth');
     const db = await deps.getDb();
-    c.set('user', await upsertUserFromAuth(db, { clerkUserId: userId, email }, deps.now()));
+    c.set('user', await upsertUserFromAuth(db, { clerkUserId: userId, email, name }, deps.now()));
     await next();
   };
 }
