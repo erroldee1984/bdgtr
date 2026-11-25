@@ -72,11 +72,14 @@ const CLOUDFLARE_CHALLENGES = 'https://challenges.cloudflare.com'; // Clerk bot 
 // it, Clerk can't assess the browser and rejects new sign-ups as "suspicious"
 // (sign_up.rejected / action_blocked), which happened on the first production sign-up.
 const CLERK_PROTECT = 'https://cdn.protect.clerk.com';
+// ...and the loaded script then probes per-instance hosts under client.protect.clerk.com
+// on several ports (443, 992, 2082, 8443, 18443 seen), so allow that one host family, any port.
+const CLERK_PROTECT_PROBES = 'https://*.client.protect.clerk.com:*';
 const scriptExtra = [];
 const frameSrc = [];
 const imgExtra = [];
 if (clerkOrigin) {
-  connectSrc.push(clerkOrigin, CLERK_PROTECT);
+  connectSrc.push(clerkOrigin, CLERK_PROTECT, CLERK_PROTECT_PROBES);
   scriptExtra.push(clerkOrigin, CLOUDFLARE_CHALLENGES, CLERK_PROTECT);
   frameSrc.push(CLOUDFLARE_CHALLENGES);
   imgExtra.push('https://img.clerk.com'); // profile pictures
