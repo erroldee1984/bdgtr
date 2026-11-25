@@ -8,3 +8,4 @@ export * from './members.ts';
 export * from './categories.ts';
 export * from './transactions.ts';
 export * from './dashboard.ts';
+export * from './alerts.ts';

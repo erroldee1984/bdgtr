@@ -25,6 +25,8 @@ export interface MembershipDoc {
   updatedAt: Date;
   alertsMuted: boolean;
   dailyDigestEnabled: boolean;
+  /** Alerts created after this are unread for this member (null: none read yet). */
+  alertsLastReadAt?: Date | null;
 }
 
 export const HOUSEHOLDS = 'households';

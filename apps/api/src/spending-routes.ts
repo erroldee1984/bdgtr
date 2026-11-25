@@ -1,4 +1,6 @@
 import {
+  type AlertsResponse,
+  type CreateTransactionResponse,
   buildDashboard,
   can,
   type CategoriesResponse,
@@ -33,6 +35,7 @@ import {
   toCategory,
   updateCategory,
 } from './categories.js';
+import { countUnread, listAlerts, markAlertsRead, readCutoff, recordCrossings, toAlert } from './alerts.js';
 import { type AppVariables, requireHousehold } from './household-routes.js';
 import {
   createTransaction,
@@ -162,16 +165,25 @@ export function registerSpendingRoutes(
     const me = c.get('user')._id;
     const now = deps.now();
 
-    // A retry of a save that already went through: return the original, change nothing.
+    // A retry of a save that already went through: return the original, change nothing
+    // (its alerts went out the first time).
     const existing = await db.collection<TransactionDoc>(TRANSACTIONS).findOne({ householdId, clientId: input.clientId });
-    if (existing) return c.json<TransactionResponse>({ transaction: toTransaction(existing, me) }, 200);
+    if (existing) return c.json<CreateTransactionResponse>({ transaction: toTransaction(existing, me), alerts: [] }, 200);
 
     if (isTooFarAhead(input.date, now)) return badDate(c);
     const problem = await categoryProblem(c, db, input.categoryId);
     if (problem) return problem;
 
     const { doc, created } = await createTransaction(db, householdId, input, me, now);
-    return c.json<TransactionResponse>({ transaction: toTransaction(doc, me) }, created ? 201 : 200);
+    if (!created) return c.json<CreateTransactionResponse>({ transaction: toTransaction(doc, me), alerts: [] }, 200);
+    // Thresholds crossed by this spend (docs/PLAN.md §6.3). Pushing them to every
+    // member's devices arrives in M2b-2/3; the person who entered it sees a toast now.
+    const alerts = await recordCrossings(db, c.get('household'), doc, now);
+    const cutoff = readCutoff(c.get('membership'));
+    return c.json<CreateTransactionResponse>(
+      { transaction: toTransaction(doc, me), alerts: alerts.map((a) => toAlert(a, cutoff, null)) },
+      201,
+    );
   });
 
   /** House Members may change only what they entered themselves (D1). */
@@ -211,6 +223,25 @@ export function registerSpendingRoutes(
     const { tx, res } = await editable(c, db, idParam(c, 'id'));
     if (res) return res;
     await deleteTransaction(db, c.get('household')._id, tx!._id);
+    return c.body(null, 204);
+  });
+
+  // --- Alerts (docs/PLAN.md §6.10) ---
+
+  app.get('/alerts', ...inHousehold('view'), async (c) => {
+    const month = monthParam(c, deps.now());
+    if (!month) return c.json({ error: 'invalid_month' }, 400);
+    const db = await deps.getDb();
+    const householdId = c.get('household')._id;
+    const cutoff = readCutoff(c.get('membership'));
+    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, month, cutoff), countUnread(db, householdId, cutoff)]);
+    return c.json<AlertsResponse>({ alerts, unreadCount });
+  });
+
+  // Marks every alert in this household read, for the caller only.
+  app.post('/alerts/read', ...inHousehold('view'), async (c) => {
+    const db = await deps.getDb();
+    await markAlertsRead(db, c.get('membership')._id, deps.now());
     return c.body(null, 204);
   });
 
