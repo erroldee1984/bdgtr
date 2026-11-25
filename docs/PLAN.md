@@ -551,6 +551,19 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 
 **Coverage targets:** shared ≥ 90%, API ≥ 80%.
 
+**Every bug gets a regression test (standing rule).** When testing finds a bug:
+1. First write a test that reproduces it through the same path the user took (e.g. render the real screens, not just a helper), and run it against the unfixed code to confirm it **fails**.
+2. Fix the bug; the test must now pass. Also add tests for the nearby edge cases the fix touches.
+3. Name the test after the user-visible symptom, add a `Regression:` comment saying what went wrong, and list it in the table below.
+
+| Found | Symptom | Regression tests |
+|---|---|---|
+| M1b | Dashboard kept the old monthly budget after it was changed under More → Household (each screen held its own copy of the household details) | `apps/mobile/src/household/__tests__/household-details-sync-test.tsx`, `use-active-household-test.tsx` |
+
+**Writing app (Jest) tests:**
+- Mocked hooks must return the **same** functions and objects on every render, like the real ones (Clerk's `useAuth`, `useFetchMe`). A new function per render makes effects refetch forever and the test hangs.
+- React Native Testing Library v14: `render`, `rerender` and `fireEvent.*` are async, so always `await` them. `rerender` needs a **new** element (`app()`), not the same object.
+
 | Area | Happy path | Negative |
 |---|---|---|
 | Transaction entry | valid ₱ spend saves; dashboard updates; draft restored after app restart | same `clientId` posted twice → one transaction (200, original returned); missing or malformed `clientId` → 400; amount ≤ 0 or non-numeric; more than 2 decimal places; removed category; date more than 1 year ahead; description over 500 characters; no token → 401 |

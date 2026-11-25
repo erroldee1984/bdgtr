@@ -1,4 +1,4 @@
-import type { MeResponse } from '@bdgtr/shared';
+import type { Household, MeResponse } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
@@ -25,7 +25,17 @@ interface HouseholdContextValue {
   refresh: (preferId?: string) => Promise<void>;
   /** Switches the shown household and remembers it on this device. */
   switchTo: (householdId: string) => void;
+  /**
+   * Household details (budget etc.) by household id, shared by every screen.
+   * One copy for the whole app, so a save on one screen shows everywhere
+   * (e.g. the dashboard budget after editing it under More → Household).
+   */
+  details: Readonly<Record<string, Household>>;
+  /** Stores fresh details (after a load or a save) for every screen to read. */
+  rememberDetails: (household: Household) => void;
 }
+
+const NO_DETAILS: Readonly<Record<string, Household>> = Object.freeze({});
 
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 
@@ -36,6 +46,10 @@ const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   const [loaded, setLoaded] = useState<State>({ status: 'idle' });
+  const [details, setDetails] = useState<{ forUser: string | null; byId: Record<string, Household> }>({
+    forUser: null,
+    byId: {},
+  });
 
   /** Fetches /me and picks the active household. Resolves to the new state; never throws. */
   const fetchState = useCallback(
@@ -81,6 +95,18 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     [userId],
   );
 
+  const rememberDetails = useCallback(
+    (household: Household) => {
+      if (!userId) return;
+      setDetails((d) => ({
+        forUser: userId,
+        // Another user's cached details are dropped, never mixed in.
+        byId: { ...(d.forUser === userId ? d.byId : {}), [household.id]: household },
+      }));
+    },
+    [userId],
+  );
+
   const value = useMemo<HouseholdContextValue>(() => {
     // Results belong to the user they were loaded for: after a sign-out/sign-in as
     // someone else, the previous person's households are never shown, even briefly.
@@ -97,8 +123,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       active: memberships.find((m) => m.householdId === activeId) ?? null,
       refresh: load,
       switchTo,
+      details: isSignedIn && details.forUser === userId ? details.byId : NO_DETAILS,
+      rememberDetails,
     };
-  }, [isSignedIn, loaded, userId, load, switchTo]);
+  }, [isSignedIn, loaded, userId, load, switchTo, details, rememberDetails]);
 
   return <HouseholdContext.Provider value={value}>{children}</HouseholdContext.Provider>;
 }
