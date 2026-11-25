@@ -44,6 +44,14 @@ jest.mock('@/lib/api', () => {
       return { ...mockServer };
     },
     deleteHousehold: async () => {},
+    // The dashboard reads its budget from /dashboard, which follows the saved household.
+    fetchDashboard: async () => ({
+      month: '2026-11',
+      totalBudgetMinor: mockServer.defaultMonthlyBudgetMinor,
+      spentMinor: 0,
+      remainingMinor: mockServer.defaultMonthlyBudgetMinor,
+      categories: [],
+    }),
     // Members & invites sections on the same screen (tested in members-invites-test.tsx).
     fetchMembers: async () => [],
     fetchInvites: async () => [],
@@ -80,7 +88,7 @@ function renderApp() {
 describe('household details stay in sync across screens', () => {
   it('dashboard shows the new budget after saving it on the Household screen', async () => {
     await renderApp();
-    await waitFor(() => expect(screen.getByLabelText('Default monthly budget ₱40,000.00')).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('Total budget ₱40,000.00')).toBeTruthy());
 
     await act(async () => router.push('/household'));
     const field = await screen.findByDisplayValue('40000.00');
@@ -90,13 +98,13 @@ describe('household details stay in sync across screens', () => {
     expect(mockUpdate).toHaveBeenCalledWith({ name: 'Dela Cruz', defaultMonthlyBudgetMinor: 5_500_000 });
 
     await act(async () => router.back());
-    await waitFor(() => expect(screen.getByLabelText('Default monthly budget ₱55,000.00')).toBeTruthy());
-    expect(screen.queryByLabelText('Default monthly budget ₱40,000.00')).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText('Total budget ₱55,000.00')).toBeTruthy());
+    expect(screen.queryByLabelText('Total budget ₱40,000.00')).toBeNull();
   });
 
   it('a rejected (invalid) budget is not saved and the dashboard keeps the old one', async () => {
     await renderApp();
-    await waitFor(() => expect(screen.getByLabelText('Default monthly budget ₱40,000.00')).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('Total budget ₱40,000.00')).toBeTruthy());
 
     await act(async () => router.push('/household'));
     await fireEvent.changeText(await screen.findByDisplayValue('40000.00'), 'abc');
@@ -105,6 +113,6 @@ describe('household details stay in sync across screens', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
 
     await act(async () => router.back());
-    expect(screen.getByLabelText('Default monthly budget ₱40,000.00')).toBeTruthy();
+    expect(screen.getByLabelText('Total budget ₱40,000.00')).toBeTruthy();
   });
 });

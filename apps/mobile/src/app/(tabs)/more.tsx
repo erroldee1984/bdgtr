@@ -7,9 +7,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
+import { SetupCheck } from '@/components/setup-check';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
-const SECTIONS = ['Budgets', 'Categories', 'Fixed transactions', 'Settings'] as const;
+const SECTIONS = ['Budgets', 'Fixed transactions', 'Settings'] as const;
 
 export default function MoreScreen() {
   const { signOut } = useClerk();
@@ -29,6 +30,21 @@ export default function MoreScreen() {
           <AppText variant="bodyStrong">Household & members</AppText>
           <AppText variant="caption" tone="secondary">
             Name, budget, members and invites
+          </AppText>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
+      </Pressable>
+      <Pressable
+        role="link"
+        accessibilityLabel="Categories"
+        onPress={() => router.push('/categories')}
+        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+      >
+        <MaterialCommunityIcons name="shape-outline" size={24} color={colors.primaryLight} aria-hidden />
+        <View style={styles.flex}>
+          <AppText variant="bodyStrong">Categories</AppText>
+          <AppText variant="caption" tone="secondary">
+            Names, icons, colours and default budgets
           </AppText>
         </View>
         <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
@@ -68,6 +84,7 @@ export default function MoreScreen() {
           Couldn&apos;t sign out. Check your connection and try again.
         </AppText>
       ) : null}
+      <SetupCheck />
     </Screen>
   );
 }

@@ -1,4 +1,12 @@
 import {
+  addStarterCategories,
+  createCategory,
+  createTransaction,
+  fetchCategories,
+  fetchDashboard,
+  removeCategory,
+  restoreCategory,
+  updateCategory,
   acceptInvite,
   ApiError,
   apiFetch,
@@ -214,5 +222,60 @@ describe('member and invite calls', () => {
   it('rejects a created invite without a valid token (contract check)', async () => {
     serve(201, { invite: INVITE, token: 'short' });
     await expect(createInvite(tok, HID, { email: 'ben@example.com', role: 'member' })).rejects.toThrow();
+  });
+});
+
+describe('category, spend and dashboard calls', () => {
+  const HID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  const CID = 'cccccccccccccccccccccccc';
+  const CAT = { id: CID, name: 'Food', icon: 'food', colour: '#FFB547', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0 };
+  const TX = {
+    id: 'dddddddddddddddddddddddd', clientId: '0b7c6b8e-2f4e-4c8a-9d1e-3a5b7c9d1e2f', date: '2026-11-25', yearMonth: '2026-11',
+    categoryId: CID, amountMinor: 100, description: null, createdBy: 'eeeeeeeeeeeeeeeeeeeeeeee', isYours: true,
+  };
+  const DASH = { month: '2026-11', totalBudgetMinor: 0, spentMinor: 0, remainingMinor: 0, categories: [] };
+  const tok = async () => 't';
+  let fetchSpy: jest.SpyInstance;
+  const last = () => {
+    const [url, init] = fetchSpy.mock.calls.at(-1) as [string, RequestInit];
+    return { url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(init.body as string) : undefined };
+  };
+  const serve = (status: number, body?: unknown) =>
+    fetchSpy.mockImplementation(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }));
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+  afterEach(() => fetchSpy.mockRestore());
+
+  const NEW = { name: 'Food', icon: 'food', colour: '#FFB547', defaultBudgetMinor: 0 } as const;
+  it.each([
+    ['fetchCategories', () => fetchCategories(tok, HID), 200, { categories: [CAT] }, 'GET', '/categories', undefined],
+    ['createCategory', () => createCategory(tok, HID, NEW), 201, { category: CAT }, 'POST', '/categories', NEW],
+    ['updateCategory', () => updateCategory(tok, HID, CID, { name: 'Meals' }), 200, { category: CAT }, 'PATCH', `/categories/${CID}`, { name: 'Meals' }],
+    ['removeCategory', () => removeCategory(tok, HID, CID), 204, undefined, 'DELETE', `/categories/${CID}`, undefined],
+    ['restoreCategory', () => restoreCategory(tok, HID, CID), 204, undefined, 'POST', `/categories/${CID}/restore`, undefined],
+    ['addStarterCategories', () => addStarterCategories(tok, HID), 201, { categories: [CAT] }, 'POST', '/categories/starter', undefined],
+    ['createTransaction', () => createTransaction(tok, HID, { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }), 201, { transaction: TX }, 'POST', '/transactions', { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }],
+    ['fetchDashboard (this month)', () => fetchDashboard(tok, HID), 200, DASH, 'GET', '/dashboard', undefined],
+    ['fetchDashboard (a month)', () => fetchDashboard(tok, HID, '2026-10'), 200, DASH, 'GET', '/dashboard?month=2026-10', undefined],
+  ] as const)('%s → %s %s for that household', async (_name, run, status, response, method, path, body) => {
+    serve(status, response);
+    await run();
+    expect(last()).toMatchObject({ url: `${API_URL}${path}`, method, body });
+    expect(last().headers).toMatchObject({ 'X-Household-Id': HID, Authorization: 'Bearer t' });
+  });
+
+  it.each([
+    [409, 'category_removed'],
+    [404, 'category_not_found'],
+    [403, 'forbidden'],
+  ])('a refused spend (%i %s) becomes an ApiError with that code', async (status, code) => {
+    serve(status, { error: code });
+    await expect(createTransaction(tok, HID, { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 1 })).rejects.toMatchObject({ status, code });
+  });
+
+  it('rejects a dashboard that does not match the contract', async () => {
+    serve(200, { ...DASH, spentMinor: -1 });
+    await expect(fetchDashboard(tok, HID)).rejects.toThrow();
   });
 });

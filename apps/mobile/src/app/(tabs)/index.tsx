@@ -1,115 +1,95 @@
-import { formatPHP, ROLE_LABELS } from '@bdgtr/shared';
+import { formatPHP } from '@bdgtr/shared';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { router } from 'expo-router';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { AccountStatus } from '@/components/account-status';
 import { AppText } from '@/components/app-text';
+import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
+import { SpendChart } from '@/dashboard/spend-chart';
+import { greetingName, monthLabel } from '@/dashboard/format';
+import { useDashboard } from '@/dashboard/use-dashboard';
 import { useHousehold } from '@/household/household-context';
 import { HouseholdSwitcher } from '@/household/household-switcher';
-import { useActiveHouseholdDetails } from '@/household/use-active-household';
-import { type ApiStatus, checkApiHealthWithRetry } from '@/lib/api-health';
-import { useHydrated } from '@/layout/use-hydrated';
-import { usesNavRail, windowClassFor } from '@/layout/window-class';
-import { API_URL } from '@/lib/config';
-import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
+import { colors, radius, spacing } from '@/theme/tokens';
 
-const STATUS_COPY: Record<ApiStatus | 'checking', { text: string; icon: 'check-circle' | 'alert-circle' | 'progress-clock'; tone: 'success' | 'danger' | 'secondary' }> = {
-  checking: { text: 'Checking connection…', icon: 'progress-clock', tone: 'secondary' },
-  connected: { text: 'Connected to the bdgtr server', icon: 'check-circle', tone: 'success' },
-  unreachable: { text: "Can't reach the bdgtr server", icon: 'alert-circle', tone: 'danger' },
-  unexpected_response: { text: 'The server answered unexpectedly', icon: 'alert-circle', tone: 'danger' },
-};
-
+/** Dashboard (docs/PLAN.md §6.2). */
 export default function DashboardScreen() {
-  const { active } = useHousehold();
-  const { household } = useActiveHouseholdDetails();
-  const [status, setStatus] = useState<ApiStatus | 'checking'>('checking');
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    void checkApiHealthWithRetry(API_URL).then((result) => {
-      if (active) setStatus(result); // ignore results after unmount / a newer retry
-    });
-    return () => {
-      active = false;
-    };
-  }, [attempt]);
-
-  const check = useCallback(() => {
-    setStatus('checking');
-    setAttempt((n) => n + 1);
-  }, []);
-
-  // Live screen size: helps confirm the layout on foldables (updates on fold/unfold).
-  const { width, height } = useWindowDimensions();
-  const windowClass = windowClassFor(width);
-  const hydrated = useHydrated(); // size isn't known in the pre-built web HTML
-
-  const copy = STATUS_COPY[status];
-  const iconColor =
-    copy.tone === 'success' ? colors.success : copy.tone === 'danger' ? colors.danger : colors.textSecondary;
+  const { active, state } = useHousehold();
+  const { dashboard, error, reload } = useDashboard();
+  const name = greetingName(state.status === 'ready' ? state.me.user.name : null);
 
   return (
     <Screen
-      title={active?.householdName ?? 'Home'}
-      subtitle={active ? `${ROLE_LABELS[active.role]} · Your dashboard arrives in milestone M2.` : undefined}
+      title={name ? `Hi, ${name}` : 'Hi there'}
+      subtitle={[active?.householdName, dashboard ? monthLabel(dashboard.month) : null].filter(Boolean).join(' · ')}
     >
       <HouseholdSwitcher />
-      <Card>
-        <AppText variant="caption" tone="secondary">
-          Default monthly budget
-        </AppText>
-        <AppText variant="headline" accessibilityLabel={household ? `Default monthly budget ${formatPHP(household.defaultMonthlyBudgetMinor)}` : 'Loading budget'}>
-          {household ? formatPHP(household.defaultMonthlyBudgetMinor) : '…'}
-        </AppText>
-      </Card>
-      <Card>
-        <AppText variant="title">Setup check</AppText>
-        <AccountStatus />
-        {/* Icon + text, never colour alone (WCAG 1.4.1). Announced when it changes (4.1.3). */}
-        <View style={styles.statusRow} aria-live="polite">
-          <MaterialCommunityIcons name={copy.icon} size={22} color={iconColor} aria-hidden />
-          <AppText variant="bodyStrong" tone={copy.tone}>
-            {copy.text}
-          </AppText>
-        </View>
-        <AppText variant="caption" tone="secondary" selectable>
-          {API_URL}
-        </AppText>
-        {hydrated ? (
-          <AppText variant="caption" tone="secondary">
-            {`Screen ${Math.round(width)} × ${Math.round(height)} dp · ${windowClass} layout · ${usesNavRail(windowClass) ? 'side menu' : 'bottom bar'}`}
-          </AppText>
-        ) : null}
-        {status !== 'checking' && status !== 'connected' ? (
-          <Pressable
-            role="button"
-            onPress={check}
-            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.75 }]}
-          >
-            <AppText variant="bodyStrong" style={{ color: colors.onPrimary }}>
-              Try again
+      {!dashboard ? (
+        error ? (
+          <Card>
+            <AppText tone="danger" role="alert">
+              Couldn&apos;t load this month&apos;s numbers.
             </AppText>
-          </Pressable>
-        ) : null}
-      </Card>
+            <Button label="Try again" compact onPress={() => void reload()} />
+          </Card>
+        ) : (
+          <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading this month" />
+        )
+      ) : (
+        <>
+          <Card>
+            <AppText variant="caption" tone="secondary">
+              Remaining this month
+            </AppText>
+            {dashboard.remainingMinor < 0 ? (
+              // Over budget: bold, red, an icon AND words (never colour alone).
+              <View style={styles.overRow} accessible accessibilityLabel={`Over budget by ${formatPHP(-dashboard.remainingMinor)}`}>
+                <MaterialCommunityIcons name="alert" size={28} color={colors.danger} aria-hidden />
+                <AppText variant="headline" tone="danger">{`Over by ${formatPHP(-dashboard.remainingMinor)}`}</AppText>
+              </View>
+            ) : (
+              <AppText variant="headline" accessibilityLabel={`Remaining ${formatPHP(dashboard.remainingMinor)}`}>
+                {formatPHP(dashboard.remainingMinor)}
+              </AppText>
+            )}
+            <View style={styles.tiles}>
+              <View style={styles.tile} accessible accessibilityLabel={`Total budget ${formatPHP(dashboard.totalBudgetMinor)}`}>
+                <MaterialCommunityIcons name="wallet-outline" size={20} color={colors.primaryLight} aria-hidden />
+                <AppText variant="caption" tone="secondary">
+                  Budget
+                </AppText>
+                <AppText variant="bodyStrong">{formatPHP(dashboard.totalBudgetMinor)}</AppText>
+              </View>
+              <View style={styles.tile} accessible accessibilityLabel={`Spent ${formatPHP(dashboard.spentMinor)}`}>
+                <MaterialCommunityIcons name="cash-minus" size={20} color={colors.primaryLight} aria-hidden />
+                <AppText variant="caption" tone="secondary">
+                  Spent
+                </AppText>
+                <AppText variant="bodyStrong">{formatPHP(dashboard.spentMinor)}</AppText>
+              </View>
+            </View>
+            <Button label="Add spend" variant="primary" icon="plus" onPress={() => router.push('/add')} />
+          </Card>
+          <Card>
+            <SpendChart categories={dashboard.categories} />
+          </Card>
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  retry: {
-    alignSelf: 'flex-start',
-    minHeight: MIN_TOUCH,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+  overRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  tiles: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginVertical: spacing.sm },
+  tile: {
+    flexGrow: 1,
+    flexBasis: 140,
+    gap: spacing.xs,
+    padding: spacing.md,
     borderRadius: radius.button,
-    backgroundColor: colors.primary,
-    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceRaised,
   },
 });

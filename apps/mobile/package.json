@@ -8,6 +8,7 @@
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
+    "@react-native-community/datetimepicker": "9.2.1",
     "expo": "~58.0.26",
     "expo-application": "~58.1.2",
     "expo-auth-session": "~58.0.19",
