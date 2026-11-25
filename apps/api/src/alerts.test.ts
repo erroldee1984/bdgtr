@@ -1,6 +1,7 @@
 import {
   AlertsResponseSchema,
   CategoriesResponseSchema,
+  CategoryResponseSchema,
   CreatedInviteResponseSchema,
   CreateTransactionResponseSchema,
   HouseholdResponseSchema,
@@ -104,12 +105,52 @@ describe('alerts from a new spend', () => {
     expect(list.alerts[0]).toMatchObject({ level: 'near', triggeredBy: 'Mia Santos', unread: true });
   });
 
-  it('then crossing 100% → "over"; neither fires again this month', async () => {
+  it('then crossing 100% → "over"; "near" never repeats', async () => {
     const { h, groceries } = await setup();
     await spend('mem', h, groceries, 95_000); // near
-    expect((await spend('mem', h, groceries, 10_000)).alerts.map((a) => a.level)).toEqual(['over']);
-    expect((await spend('mem', h, groceries, 50_000)).alerts).toEqual([]);
-    expect((await alertsOf('owner', h)).alerts.map((a) => a.level)).toEqual(['over', 'near']); // newest first
+    expect((await spend('mem', h, groceries, 10_000)).alerts.map((a) => [a.level, a.title])).toEqual([['over', 'Over budget · Groceries']]);
+    expect((await alertsOf('owner', h)).alerts.filter((a) => a.level === 'near')).toHaveLength(1);
+  });
+
+  it('a category already over: every further spend in it sends "Still over budget" with the new amount', async () => {
+    const { h, groceries } = await setup();
+    await spend('mem', h, groceries, 110_000); // over by ₱100
+    const second = await spend('owner', h, groceries, 25_000);
+    expect(second.alerts.map((a) => [a.title, a.body])).toEqual([
+      ['Still over budget · Groceries', 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱350'],
+    ]);
+    const third = await spend('mem', h, groceries, 50);
+    expect(third.alerts.map((a) => a.body)).toEqual(['Dela Cruz household is over its ₱1,000 Groceries budget by ₱350.50']);
+    const list = (await alertsOf('owner', h)).alerts;
+    expect(list.map((a) => a.title)).toEqual(['Still over budget · Groceries', 'Still over budget · Groceries', 'Over budget · Groceries']);
+    expect(list[0]!.triggeredBy).toBe('Mia Santos');
+  });
+
+  it('the household total stays once a month, even while it is over', async () => {
+    const { h, groceries } = await setup(100_000, 0); // ₱1,000 total, Groceries has no budget
+    expect((await spend('owner', h, groceries, 120_000)).alerts.map((a) => [a.level, a.categoryId])).toEqual([['over', null]]);
+    expect((await spend('owner', h, groceries, 5_000)).alerts).toEqual([]);
+  });
+
+  it('a spend in another category does not repeat the over-budget category', async () => {
+    const { h, groceries } = await setup();
+    await spend('owner', h, groceries, 120_000);
+    const res = await call('owner', 'POST', '/categories', { householdId: h, body: { name: 'Transport', icon: 'car', colour: '#5A94FF', defaultBudgetMinor: 0 } });
+    const transport = CategoryResponseSchema.parse(await res.json()).category.id;
+    expect((await spend('owner', h, transport, 5_000)).alerts).toEqual([]);
+  });
+
+  it('simultaneous spends pushing a category over: one "Over budget", the rest "Still over", none lost', async () => {
+    const { h, groceries } = await setup();
+    await spend('owner', h, groceries, 95_000);
+    const results = await Promise.all(
+      [1, 2, 3].map(() =>
+        call('mem', 'POST', '/transactions', { householdId: h, body: { clientId: crypto.randomUUID(), date: '2026-11-25', categoryId: groceries, amountMinor: 10_000 } }),
+      ),
+    );
+    expect(results.every((r) => r.status === 201)).toBe(true);
+    expect(await db.collection(ALERTS).countDocuments({ scope: groceries, level: 'over', repeat: false })).toBe(1);
+    expect(await db.collection(ALERTS).countDocuments({ scope: groceries, level: 'over' })).toBeGreaterThanOrEqual(1);
   });
 
   it('one spend can cross the category and the household total together', async () => {
@@ -238,6 +279,27 @@ describe('unread alerts (per member)', () => {
     expect(late.alerts).toHaveLength(1); // still visible
     expect(late.unreadCount).toBe(0);
     expect(late.alerts[0]!.unread).toBe(false);
+  });
+});
+
+describe('upgrading the alerts index from the first version', () => {
+  it('existing alerts are kept and marked as firsts, the old index is replaced, and it can run again', async () => {
+    const coll = db.collection(ALERTS);
+    await coll.dropIndexes().catch(() => {});
+    await coll.createIndex({ householdId: 1, yearMonth: 1, scope: 1, level: 1 }, { unique: true, name: 'one_per_crossing' });
+    await coll.insertOne({ householdId: 'h', yearMonth: '2026-11', scope: 'total', level: 'over', createdAt: new Date() });
+    await ensureAlertIndexes(db);
+    await ensureAlertIndexes(db); // a second start-up is fine
+    const names = (await coll.indexes()).map((i) => i.name);
+    expect(names).toContain('first_per_crossing');
+    expect(names).not.toContain('one_per_crossing');
+    expect(await coll.findOne({ householdId: 'h' })).toMatchObject({ repeat: false });
+    // Firsts are still unique...
+    await expect(coll.insertOne({ householdId: 'h', yearMonth: '2026-11', scope: 'total', level: 'over', repeat: false })).rejects.toThrow(/duplicate key/);
+    // ...repeats are not.
+    await coll.insertOne({ householdId: 'h', yearMonth: '2026-11', scope: 'total', level: 'over', repeat: true });
+    await coll.insertOne({ householdId: 'h', yearMonth: '2026-11', scope: 'total', level: 'over', repeat: true });
+    expect(await coll.countDocuments({ householdId: 'h' })).toBe(3);
   });
 });
 
