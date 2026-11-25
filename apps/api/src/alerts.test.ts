@@ -111,7 +111,7 @@ describe('alerts from a new spend', () => {
     expect((await spend('mem', h, groceries, 10_000)).alerts.map((a) => [a.level, a.title])).toEqual([['over', 'Over budget · Groceries']]);
   });
 
-  it('a category at 90–100%: every further spend in it sends "near" again, same wording, updated percentage', async () => {
+  it('a category at 90–100%: every further spend in it sends "near" again, same title, updated percentage', async () => {
     const { h, groceries } = await setup();
     await spend('mem', h, groceries, 92_000);
     const again = await spend('owner', h, groceries, 3_000);
@@ -120,17 +120,17 @@ describe('alerts from a new spend', () => {
     ]);
     expect((await alertsOf('owner', h)).alerts.map((a) => a.level)).toEqual(['near', 'near']);
   });
-  it('a category already over: every further spend in it sends "over" again, same wording, new amount', async () => {
+  it('a category already over: every further spend in it sends "Still over budget" with the new amount', async () => {
     const { h, groceries } = await setup();
     await spend('mem', h, groceries, 110_000); // over by ₱100
     const second = await spend('owner', h, groceries, 25_000);
     expect(second.alerts.map((a) => [a.title, a.body])).toEqual([
-      ['Over budget · Groceries', 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱350'],
+      ['Still over budget · Groceries', 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱350'],
     ]);
     const third = await spend('mem', h, groceries, 50);
     expect(third.alerts.map((a) => a.body)).toEqual(['Dela Cruz household is over its ₱1,000 Groceries budget by ₱350.50']);
     const list = (await alertsOf('owner', h)).alerts;
-    expect(list.map((a) => a.title)).toEqual(['Over budget · Groceries', 'Over budget · Groceries', 'Over budget · Groceries']);
+    expect(list.map((a) => a.title)).toEqual(['Still over budget · Groceries', 'Still over budget · Groceries', 'Over budget · Groceries']);
     expect(list[0]!.triggeredBy).toBe('Mia Santos');
   });
   it('the household total stays once a month, even while it is over', async () => {

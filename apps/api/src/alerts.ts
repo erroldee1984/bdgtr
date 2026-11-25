@@ -108,7 +108,7 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
       scope: c.scope,
       level,
       categoryId: c.categoryId,
-      ...formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after }),
+      ...formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after, repeat }),
       budgetMinor: c.budget,
       spentMinor: c.after,
       triggeredBy: tx.createdBy,
@@ -117,7 +117,8 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
       createdAt: now,
     });
     // A category at 90%+: every further spend in it sends its current alert again
-    // (same wording, updated numbers). The household total stays once a month per level.
+    // (updated numbers; a repeated "over" says "Still over budget"). The household
+    // total stays once a month per level.
     if (!(await insert(make(false))) && c.categoryId) await insert(make(true));
   }
   return created;

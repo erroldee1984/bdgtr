@@ -15,8 +15,8 @@ import { TransactionSchema } from './transactions.ts';
  * jumps past both sends only "over", and a ₱0 budget never fires.
  *
  * Category budgets: every new spend in a category at 90% or more sends that
- * category's current alert again ("near" or "over", same wording, updated
- * numbers). The household total stays once a month per level.
+ * category's current alert again with updated numbers; a repeated "over" is
+ * titled "Still over budget". The household total stays once a month per level.
  *
  * Judging the level reached (not "did this one spend cross the line") keeps
  * simultaneous spends from all missing a crossing: whichever save checks
@@ -68,12 +68,16 @@ export function formatAlert(input: {
   level: AlertLevel;
   budgetMinor: number;
   spentMinor: number;
+  /** A further spend in a category already at this level this month. */
+  repeat?: boolean;
 }): { title: string; body: string } {
   const who = householdLabel(input.householdName);
   const budget = input.categoryName ? `${pesos(input.budgetMinor)} ${input.categoryName} budget` : `${pesos(input.budgetMinor)} monthly budget`;
   if (input.level === 'over') {
     return {
-      title: input.categoryName ? `Over budget · ${input.categoryName}` : 'Over the monthly budget',
+      title: input.categoryName
+        ? `${input.repeat ? 'Still over budget' : 'Over budget'} · ${input.categoryName}`
+        : 'Over the monthly budget',
       body: `${who} is over its ${budget} by ${pesos(input.spentMinor - input.budgetMinor)}`,
     };
   }
