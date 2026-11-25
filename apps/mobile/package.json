@@ -4,16 +4,22 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@bdgtr/shared": "workspace:*",
+    "@clerk/expo": "^4.17.4",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
     "expo": "~58.0.26",
+    "expo-application": "~58.1.2",
+    "expo-auth-session": "~58.0.19",
     "expo-constants": "~58.0.16",
+    "expo-crypto": "~58.0.8",
+    "expo-dev-client": "~58.0.21",
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.12",
     "expo-image": "~58.0.18",
     "expo-linking": "~58.0.17",
     "expo-router": "~58.0.32",
+    "expo-secure-store": "~58.0.3",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
     "expo-system-ui": "~58.0.7",
@@ -26,7 +32,8 @@
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",
     "react-native-web": "~0.21.4",
-    "react-native-worklets": "0.13.0"
+    "react-native-worklets": "0.13.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@testing-library/react-native": "^14.1.0",
@@ -47,7 +54,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "dev:web": "expo start --web",
-    "dev:phone": "expo start --tunnel"
+    "dev:phone": "node ../../scripts/dev-phone.mjs"
   },
   "private": true,
   "description": "bdgtr app for Android and web (Expo / React Native)",

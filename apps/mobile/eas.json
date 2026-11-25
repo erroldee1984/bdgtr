@@ -8,6 +8,14 @@
       "node": "26.13.1",
       "pnpm": "12.21.0"
     },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "preview": {
       "extends": "base",
       "distribution": "internal",
@@ -15,7 +23,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com"
+        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA"
       }
     },
     "production": {
@@ -25,7 +34,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com"
+        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA"
       }
     }
   }

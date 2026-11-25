@@ -1,0 +1,11 @@
+# gitleaks configuration (used by the "Secret scan" CI job).
+# Start from gitleaks' default rules, then allow ONLY values that are public by design.
+# Uses the [allowlist] form, which every gitleaks 8.x version understands.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Clerk publishable keys (pk_test_/pk_live_) are public by design: they ship inside every app build. Clerk SECRET keys (sk_...) are still detected."
+regexTarget = "match"
+regexes = ['''pk_(test|live)_[A-Za-z0-9+/=_-]{10,}''']

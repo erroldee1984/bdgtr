@@ -34,6 +34,15 @@ const EnvSchema = z.object({
       ),
     ),
   PORT: z.coerce.number().int().min(1).max(65535).default(8787),
+  // Clerk instance JWT public key (PEM). PUBLIC, not a secret. Optional so health
+  // checks work before sign-in is configured; signed-in routes answer 503 without it.
+  CLERK_JWT_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined))
+    .refine((v) => v === undefined || /-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----/.test(v.replace(/\\n/g, '\n')), {
+      message: 'CLERK_JWT_KEY must be the PEM public key from Clerk (-----BEGIN PUBLIC KEY----- …)',
+    }),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -39,7 +39,7 @@ The app needs no env file in development: it picks the right API on its own
 |---|---|
 | `pnpm dev:api` | Starts the API on http://localhost:8787 (reloads on change) |
 | `pnpm dev:web` | The app in your browser at http://localhost:8081, using the local API (run `pnpm dev:api` too) |
-| `pnpm dev:phone` | The app on your phone in **Expo Go**, using the live API. Scan the QR code |
+| `pnpm dev:phone` | The app on your phone (development build) against the local API via a tunnel. Scan the QR code |
 | `pnpm check` | Typecheck + lint + all unit tests (same as CI) |
 | `pnpm test` | Unit tests only |
 | `pnpm build:web` | Static website into `apps/mobile/dist` (plus Cloudflare `_headers`) |
@@ -56,10 +56,20 @@ device toolbar (Ctrl+Shift+M), choose "Responsive" and enter:
 | Fold 6 unfolded, portrait | 707 × 760 |
 | Fold 6 unfolded, landscape | 823 × 680 |
 
-**Phone (Expo Go):** install Expo Go from the Play Store, run `pnpm dev:phone`
-(first time: `npx eas-cli@latest login`), and scan the QR code with Expo Go. Saved
-changes reload on the phone. The tunnel goes through Expo's servers, so it works
-even though WSL isn't reachable from your Wi-Fi.
+**Phone (development build):** `pnpm dev:phone`, then scan the QR code with the
+**bdgtr (development)** app on your phone. It starts the local API (development
+database and Clerk development sign-in), opens a temporary Cloudflare tunnel so the
+phone can reach it, and starts Expo with its own tunnel. Saved changes reload on the phone.
+
+We use a development build rather than Expo Go: it's "your own Expo Go" containing
+exactly this app's native modules (sign-in needs some, and Android push notifications
+don't work in Expo Go at all). Build it once, and again only when a native library is added:
+`npx eas-cli@latest build -p android --profile development`
+
+One-time setup for `pnpm dev:phone`:
+- `npx eas-cli@latest login` (Expo's tunnel uses your Expo account)
+- install [cloudflared](https://github.com/cloudflare/cloudflared/releases) into `~/.local/bin`
+  (no Cloudflare account needed for quick tunnels)
 
 Cloud APK builds (`npx eas-cli@latest build -p android --profile preview`) are only
 needed when a library with its own native Android code is added, or to share the app.

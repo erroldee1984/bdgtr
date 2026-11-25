@@ -6,6 +6,8 @@ import { existsSync } from 'node:fs';
 
 import { serve } from '@hono/node-server';
 
+import { getAppDb } from './app-db.js';
+import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
 import { closeDb, pingDb } from './db.js';
 import { EnvError, loadEnv } from './env.js';
@@ -23,11 +25,15 @@ try {
   throw err;
 }
 
-const { MONGODB_URI, MONGODB_DB, ALLOWED_ORIGINS, PORT } = env;
+const { MONGODB_URI, MONGODB_DB, ALLOWED_ORIGINS, PORT, CLERK_JWT_KEY } = env;
 const app = createApp({
   allowedOrigins: ALLOWED_ORIGINS,
   pingDb: () => pingDb(MONGODB_URI, MONGODB_DB),
+  getDb: () => getAppDb(MONGODB_URI, MONGODB_DB),
+  verifyToken: CLERK_JWT_KEY ? createClerkVerifier(CLERK_JWT_KEY) : null,
 });
+if (!CLERK_JWT_KEY) console.warn('CLERK_JWT_KEY not set: signed-in routes will answer 503.');
+console.log(`Database: ${MONGODB_DB}`);
 
 const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`bdgtr-api listening on http://localhost:${info.port}`);
