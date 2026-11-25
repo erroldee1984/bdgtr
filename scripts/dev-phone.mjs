@@ -64,6 +64,12 @@ if (!cloudflared) {
   process.exit(1);
 }
 
+// 0. Shared package build (Expo's server rendering and the API load its compiled dist/)
+if (spawnSync('pnpm', ['--filter', '@bdgtr/shared', 'build'], { cwd: root, stdio: 'inherit' }).status !== 0) {
+  console.error('[dev-phone] Building @bdgtr/shared failed.');
+  process.exit(1);
+}
+
 // 1. Local API
 if (await apiIsUp()) {
   console.log(`[dev-phone] Using the API already running on :${API_PORT}`);
