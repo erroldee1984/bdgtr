@@ -9,6 +9,7 @@ import { RequireSignIn } from '@/components/require-sign-in';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
 import { type HouseholdFormErrors, validateHouseholdForm } from '@/household/household-form';
+import { goBackOrHome } from '@/layout/back-button';
 import { ApiError, createHousehold } from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
@@ -118,7 +119,7 @@ function CreateHousehold() {
             )}
           </Pressable>
           {isAdditional ? (
-            <Pressable role="button" onPress={() => router.back()} style={styles.secondary}>
+            <Pressable role="button" onPress={goBackOrHome} style={styles.secondary}>
               <AppText variant="bodyStrong" tone="accent">
                 Cancel
               </AppText>

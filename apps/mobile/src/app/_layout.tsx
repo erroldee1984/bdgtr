@@ -11,6 +11,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { HouseholdProvider } from '@/household/household-context';
+import { HeaderBackButton } from '@/layout/back-button';
 import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
 import { colors, spacing } from '@/theme/tokens';
 
@@ -57,15 +58,17 @@ export default function RootLayout() {
             <Stack.Screen name="sign-in" />
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="invite/[token]" />
-          <Stack.Screen
-            name="household"
-            options={{
-              headerShown: true,
-              title: 'Household',
-              headerStyle: { backgroundColor: colors.surface },
-              headerTintColor: colors.textPrimary,
-            }}
-          />
+            <Stack.Screen
+              name="household"
+              options={{
+                headerShown: true,
+                title: 'Household',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.textPrimary,
+                // Always a way back, even when the page was opened straight from its URL.
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
             <Stack.Screen
               name="add"
               options={{
@@ -74,6 +77,7 @@ export default function RootLayout() {
                 title: 'Add spend',
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.textPrimary,
+                headerLeft: () => <HeaderBackButton />,
               }}
             />
           </Stack>
