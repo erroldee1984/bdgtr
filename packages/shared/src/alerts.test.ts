@@ -68,11 +68,4 @@ describe('formatAlert (household-first wording, no descriptions)', () => {
       'Reyes Household is over its ₱1,000.50 Bills budget by ₱0.50',
     );
   });
-
-  it('a further spend in a category already over says "Still over budget", with the new amount', () => {
-    expect(formatAlert({ householdName: 'Dela Cruz', categoryName: 'Groceries', level: 'over', budgetMinor: 100_000, spentMinor: 135_000, repeat: true })).toEqual({
-      title: 'Still over budget · Groceries',
-      body: 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱350',
-    });
-  });
 });

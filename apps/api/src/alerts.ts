@@ -9,7 +9,7 @@ import { USERS, type UserDoc } from './users.js';
 
 /**
  * docs/PLAN.md §4: the first alert per household, month, scope and level is
- * unique; "repeat" ones (further spends in a category already over) aren't.
+ * unique; "repeat" ones (further spends in a category already at 90%+) aren't.
  */
 export interface AlertDoc {
   _id: ObjectId;
@@ -25,7 +25,7 @@ export interface AlertDoc {
   spentMinor: number;
   triggeredBy: ObjectId;
   transactionId: ObjectId;
-  /** True for a further "over" in a category already over this month. */
+  /** True for a further alert in a category already at that level this month. */
   repeat: boolean;
   createdAt: Date;
 }
@@ -101,13 +101,6 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
   for (const c of candidates) {
     const level = levelReached(c.after, c.budget);
     if (!level) continue;
-    // "Nearly there" after "over" this month would be confusing (e.g. after a delete brings it back down).
-    if (
-      level === 'near' &&
-      (await db.collection<AlertDoc>(ALERTS).countDocuments({ householdId: household._id, yearMonth: tx.yearMonth, scope: c.scope, level: 'over' })) > 0
-    ) {
-      continue;
-    }
     const make = (repeat: boolean): AlertDoc => ({
       _id: new ObjectId(),
       householdId: household._id,
@@ -115,7 +108,7 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
       scope: c.scope,
       level,
       categoryId: c.categoryId,
-      ...formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after, repeat }),
+      ...formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after }),
       budgetMinor: c.budget,
       spentMinor: c.after,
       triggeredBy: tx.createdBy,
@@ -123,8 +116,9 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
       repeat,
       createdAt: now,
     });
-    // A category already over: every further spend in it says so again (the total doesn't).
-    if (!(await insert(make(false))) && level === 'over' && c.categoryId) await insert(make(true));
+    // A category at 90%+: every further spend in it sends its current alert again
+    // (same wording, updated numbers). The household total stays once a month per level.
+    if (!(await insert(make(false))) && c.categoryId) await insert(make(true));
   }
   return created;
 }

@@ -105,27 +105,34 @@ describe('alerts from a new spend', () => {
     expect(list.alerts[0]).toMatchObject({ level: 'near', triggeredBy: 'Mia Santos', unread: true });
   });
 
-  it('then crossing 100% → "over"; "near" never repeats', async () => {
+  it('then crossing 100% → "over"', async () => {
     const { h, groceries } = await setup();
     await spend('mem', h, groceries, 95_000); // near
     expect((await spend('mem', h, groceries, 10_000)).alerts.map((a) => [a.level, a.title])).toEqual([['over', 'Over budget · Groceries']]);
-    expect((await alertsOf('owner', h)).alerts.filter((a) => a.level === 'near')).toHaveLength(1);
   });
 
-  it('a category already over: every further spend in it sends "Still over budget" with the new amount', async () => {
+  it('a category at 90–100%: every further spend in it sends "near" again, same wording, updated percentage', async () => {
+    const { h, groceries } = await setup();
+    await spend('mem', h, groceries, 92_000);
+    const again = await spend('owner', h, groceries, 3_000);
+    expect(again.alerts.map((a) => [a.level, a.title, a.body])).toEqual([
+      ['near', 'Nearly at budget · Groceries', 'Dela Cruz household has used 95% of its ₱1,000 Groceries budget'],
+    ]);
+    expect((await alertsOf('owner', h)).alerts.map((a) => a.level)).toEqual(['near', 'near']);
+  });
+  it('a category already over: every further spend in it sends "over" again, same wording, new amount', async () => {
     const { h, groceries } = await setup();
     await spend('mem', h, groceries, 110_000); // over by ₱100
     const second = await spend('owner', h, groceries, 25_000);
     expect(second.alerts.map((a) => [a.title, a.body])).toEqual([
-      ['Still over budget · Groceries', 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱350'],
+      ['Over budget · Groceries', 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱350'],
     ]);
     const third = await spend('mem', h, groceries, 50);
     expect(third.alerts.map((a) => a.body)).toEqual(['Dela Cruz household is over its ₱1,000 Groceries budget by ₱350.50']);
     const list = (await alertsOf('owner', h)).alerts;
-    expect(list.map((a) => a.title)).toEqual(['Still over budget · Groceries', 'Still over budget · Groceries', 'Over budget · Groceries']);
+    expect(list.map((a) => a.title)).toEqual(['Over budget · Groceries', 'Over budget · Groceries', 'Over budget · Groceries']);
     expect(list[0]!.triggeredBy).toBe('Mia Santos');
   });
-
   it('the household total stays once a month, even while it is over', async () => {
     const { h, groceries } = await setup(100_000, 0); // ₱1,000 total, Groceries has no budget
     expect((await spend('owner', h, groceries, 120_000)).alerts.map((a) => [a.level, a.categoryId])).toEqual([['over', null]]);
@@ -140,7 +147,7 @@ describe('alerts from a new spend', () => {
     expect((await spend('owner', h, transport, 5_000)).alerts).toEqual([]);
   });
 
-  it('simultaneous spends pushing a category over: one "Over budget", the rest "Still over", none lost', async () => {
+  it('simultaneous spends pushing a category over: exactly one first "over", the rest repeats, every save succeeds', async () => {
     const { h, groceries } = await setup();
     await spend('owner', h, groceries, 95_000);
     const results = await Promise.all(
@@ -152,7 +159,6 @@ describe('alerts from a new spend', () => {
     expect(await db.collection(ALERTS).countDocuments({ scope: groceries, level: 'over', repeat: false })).toBe(1);
     expect(await db.collection(ALERTS).countDocuments({ scope: groceries, level: 'over' })).toBeGreaterThanOrEqual(1);
   });
-
   it('one spend can cross the category and the household total together', async () => {
     const { h, groceries } = await setup(100_000, 100_000);
     const { alerts } = await spend('owner', h, groceries, 150_000);
@@ -168,16 +174,13 @@ describe('alerts from a new spend', () => {
     expect((await spend('owner', h, groceries, 120_000)).alerts.filter((a) => a.categoryId).map((a) => a.level)).toEqual(['over']);
   });
 
-  it('after "over", dropping back under 100% (a delete) and spending again does not send "near"', async () => {
+  it('after "over", dropping back to 90–100% (a delete) and spending again says "near" (its current state)', async () => {
     const { h, groceries } = await setup();
     const big = await spend('owner', h, groceries, 120_000); // over
     await call('owner', 'DELETE', `/transactions/${big.transaction.id}`, { householdId: h });
-    expect((await spend('owner', h, groceries, 95_000)).alerts.filter((a) => a.categoryId)).toEqual([]);
+    expect((await spend('owner', h, groceries, 95_000)).alerts.filter((a) => a.categoryId).map((a) => a.level)).toEqual(['near']);
   });
-
-  // Regression (found while building M2b): simultaneous spends that together crossed 90%
-  // each saw the others as "already there" and none fired. Now the level reached is judged.
-  it('simultaneous spends that only together reach 90% still send exactly one alert', async () => {
+  it('simultaneous spends that only together reach 90% still send an alert (never missed), with one first', async () => {
     const { h, groceries } = await setup();
     await spend('owner', h, groceries, 85_000);
     await Promise.all(
@@ -185,9 +188,8 @@ describe('alerts from a new spend', () => {
         call('mem', 'POST', '/transactions', { householdId: h, body: { clientId: crypto.randomUUID(), date: '2026-11-25', categoryId: groceries, amountMinor: 2_000 } }),
       ),
     );
-    expect(await db.collection(ALERTS).countDocuments({ level: 'near', scope: groceries })).toBe(1);
+    expect(await db.collection(ALERTS).countDocuments({ level: 'near', scope: groceries, repeat: false })).toBe(1);
   });
-
   it('a new month starts fresh', async () => {
     const { h, groceries } = await setup();
     await spend('owner', h, groceries, 95_000);
@@ -219,15 +221,15 @@ describe('alerts from a new spend', () => {
     expect(await db.collection(ALERTS).countDocuments()).toBe(1);
   });
 
-  it('deleting spending never fires, and re-adding past 90% does not repeat "near"', async () => {
+  it('deleting spending never fires; re-adding past 90% sends "near" again', async () => {
     const { h, groceries } = await setup();
     const { transaction } = await spend('owner', h, groceries, 95_000);
+    const before = await db.collection(ALERTS).countDocuments();
     expect((await call('owner', 'DELETE', `/transactions/${transaction.id}`, { householdId: h })).status).toBe(204);
-    expect((await spend('owner', h, groceries, 95_000)).alerts).toEqual([]);
-    expect(await db.collection(ALERTS).countDocuments()).toBe(1);
+    expect(await db.collection(ALERTS).countDocuments()).toBe(before);
+    expect((await spend('owner', h, groceries, 95_000)).alerts.map((a) => a.level)).toEqual(['near']);
   });
-
-  it('simultaneous spends crossing the same line create one alert', async () => {
+  it('simultaneous spends crossing the same line: one first alert, no errors', async () => {
     const { h, groceries } = await setup();
     await spend('owner', h, groceries, 85_000);
     const results = await Promise.all(
@@ -235,11 +237,9 @@ describe('alerts from a new spend', () => {
         call('mem', 'POST', '/transactions', { householdId: h, body: { clientId: crypto.randomUUID(), date: '2026-11-25', categoryId: groceries, amountMinor: 3_000 } }),
       ),
     );
-    const sent = (await Promise.all(results.map(async (r) => CreateTransactionResponseSchema.parse(await r.json()).alerts))).flat();
-    expect(sent.filter((a) => a.categoryId).length).toBeLessThanOrEqual(1);
-    expect(await db.collection(ALERTS).countDocuments({ level: 'near', scope: groceries })).toBe(1);
+    expect(results.every((r) => r.status === 201)).toBe(true);
+    expect(await db.collection(ALERTS).countDocuments({ level: 'near', scope: groceries, repeat: false })).toBe(1);
   });
-
   it('alert text never includes the spend description (it can show on a lock screen)', async () => {
     const { h, groceries } = await setup();
     const { alerts } = await spend('owner', h, groceries, 120_000);
