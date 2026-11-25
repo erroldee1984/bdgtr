@@ -5,3 +5,6 @@ export * from './me.ts';
 export * from './roles.ts';
 export * from './household.ts';
 export * from './members.ts';
+export * from './categories.ts';
+export * from './transactions.ts';
+export * from './dashboard.ts';
