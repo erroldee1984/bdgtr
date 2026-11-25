@@ -68,12 +68,16 @@ export function clerkFrontendApiOrigin(publishableKey) {
 
 const clerkOrigin = clerkFrontendApiOrigin(process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY);
 const CLOUDFLARE_CHALLENGES = 'https://challenges.cloudflare.com'; // Clerk bot protection (sign-up)
+// Clerk Protect (fraud/bot signals) loads its bootstrap script from here. If CSP blocks
+// it, Clerk can't assess the browser and rejects new sign-ups as "suspicious"
+// (sign_up.rejected / action_blocked), which happened on the first production sign-up.
+const CLERK_PROTECT = 'https://cdn.protect.clerk.com';
 const scriptExtra = [];
 const frameSrc = [];
 const imgExtra = [];
 if (clerkOrigin) {
-  connectSrc.push(clerkOrigin);
-  scriptExtra.push(clerkOrigin, CLOUDFLARE_CHALLENGES);
+  connectSrc.push(clerkOrigin, CLERK_PROTECT);
+  scriptExtra.push(clerkOrigin, CLOUDFLARE_CHALLENGES, CLERK_PROTECT);
   frameSrc.push(CLOUDFLARE_CHALLENGES);
   imgExtra.push('https://img.clerk.com'); // profile pictures
 } else if (process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY) {
