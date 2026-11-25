@@ -25,6 +25,23 @@ export function resolveApiUrl(envValue: string | undefined, platform: string): s
 
 export const API_URL: string = resolveApiUrl(process.env.EXPO_PUBLIC_API_URL, Platform.OS);
 
+export const PRODUCTION_WEB_URL = 'https://bdgtr.erroldee.com';
+
+/**
+ * Website address used in invite links. On the web it's wherever the app is
+ * running (so local testing makes local links); on Android it's the real
+ * website, which opens the app through App Links. EXPO_PUBLIC_WEB_URL overrides.
+ */
+export function resolveWebUrl(envValue: string | undefined, platform: string, browserOrigin: string | undefined): string {
+  const value = envValue?.trim() || (platform === 'web' && browserOrigin ? browserOrigin : PRODUCTION_WEB_URL);
+  return value.replace(/\/+$/, '');
+}
+
+export function webUrl(): string {
+  const origin = typeof window !== 'undefined' ? window.location?.origin : undefined;
+  return resolveWebUrl(process.env.EXPO_PUBLIC_WEB_URL, Platform.OS, origin);
+}
+
 /**
  * Clerk publishable key. PUBLIC by design (it's in every copy of the app).
  * - Development (`pnpm dev:web`, `pnpm dev:phone`): the Clerk *development*

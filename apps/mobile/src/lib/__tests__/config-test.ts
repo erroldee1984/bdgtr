@@ -1,4 +1,6 @@
 import {
+  PRODUCTION_WEB_URL,
+  resolveWebUrl,
   DEV_CLERK_PUBLISHABLE_KEY,
   LOCAL_API_URL,
   PRODUCTION_API_URL,
@@ -30,6 +32,21 @@ describe('resolveApiUrl', () => {
   });
 });
 
+
+describe('resolveWebUrl (invite links)', () => {
+  it('web uses the site it is running on (local testing makes local links)', () => {
+    expect(resolveWebUrl(undefined, 'web', 'http://localhost:8081')).toBe('http://localhost:8081');
+  });
+  it('Android uses the real website (App Links open the app from it)', () => {
+    expect(resolveWebUrl(undefined, 'android', undefined)).toBe(PRODUCTION_WEB_URL);
+  });
+  it('EXPO_PUBLIC_WEB_URL wins, without a trailing slash', () => {
+    expect(resolveWebUrl('https://staging.example.com/', 'web', 'http://localhost:8081')).toBe('https://staging.example.com');
+  });
+  it('web without a known origin falls back to the real website', () => {
+    expect(resolveWebUrl('  ', 'web', undefined)).toBe(PRODUCTION_WEB_URL);
+  });
+});
 
 describe('resolveClerkKey', () => {
   const LIVE = 'pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA';

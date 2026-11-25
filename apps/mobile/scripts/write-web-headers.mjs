@@ -4,6 +4,7 @@
  *  - _headers: security headers (docs/PLAN.md §10), with a Content-Security-Policy
  *    that allows ONLY the exact inline scripts Expo generated (by SHA-256 hash).
  *  - 404.html: copied from +not-found.html so unknown URLs get the app's 404 page.
+ *  - _redirects: serves the one pre-built invite page for every /invite/<token> link.
  *
  * Usage: node scripts/write-web-headers.mjs [distDir]
  * Reads EXPO_PUBLIC_API_URL to allow the API origin in connect-src.
@@ -121,9 +122,23 @@ const headers = `/*
 
 /sw.js
   Cache-Control: no-cache
+
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *
 `;
 
 writeFileSync(join(distDir, '_headers'), headers);
+
+// Dynamic routes are exported once as e.g. invite/[token].html; rewrite (200, not a
+// redirect, so the URL and its token stay) every matching link to that page.
+const rewrites = [];
+for (const file of htmlFiles(distDir)) {
+  const rel = file.slice(distDir.length).replace(/\\/g, '/').replace(/^\/?/, '/');
+  const m = /^(.*)\/\[[A-Za-z0-9_]+\]\.html$/.exec(rel);
+  if (m) rewrites.push(`${m[1]}/*  ${rel.replace(/\.html$/, '')}  200`);
+}
+writeFileSync(join(distDir, '_redirects'), rewrites.length ? `${rewrites.join('\n')}\n` : '');
 
 const notFound = join(distDir, '+not-found.html');
 if (existsSync(notFound)) copyFileSync(notFound, join(distDir, '404.html'));

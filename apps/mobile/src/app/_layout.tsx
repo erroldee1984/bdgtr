@@ -56,6 +56,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="sign-in" />
             <Stack.Screen name="onboarding" />
+            <Stack.Screen name="invite/[token]" />
           <Stack.Screen
             name="household"
             options={{
