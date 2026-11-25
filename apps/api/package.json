@@ -5,12 +5,12 @@
   "description": "bdgtr HTTP API (Hono). Holds all secrets; the apps never talk to MongoDB directly.",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
-    "test": "vitest run",
+    "dev": "pnpm --filter @bdgtr/shared build && tsx watch src/server.ts",
+    "start": "pnpm --filter @bdgtr/shared build && tsx src/server.ts",
+    "test": "pnpm --filter @bdgtr/shared build && vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify:deploy": "node scripts/verify-deploy-build.mjs"
+    "verify:deploy": "pnpm --filter @bdgtr/shared build && node scripts/verify-deploy-build.mjs"
   },
   "dependencies": {
     "@bdgtr/shared": "workspace:*",

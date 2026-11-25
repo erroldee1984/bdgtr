@@ -29,6 +29,26 @@ if (shadowing.length > 0) {
   process.exit(1);
 }
 
+// Vercel type-checks with looser settings than our tsconfig (strictNullChecks
+// off, seen in its build log), where some narrowing that passes locally fails
+// (e.g. on an { ok: true | false } union). Check that mode too.
+try {
+  execFileSync(
+    process.execPath,
+    [
+      join(apiDir, 'node_modules/typescript/bin/tsc'),
+      '-p', join(apiDir, 'tsconfig.json'),
+      '--noEmit',
+      '--strictNullChecks', 'false',
+      '--exactOptionalPropertyTypes', 'false',
+    ],
+    { stdio: 'inherit' },
+  );
+} catch {
+  console.error('verify-deploy-build: FAILED, the API does not type-check the way Vercel compiles it (strictNullChecks off).');
+  process.exit(1);
+}
+
 const outDir = mkdtempSync(join(tmpdir(), 'bdgtr-api-verify-'));
 
 try {

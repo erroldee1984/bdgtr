@@ -1,5 +1,12 @@
 import { useAuth } from '@clerk/expo';
-import { MeResponseSchema, type MeResponse } from '@bdgtr/shared';
+import {
+  type CreateHouseholdInput,
+  type Household,
+  HouseholdResponseSchema,
+  MeResponseSchema,
+  type MeResponse,
+  type UpdateHouseholdInput,
+} from '@bdgtr/shared';
 import { useCallback } from 'react';
 
 import { ApiError } from './api-error';
@@ -27,6 +34,7 @@ export async function apiFetch(
     ...init,
     headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` },
   });
+  if (res.status === 204) return null;
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const code = typeof body === 'object' && body && 'error' in body ? String(body.error) : 'request_failed';
@@ -43,4 +51,37 @@ export async function fetchMe(getToken: GetToken, fetchImpl: typeof fetch = fetc
 export function useFetchMe() {
   const { getToken } = useAuth();
   return useCallback(() => withNetworkRetry(() => fetchMe(() => getToken())), [getToken]);
+}
+
+/** Options for calls scoped to one household (sent as X-Household-Id). */
+function inHousehold(householdId: string, init: RequestInit = {}): RequestInit {
+  return { ...init, headers: { ...(init.headers as Record<string, string>), 'X-Household-Id': householdId } };
+}
+
+const json = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+export async function createHousehold(getToken: GetToken, input: CreateHouseholdInput): Promise<Household> {
+  return HouseholdResponseSchema.parse(await apiFetch('/households', getToken, json('POST', input))).household;
+}
+
+export async function fetchHousehold(getToken: GetToken, householdId: string): Promise<Household> {
+  return HouseholdResponseSchema.parse(await apiFetch('/household', getToken, inHousehold(householdId))).household;
+}
+
+export async function updateHousehold(
+  getToken: GetToken,
+  householdId: string,
+  input: UpdateHouseholdInput,
+): Promise<Household> {
+  return HouseholdResponseSchema.parse(
+    await apiFetch('/household', getToken, inHousehold(householdId, json('PATCH', input))),
+  ).household;
+}
+
+export async function deleteHousehold(getToken: GetToken, householdId: string): Promise<void> {
+  await apiFetch('/household', getToken, inHousehold(householdId, { method: 'DELETE' }));
 }

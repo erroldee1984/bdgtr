@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatPHP, MAX_AMOUNT_MINOR, parseAmountInput } from './money';
+import { formatPHP, MAX_AMOUNT_MINOR, parseAmountInput } from './money.ts';
 
 describe('formatPHP', () => {
   it.each([

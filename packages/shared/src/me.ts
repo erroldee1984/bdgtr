@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ROLES } from './roles.ts';
+
 /** Response of GET /me: the signed-in user and the households they belong to. */
 export const MeResponseSchema = z.object({
   user: z.object({
@@ -11,7 +13,7 @@ export const MeResponseSchema = z.object({
     z.object({
       householdId: z.string().min(1),
       householdName: z.string().min(1),
-      role: z.enum(['owner', 'co_owner', 'member']),
+      role: z.enum(ROLES),
     }),
   ),
 });

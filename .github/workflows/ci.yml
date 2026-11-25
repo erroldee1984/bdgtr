@@ -51,7 +51,9 @@ jobs:
           EXPO_PUBLIC_API_URL: https://bdgtr-api.erroldee.com
           # Production Clerk publishable key (public), so CI checks the same CSP as the live site.
           EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA
-        run: pnpm build:web
+        # Start without packages/shared/dist, like Cloudflare Pages' fresh checkout
+        # (earlier test steps build it, which once hid a missing build step).
+        run: rm -rf packages/shared/dist && pnpm build:web
 
       - name: Dependency audit (fail on high/critical)
         run: pnpm audit --audit-level high

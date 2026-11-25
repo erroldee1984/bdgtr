@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["sin1"],
-  "installCommand": "pnpm install --frozen-lockfile --filter @bdgtr/api..."
+  "regions": [
+    "sin1"
+  ],
+  "installCommand": "pnpm install --frozen-lockfile --filter @bdgtr/api...",
+  "buildCommand": "pnpm --filter @bdgtr/shared build"
 }

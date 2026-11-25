@@ -46,14 +46,14 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "web": "expo start --web",
-    "build:web": "expo export -p web && node scripts/write-web-headers.mjs dist",
+    "start": "pnpm --filter @bdgtr/shared build && expo start",
+    "android": "pnpm --filter @bdgtr/shared build && expo start --android",
+    "web": "pnpm --filter @bdgtr/shared build && expo start --web",
+    "build:web": "pnpm --filter @bdgtr/shared build && expo export -p web && node scripts/write-web-headers.mjs dist",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "dev:web": "expo start --web",
+    "dev:web": "pnpm --filter @bdgtr/shared build && expo start --web",
     "dev:phone": "node ../../scripts/dev-phone.mjs"
   },
   "private": true,

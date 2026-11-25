@@ -8,7 +8,7 @@ import {
   manilaDate,
   manilaYesterday,
   yearMonthOf,
-} from './dates';
+} from './dates.ts';
 
 describe('manilaDate', () => {
   it('uses Manila time, not UTC: 23:00 UTC is already the next day in Manila', () => {
