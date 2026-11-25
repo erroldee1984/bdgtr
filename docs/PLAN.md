@@ -347,7 +347,7 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 > For the transaction's category and for the household total: moving from below 90% to 90% or more fires **"near"**. Moving from 100% or less to above 100% fires **"over"**. Each fires once per month per scope. A budget of zero or no budget never fires.
 
 ### 6.4 Categories
-Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore. **A household always has at least one active category:** new households start with **Groceries**, any household found with none gets Groceries added automatically, and the last active category can't be removed (the API refuses with 409 `last_category`; the app hides Remove on it and says why).
+Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore. **A household always has at least one active category:** new households start with **Groceries**, any household found with none gets Groceries added automatically, and the last active category can't be removed (the API refuses with 409 `last_category`; the app shows Remove disabled on it and says why).
 
 ### 6.5 Monthly Fixed Transactions
 - CRUD list: name, category, amount, day of month, auto-post toggle

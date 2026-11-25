@@ -178,16 +178,15 @@ export function CategoriesManager() {
                     ) : canManage ? (
                       <View style={styles.actions}>
                         <Button label="Edit" compact accessibilityLabel={`Edit ${c.name}`} onPress={() => setEditing({ mode: 'edit', category: c })} />
-                        {/* A household always keeps at least one category. */}
-                        {activeCats.length > 1 ? (
-                          <Button
-                            label="Remove"
-                            variant="danger"
-                            compact
-                            accessibilityLabel={`Remove ${c.name}`}
-                            onPress={() => setConfirmRemove(c)}
-                          />
-                        ) : null}
+                        {/* A household always keeps at least one category: shown, but disabled on the last one. */}
+                        <Button
+                          label="Remove"
+                          variant="danger"
+                          compact
+                          disabled={activeCats.length <= 1}
+                          accessibilityLabel={`Remove ${c.name}`}
+                          onPress={() => setConfirmRemove(c)}
+                        />
                       </View>
                     ) : null}
                   </View>

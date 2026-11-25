@@ -142,10 +142,14 @@ describe('Categories (House Owner / Co-Owner)', () => {
     expect(mockCalls).not.toContain('create');
   });
 
-  it('the last category has no Remove button, with an explanation', async () => {
+  it('the last category shows Remove disabled, with an explanation; pressing it does nothing', async () => {
     mockDb = mockDb.filter((c) => c.name === 'Groceries');
     await open();
-    expect(screen.queryByLabelText('Remove Groceries')).toBeNull();
+    const remove = screen.getByLabelText('Remove Groceries');
+    expect(remove).toBeDisabled();
+    await fireEvent.press(remove);
+    expect(screen.queryByText(/Remove Groceries\?/)).toBeNull();
+    expect(mockCalls).not.toContain('remove');
     expect(screen.getByLabelText('Edit Groceries')).toBeTruthy();
     expect(screen.getByText('A household needs at least one category. Add another before removing this one.')).toBeTruthy();
   });
