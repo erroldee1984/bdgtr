@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MeResponseSchema } from './me';
+import { MeResponseSchema } from './me.ts';
 
 describe('MeResponseSchema', () => {
   it('accepts a user with no households yet', () => {
