@@ -1,5 +1,9 @@
 import { useAuth } from '@clerk/expo';
 import {
+  type AlertsResponse,
+  AlertsResponseSchema,
+  type CreateTransactionResponse,
+  CreateTransactionResponseSchema,
   type Category,
   CategoriesResponseSchema,
   CategoryResponseSchema,
@@ -7,8 +11,6 @@ import {
   type CreateTransactionInput,
   type Dashboard,
   DashboardSchema,
-  type Transaction,
-  TransactionResponseSchema,
   type UpdateCategoryInput,
   type AcceptInviteResponse,
   AcceptInviteResponseSchema,
@@ -192,10 +194,21 @@ export async function createTransaction(
   getToken: GetToken,
   householdId: string,
   input: CreateTransactionInput,
-): Promise<Transaction> {
-  return TransactionResponseSchema.parse(
+): Promise<CreateTransactionResponse> {
+  return CreateTransactionResponseSchema.parse(
     await apiFetch('/transactions', getToken, inHousehold(householdId, json('POST', input))),
-  ).transaction;
+  );
+}
+
+/** A month's alerts (default: this month) plus the unread count across all months. */
+export async function fetchAlerts(getToken: GetToken, householdId: string, month?: string): Promise<AlertsResponse> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : '';
+  return AlertsResponseSchema.parse(await apiFetch(`/alerts${query}`, getToken, inHousehold(householdId)));
+}
+
+/** Marks this household's alerts read for the signed-in member. */
+export async function markAlertsRead(getToken: GetToken, householdId: string): Promise<void> {
+  await apiFetch('/alerts/read', getToken, inHousehold(householdId, { method: 'POST' }));
 }
 
 export async function fetchDashboard(getToken: GetToken, householdId: string, month?: string): Promise<Dashboard> {

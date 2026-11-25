@@ -33,8 +33,8 @@ export function SpendChart({ categories }: { categories: DashboardCategory[] }) 
         <AppText tone="secondary">No categories yet.</AppText>
       ) : asTable ? (
         <View role="table" aria-label="Spending per category">
-          <View role="row" style={[styles.tr, styles.th]}>
-            {['Category', 'Spent', 'Budget', 'Left'].map((h, i) => (
+          <View role="row" testID="table-row" style={[styles.tr, styles.th]}>
+            {['Category', 'Budget', 'Spent', 'Left'].map((h, i) => (
               <AppText key={h} role="columnheader" variant="caption" tone="secondary" style={i === 0 ? styles.cellName : styles.cell}>
                 {h}
               </AppText>
@@ -43,16 +43,16 @@ export function SpendChart({ categories }: { categories: DashboardCategory[] }) 
           {categories.map((c) => {
             const left = c.budgetMinor - c.spentMinor;
             return (
-              <View key={c.id} role="row" style={styles.tr}>
+              <View key={c.id} role="row" testID="table-row" style={styles.tr}>
                 <AppText role="cell" style={styles.cellName}>
                   {c.name}
                   {c.isRemoved ? ' (removed)' : ''}
                 </AppText>
                 <AppText role="cell" style={styles.cell}>
-                  {formatPHP(c.spentMinor)}
+                  {c.budgetMinor > 0 ? formatPHP(c.budgetMinor) : '—'}
                 </AppText>
                 <AppText role="cell" style={styles.cell}>
-                  {c.budgetMinor > 0 ? formatPHP(c.budgetMinor) : '—'}
+                  {formatPHP(c.spentMinor)}
                 </AppText>
                 <AppText role="cell" tone={c.budgetMinor > 0 && left < 0 ? 'danger' : 'primary'} style={styles.cell}>
                   {c.budgetMinor <= 0 ? '—' : left < 0 ? `Over ${formatPHP(-left)}` : formatPHP(left)}

@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useUnreadAlerts } from '@/alerts/unread-alerts';
 import { AppText } from '@/components/app-text';
 import { usesNavRail, useWindowClass } from '@/layout/window-class';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
@@ -29,6 +30,7 @@ export function AppNav() {
   const windowClass = useWindowClass();
   const rail = usesNavRail(windowClass);
   const insets = useSafeAreaInsets();
+  const unread = useUnreadAlerts().count;
 
   const tabList = (
     <TabList
@@ -45,7 +47,12 @@ export function AppNav() {
       {rail ? <RailHeader /> : null}
       {NAV_ITEMS.map((item) => (
         <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-          <NavButton icon={item.icon} label={item.label} orientation={rail ? 'rail' : 'bar'} />
+          <NavButton
+            icon={item.icon}
+            label={item.label}
+            orientation={rail ? 'rail' : 'bar'}
+            badge={item.name === 'alerts' ? unread : 0}
+          />
         </TabTrigger>
       ))}
     </TabList>
@@ -70,11 +77,13 @@ interface NavButtonProps extends TabTriggerSlotProps {
   icon: IconName;
   label: string;
   orientation: 'bar' | 'rail';
+  /** Unread count shown on the icon (0 = none). */
+  badge?: number;
 }
 
 type PressableRef = ComponentProps<typeof Pressable>['ref'];
 
-function NavButton({ icon, label, orientation, isFocused, ref, ...props }: NavButtonProps) {
+function NavButton({ icon, label, orientation, badge = 0, isFocused, ref, ...props }: NavButtonProps) {
   const color = isFocused ? colors.primaryLight : colors.textSecondary;
   return (
     <Pressable
@@ -83,7 +92,7 @@ function NavButton({ icon, label, orientation, isFocused, ref, ...props }: NavBu
       ref={ref as PressableRef}
       role="tab"
       aria-selected={!!isFocused}
-      accessibilityLabel={label}
+      accessibilityLabel={badge > 0 ? `${label}, ${badge} unread` : label}
       style={({ pressed }) => [
         styles.navButton,
         orientation === 'rail' ? styles.navButtonRail : styles.navButtonBar,
@@ -91,7 +100,16 @@ function NavButton({ icon, label, orientation, isFocused, ref, ...props }: NavBu
         pressed && styles.pressed,
       ]}
     >
-      <MaterialCommunityIcons name={icon} size={24} color={color} aria-hidden />
+      <View>
+        <MaterialCommunityIcons name={icon} size={24} color={color} aria-hidden />
+        {badge > 0 ? (
+          <View style={styles.badge} aria-hidden>
+            <AppText variant="caption" style={styles.badgeText}>
+              {badge > 9 ? '9+' : String(badge)}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
       <AppText variant="caption" style={{ color }} numberOfLines={1}>
         {label}
       </AppText>
@@ -143,6 +161,19 @@ function AddSpendFab() {
 }
 
 const styles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: colors.onPrimary, fontSize: 11, lineHeight: 14 },
   root: { flex: 1, backgroundColor: colors.bg },
   slot: { flex: 1 },
   bottomBar: {

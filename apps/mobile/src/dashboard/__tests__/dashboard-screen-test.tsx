@@ -1,5 +1,5 @@
 /** Dashboard (docs/PLAN.md §6.2) with the real screen and a fake /dashboard. */
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { router, Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
@@ -84,6 +84,18 @@ describe('Dashboard', () => {
     expect(screen.getByLabelText('Transport: spent ₱1,500.00 of ₱2,000.00, ₱500.00 left')).toBeTruthy();
     expect(screen.getByLabelText('Gifts: spent ₱0.00, no budget set')).toBeTruthy();
     expect(screen.getByText('Over by ₱1,000.00')).toBeTruthy();
+  });
+
+  it('table columns read Category, Budget, Spent, Left (left to right), in every row', async () => {
+    await open();
+    await fireEvent.press(await screen.findByText('View as table'));
+    const rows = screen.getAllByTestId('table-row');
+    const cells = (row: (typeof rows)[number]) =>
+      within(row).queryAllByRole('columnheader').concat(within(row).queryAllByRole('cell')).map((c) => [c.props.children].flat().join(''));
+    expect(cells(rows[0]!)).toEqual(['Category', 'Budget', 'Spent', 'Left']);
+    expect(cells(rows.find((r) => within(r).queryByText('Transport'))!)).toEqual(['Transport', '₱2,000.00', '₱1,500.00', '₱500.00']);
+    expect(cells(rows.find((r) => within(r).queryByText('Dining out'))!)).toEqual(['Dining out', '₱5,000.00', '₱6,000.00', 'Over ₱1,000.00']);
+    expect(cells(rows.find((r) => within(r).queryByText('Gifts'))!)).toEqual(['Gifts', '—', '₱0.00', '—']);
   });
 
   it('"View as table" shows the same numbers as a table, and back', async () => {

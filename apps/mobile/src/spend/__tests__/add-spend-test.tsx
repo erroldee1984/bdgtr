@@ -18,6 +18,8 @@ jest.mock('@/household/household-context', () => ({
 jest.mock('@react-native-community/datetimepicker', () => ({ DateTimePickerAndroid: { open: jest.fn() } }));
 let mockUuid = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `00000000-0000-4000-8000-${String(++mockUuid).padStart(12, '0')}` }));
+const mockShow = jest.fn();
+jest.mock('@/toast/toast', () => ({ useToast: () => ({ show: mockShow }) }));
 const mockCategories = jest.fn();
 const mockCreate = jest.fn();
 jest.mock('@/lib/api', () => ({
@@ -35,7 +37,8 @@ const now = () => NOW;
 beforeEach(() => {
   mockRole = 'member';
   mockCategories.mockReset().mockResolvedValue([cat('a', 'Groceries', 1), cat('b', 'Transport', 5), cat('c', 'Old', 9, true), cat('d', 'Bills', 1)]);
-  mockCreate.mockReset().mockResolvedValue({});
+  mockCreate.mockReset().mockResolvedValue({ transaction: {}, alerts: [] });
+  mockShow.mockClear();
   jest.mocked(DateTimePickerAndroid.open).mockReset();
 });
 
@@ -154,5 +157,27 @@ describe('Add spend', () => {
     await open();
     await fireEvent.press(await screen.findByText('Try again'));
     expect(await screen.findByLabelText('Category')).toBeTruthy();
+  });
+
+  it('alerts set off by the spend appear as toasts for the person who entered it', async () => {
+    mockCreate.mockResolvedValue({
+      transaction: {},
+      alerts: [
+        { id: 'x', yearMonth: '2026-11', level: 'over', categoryId: 'c', title: 'Over budget · Transport', body: 'Home household is over its ₱2,000 Transport budget by ₱100', triggeredBy: null, createdAt: '2026-11-25T02:00:00.000Z', unread: true },
+        { id: 'y', yearMonth: '2026-11', level: 'near', categoryId: null, title: 'Nearly at the monthly budget', body: 'Home household has used 91% of its ₱40,000 monthly budget', triggeredBy: null, createdAt: '2026-11-25T02:00:00.000Z', unread: true },
+      ],
+    });
+    await open();
+    await fillAndSave();
+    await screen.findByText('Dashboard');
+    expect(mockShow.mock.calls.map((c) => c[0].level)).toEqual(['over', 'near']);
+    expect(mockShow).toHaveBeenCalledWith({ level: 'over', title: 'Over budget · Transport', body: 'Home household is over its ₱2,000 Transport budget by ₱100' });
+  });
+
+  it('no alerts: no toast', async () => {
+    await open();
+    await fillAndSave();
+    await screen.findByText('Dashboard');
+    expect(mockShow).not.toHaveBeenCalled();
   });
 });
