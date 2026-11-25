@@ -23,7 +23,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com"
+        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA"
       }
     },
     "production": {
@@ -33,7 +34,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com"
+        "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA"
       }
     }
   }
