@@ -568,6 +568,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M1b audit | A failed sign-out did nothing and showed nothing | `household-switcher-test.tsx` (More screen) |
 | M1b prod | Android sign-in only said "Sign-in didn't complete" when Clerk rejected the app's return link (`resource_missmatch`), so the cause had to be found by hand. Now Clerk's reason code is shown | `apps/mobile/src/components/__tests__/sign-in-test.tsx` |
 | M1a prod | Web CSP blocked Clerk Protect, then its probe hosts, and new sign-ups were rejected (PRs #8, #9); a custom `+html.tsx` once shipped pages without their JavaScript | `apps/mobile/scripts/__tests__/write-web-headers-test.ts` |
+| M1c | Opening or refreshing `/household` (also `/add`, "Create another household") straight from its URL left no way out: no history, so no header back button and Cancel did nothing. Now Back/Cancel go to the dashboard when there's no history | `apps/mobile/src/components/__tests__/back-navigation-test.tsx` (real root layout) |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
