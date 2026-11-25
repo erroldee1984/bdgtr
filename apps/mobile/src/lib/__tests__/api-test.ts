@@ -1,5 +1,4 @@
 import {
-  addStarterCategories,
   createCategory,
   createTransaction,
   fetchCategories,
@@ -254,7 +253,6 @@ describe('category, spend and dashboard calls', () => {
     ['updateCategory', () => updateCategory(tok, HID, CID, { name: 'Meals' }), 200, { category: CAT }, 'PATCH', `/categories/${CID}`, { name: 'Meals' }],
     ['removeCategory', () => removeCategory(tok, HID, CID), 204, undefined, 'DELETE', `/categories/${CID}`, undefined],
     ['restoreCategory', () => restoreCategory(tok, HID, CID), 204, undefined, 'POST', `/categories/${CID}/restore`, undefined],
-    ['addStarterCategories', () => addStarterCategories(tok, HID), 201, { categories: [CAT] }, 'POST', '/categories/starter', undefined],
     ['createTransaction', () => createTransaction(tok, HID, { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }), 201, { transaction: TX }, 'POST', '/transactions', { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }],
     ['fetchDashboard (this month)', () => fetchDashboard(tok, HID), 200, DASH, 'GET', '/dashboard', undefined],
     ['fetchDashboard (a month)', () => fetchDashboard(tok, HID, '2026-10'), 200, DASH, 'GET', '/dashboard?month=2026-10', undefined],

@@ -187,12 +187,6 @@ export async function restoreCategory(getToken: GetToken, householdId: string, i
   await apiFetch(`/categories/${encodeURIComponent(id)}/restore`, getToken, inHousehold(householdId, { method: 'POST' }));
 }
 
-export async function addStarterCategories(getToken: GetToken, householdId: string): Promise<Category[]> {
-  return CategoriesResponseSchema.parse(
-    await apiFetch('/categories/starter', getToken, inHousehold(householdId, { method: 'POST' })),
-  ).categories;
-}
-
 /** Saves a spend. Sending the same clientId again returns the original (safe to retry). */
 export async function createTransaction(
   getToken: GetToken,

@@ -212,7 +212,7 @@ Each household has **exactly one House Owner**, any number of Co-Owners, and any
 - **Transfer ownership:** the House Owner picks an existing member, who becomes House Owner. The old Owner becomes a Co-Owner and can leave afterwards. Both changes happen in one database transaction.
 
 ### Flows
-1. **First sign-in with no invite:** "Create your household" asks for a name, the default monthly budget (₱) and starter categories. The user becomes House Owner. Existing users can create more households from the switcher at any time.
+1. **First sign-in with no invite:** "Create your household" asks for a name and the default monthly budget (₱). The household starts with one category, **Groceries**. The user becomes House Owner. Existing users can create more households from the switcher at any time.
 2. **Invite** (House Owner or Co-Owner):
    - Enter the invitee's email and role (Co-Owner or House Member; House Owner is never invited, only transferred). The API creates an invite with a **random 256-bit token**. Only its **SHA-256 hash** is stored. It **expires in 7 days**, is **single-use**, and is **bound to that email**.
    - The app shows the invite link `https://bdgtr.erroldee.com/invite/<token>` and opens the **native share sheet** (Messenger, Viber, SMS, email). No email service is needed in v1. Sending emails through **Resend's free tier** is a v2 option once your domain is verified.
@@ -347,7 +347,7 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 > For the transaction's category and for the household total: moving from below 90% to 90% or more fires **"near"**. Moving from 100% or less to above 100% fires **"over"**. Each fires once per month per scope. A budget of zero or no budget never fires.
 
 ### 6.4 Categories
-Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore.
+Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore. **A household always has at least one active category:** new households start with **Groceries**, any household found with none gets Groceries added automatically, and the last active category can't be removed (the API refuses with 409 `last_category`; the app shows Remove disabled on it and says why).
 
 ### 6.5 Monthly Fixed Transactions
 - CRUD list: name, category, amount, day of month, auto-post toggle

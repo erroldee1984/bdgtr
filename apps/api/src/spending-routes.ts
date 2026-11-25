@@ -21,11 +21,11 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { type Db, ObjectId } from 'mongodb';
 
 import {
-  addStarterCategories,
   CATEGORIES,
   type CategoryDoc,
   countCategories,
   createCategory,
+  ensureDefaultCategory,
   findCategory,
   listCategories,
   removeCategory,
@@ -90,6 +90,7 @@ export function registerSpendingRoutes(
 
   app.get('/categories', ...inHousehold('view'), async (c) => {
     const db = await deps.getDb();
+    await ensureDefaultCategory(db, c.get('household')._id, c.get('user')._id, deps.now());
     return c.json<CategoriesResponse>({ categories: await listCategories(db, c.get('household')._id, deps.now()) });
   });
 
@@ -103,15 +104,6 @@ export function registerSpendingRoutes(
     return c.json<CategoryResponse>({ category: toCategory(doc) }, 201);
   });
 
-  // Only for a household with no categories at all (new households get them automatically).
-  app.post('/categories/starter', ...inHousehold('manage_budget_data'), async (c) => {
-    const db = await deps.getDb();
-    const householdId = c.get('household')._id;
-    if ((await countCategories(db, householdId)) > 0) return c.json({ error: 'categories_exist' }, 409);
-    const docs = await addStarterCategories(db, householdId, c.get('user')._id, deps.now());
-    return c.json<CategoriesResponse>({ categories: docs.map((d) => toCategory(d)) }, 201);
-  });
-
   app.patch('/categories/:id', ...inHousehold('manage_budget_data'), async (c) => {
     const id = idParam(c, 'id');
     const input = await parseJsonBody(c, UpdateCategoryInputSchema);
@@ -123,12 +115,14 @@ export function registerSpendingRoutes(
     return c.json<CategoryResponse>({ category: toCategory(doc) });
   });
 
-  // Soft remove: past spending keeps showing the category.
+  // Soft remove: past spending keeps showing the category. Never the last one.
   app.delete('/categories/:id', ...inHousehold('manage_budget_data'), async (c) => {
     const id = idParam(c, 'id');
     if (!id) return c.json({ error: 'not_found' }, 404);
     const db = await deps.getDb();
-    if (!(await removeCategory(db, c.get('household')._id, id, deps.now()))) return c.json({ error: 'not_found' }, 404);
+    const result = await removeCategory(db, c.get('household')._id, id, deps.now());
+    if (result === 'not_found') return c.json({ error: 'not_found' }, 404);
+    if (result === 'last_category') return c.json({ error: 'last_category' }, 409);
     return c.body(null, 204);
   });
 
@@ -227,6 +221,7 @@ export function registerSpendingRoutes(
     if (!month) return c.json({ error: 'invalid_month' }, 400);
     const db = await deps.getDb();
     const household = c.get('household');
+    await ensureDefaultCategory(db, household._id, c.get('user')._id, deps.now());
     const [categories, spent] = await Promise.all([
       db.collection<CategoryDoc>(CATEGORIES).find({ householdId: household._id }).toArray(),
       spentByCategory(db, household._id, month),

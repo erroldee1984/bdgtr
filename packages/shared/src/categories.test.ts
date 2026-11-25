@@ -7,7 +7,7 @@ import {
   categoriesForEntry,
   categoryNameKey,
   CreateCategoryInputSchema,
-  STARTER_CATEGORIES,
+  DEFAULT_CATEGORY,
   UpdateCategoryInputSchema,
 } from './categories.ts';
 import { MAX_AMOUNT_MINOR } from './money.ts';
@@ -54,13 +54,10 @@ describe('UpdateCategoryInputSchema', () => {
   });
 });
 
-describe('starter categories', () => {
-  it('are valid, uniquely named categories', () => {
-    const keys = STARTER_CATEGORIES.map((c) => categoryNameKey(c.name));
-    expect(new Set(keys).size).toBe(keys.length);
-    for (const c of STARTER_CATEGORIES) {
-      expect(CreateCategoryInputSchema.safeParse({ ...c, defaultBudgetMinor: 0 }).success).toBe(true);
-    }
+describe('default category', () => {
+  it('is Groceries, and a valid category', () => {
+    expect(DEFAULT_CATEGORY.name).toBe('Groceries');
+    expect(CreateCategoryInputSchema.safeParse({ ...DEFAULT_CATEGORY, defaultBudgetMinor: 0 }).success).toBe(true);
   });
 
   it('palette and icon lists have no duplicates', () => {

@@ -47,10 +47,6 @@ jest.mock('@/lib/api', () => ({
     mockMaybeFail('restore');
     mockDb = mockDb.map((c) => (c.id === id ? { ...c, isRemoved: false } : c));
   },
-  addStarterCategories: async () => {
-    mockMaybeFail('starter');
-    mockDb = [{ id: 'a'.repeat(24), name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0 }];
-  },
 }));
 
 beforeEach(() => {
@@ -146,17 +142,29 @@ describe('Categories (House Owner / Co-Owner)', () => {
     expect(mockCalls).not.toContain('create');
   });
 
-  it('a household with none: "Add starter categories"', async () => {
-    mockDb = [];
-    await renderRouter({ index: CategoriesManager }, { initialUrl: '/' });
-    await fireEvent.press(await screen.findByText('Add starter categories'));
-    expect(await screen.findByText('Starter categories added.')).toBeTruthy();
-    expect(await screen.findByText('Groceries')).toBeTruthy();
+  it('the last category shows Remove disabled, with an explanation; pressing it does nothing', async () => {
+    mockDb = mockDb.filter((c) => c.name === 'Groceries');
+    await open();
+    const remove = screen.getByLabelText('Remove Groceries');
+    expect(remove).toBeDisabled();
+    await fireEvent.press(remove);
+    expect(screen.queryByText(/Remove Groceries\?/)).toBeNull();
+    expect(mockCalls).not.toContain('remove');
+    expect(screen.getByLabelText('Edit Groceries')).toBeTruthy();
+    expect(screen.getByText('A household needs at least one category. Add another before removing this one.')).toBeTruthy();
+  });
+
+  it('if the server refuses because it would be the last one (someone else removed the other), it says so', async () => {
+    await open();
+    mockFailNext = new ApiError(409, 'last_category');
+    await fireEvent.press(screen.getByLabelText('Remove Transport'));
+    await fireEvent.press(within(row('Transport')).getByText('Remove'));
+    expect(await screen.findByText('A household needs at least one category, so the last one can’t be removed.')).toBeTruthy();
   });
 });
 
 describe('Categories (House Member)', () => {
-  it('read-only: no add, edit, remove, restore or starter set', async () => {
+  it('read-only: no add, edit, remove or restore', async () => {
     mockRole = 'member';
     await open();
     expect(screen.getByText('Only the House Owner or a Co-Owner can change these.')).toBeTruthy();
@@ -167,11 +175,4 @@ describe('Categories (House Member)', () => {
     expect(screen.queryByLabelText('Restore Old stuff')).toBeNull();
   });
 
-  it('none yet: no starter button for a House Member', async () => {
-    mockRole = 'member';
-    mockDb = [];
-    await renderRouter({ index: CategoriesManager }, { initialUrl: '/' });
-    expect(await screen.findByText('No categories yet.')).toBeTruthy();
-    expect(screen.queryByText('Add starter categories')).toBeNull();
-  });
 });

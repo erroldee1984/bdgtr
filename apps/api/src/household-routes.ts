@@ -22,7 +22,7 @@ import {
 } from './households.js';
 import { type UserDoc, upsertUserFromAuth } from './users.js';
 import { parseJsonBody } from './validation.js';
-import { addStarterCategories } from './categories.js';
+import { ensureDefaultCategory } from './categories.js';
 
 export type AppVariables = AuthVariables & {
   user: UserDoc;
@@ -93,8 +93,8 @@ export function registerHouseholdRoutes(app: Hono<AppEnv>, auth: MiddlewareHandl
     }
     const now = deps.now();
     const { household, membership } = await createHouseholdWithOwner(db, me._id, input, now);
-    // Every new household starts with a starter set of categories (docs/PLAN.md §3 flow 1).
-    await addStarterCategories(db, household._id, me._id, now);
+    // Every household always has at least one category; new ones start with Groceries.
+    await ensureDefaultCategory(db, household._id, me._id, now);
     return c.json<HouseholdResponse>({ household: toHousehold(household, membership) }, 201);
   });
 
