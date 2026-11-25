@@ -1,5 +1,15 @@
 import { useAuth } from '@clerk/expo';
 import {
+  type AcceptInviteResponse,
+  AcceptInviteResponseSchema,
+  type AssignableRole,
+  type CreatedInviteResponse,
+  CreatedInviteResponseSchema,
+  type CreateInviteInput,
+  type Invite,
+  InvitesResponseSchema,
+  type Member,
+  MembersResponseSchema,
   type CreateHouseholdInput,
   type Household,
   HouseholdResponseSchema,
@@ -84,4 +94,55 @@ export async function updateHousehold(
 
 export async function deleteHousehold(getToken: GetToken, householdId: string): Promise<void> {
   await apiFetch('/household', getToken, inHousehold(householdId, { method: 'DELETE' }));
+}
+
+// --- Members & invites (docs/PLAN.md §3) ---
+
+export async function fetchMembers(getToken: GetToken, householdId: string): Promise<Member[]> {
+  return MembersResponseSchema.parse(await apiFetch('/members', getToken, inHousehold(householdId))).members;
+}
+
+export async function changeMemberRole(
+  getToken: GetToken,
+  householdId: string,
+  userId: string,
+  role: AssignableRole,
+): Promise<void> {
+  await apiFetch(`/members/${encodeURIComponent(userId)}`, getToken, inHousehold(householdId, json('PATCH', { role })));
+}
+
+/** Removes someone, or leaves the household when `userId` is yourself. */
+export async function removeMember(getToken: GetToken, householdId: string, userId: string): Promise<void> {
+  await apiFetch(`/members/${encodeURIComponent(userId)}`, getToken, inHousehold(householdId, { method: 'DELETE' }));
+}
+
+export async function transferOwnership(getToken: GetToken, householdId: string, userId: string): Promise<void> {
+  await apiFetch('/members/transfer-ownership', getToken, inHousehold(householdId, json('POST', { userId })));
+}
+
+export async function fetchInvites(getToken: GetToken, householdId: string): Promise<Invite[]> {
+  return InvitesResponseSchema.parse(await apiFetch('/invites', getToken, inHousehold(householdId))).invites;
+}
+
+export async function createInvite(
+  getToken: GetToken,
+  householdId: string,
+  input: CreateInviteInput,
+): Promise<CreatedInviteResponse> {
+  return CreatedInviteResponseSchema.parse(await apiFetch('/invites', getToken, inHousehold(householdId, json('POST', input))));
+}
+
+/** "Share again": a fresh link for a pending invite (the old link stops working). */
+export async function reissueInvite(getToken: GetToken, householdId: string, inviteId: string): Promise<CreatedInviteResponse> {
+  return CreatedInviteResponseSchema.parse(
+    await apiFetch(`/invites/${encodeURIComponent(inviteId)}/reissue`, getToken, inHousehold(householdId, { method: 'POST' })),
+  );
+}
+
+export async function revokeInvite(getToken: GetToken, householdId: string, inviteId: string): Promise<void> {
+  await apiFetch(`/invites/${encodeURIComponent(inviteId)}`, getToken, inHousehold(householdId, { method: 'DELETE' }));
+}
+
+export async function acceptInvite(getToken: GetToken, token: string): Promise<AcceptInviteResponse> {
+  return AcceptInviteResponseSchema.parse(await apiFetch('/invites/accept', getToken, json('POST', { token })));
 }

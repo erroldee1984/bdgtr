@@ -511,7 +511,11 @@ v1 ships dark mode only, matching the template.
 - Membership check on every household-scoped request. Every query filters by `householdId` and object IDs are never trusted alone, which prevents BOLA/IDOR.
 - Every route declares its minimum role (§5) and the server enforces it; hiding controls in the UI is only cosmetic. A dedicated guard rejects any change targeting the House Owner's membership unless it's the Owner acting on themselves, and a partial unique index guarantees exactly one House Owner per household.
 - Strict Zod `.strict()` schemas reject unknown keys and `$`-prefixed operators, blocking NoSQL injection
-- Invite tokens: 256-bit random values, stored as hashes, single-use, 7-day expiry, bound to an email, rate-limited on accept
+- Invite tokens: 256-bit random values, stored as hashes, single-use, 7-day expiry, bound to an email, rate-limited on accept (10 failures per person per 15 minutes → 429). "Share again" issues a fresh token and revokes the old one, because the original can't be recovered from its hash.
+
+**Clerk session token claims** (Clerk dashboard → Sessions → Customize session token), read by the API:
+- `"email": "{{user.primary_email_address}}"`: required for invites (an invite is only accepted by the email it was sent to). Clerk only makes an email primary once it's verified.
+- `"name": "{{user.full_name}}"`: optional. Shows people's names in the members list; without it, the list shows emails.
 - **CORS** allows only `https://bdgtr.erroldee.com` (and localhost in dev)
 - Rate limiting, secure headers, body size limits, generic error responses
 - The cron endpoints require `CRON_SECRET`, compared in constant time

@@ -11,6 +11,8 @@ import { Screen } from '@/components/screen';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
 import { type HouseholdFormErrors, validateHouseholdForm } from '@/household/household-form';
+import { InvitesSection } from '@/household/invites-section';
+import { MembersSection } from '@/household/members-section';
 import { RequireHousehold } from '@/household/require-household';
 import { useActiveHouseholdDetails } from '@/household/use-active-household';
 import { deleteHousehold, updateHousehold } from '@/lib/api';
@@ -52,10 +54,19 @@ function HouseholdDetails() {
     );
   }
 
-  return <HouseholdEditor key={household.id} household={household} onSaved={setHousehold} />;
+  return <HouseholdEditor key={household.id} household={household} onSaved={setHousehold} onChanged={reload} />;
 }
 
-function HouseholdEditor({ household, onSaved }: { household: Household; onSaved: (h: Household) => void }) {
+function HouseholdEditor({
+  household,
+  onSaved,
+  onChanged,
+}: {
+  household: Household;
+  onSaved: (h: Household) => void;
+  /** Re-reads the household (e.g. your role changed after transferring ownership). */
+  onChanged: () => void;
+}) {
   const { getToken } = useAuth();
   const { refresh } = useHousehold();
   const [name, setName] = useState(household.name);
@@ -147,10 +158,8 @@ function HouseholdEditor({ household, onSaved }: { household: Household; onSaved
         )}
       </Card>
 
-      <Card>
-        <AppText variant="title">Members & invites</AppText>
-        <AppText tone="secondary">Inviting and managing members arrives in the next update (M1c).</AppText>
-      </Card>
+      <MembersSection household={household} onHouseholdChanged={onChanged} />
+      {can(household.role, 'manage_members') ? <InvitesSection household={household} /> : null}
 
       {canDelete ? (
         <Card style={styles.danger}>

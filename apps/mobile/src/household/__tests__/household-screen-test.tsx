@@ -31,6 +31,9 @@ jest.mock('@/lib/api', () => ({
   fetchHousehold: (...a: unknown[]) => mockFetchHousehold(...a),
   updateHousehold: (...a: unknown[]) => mockUpdate(...a),
   deleteHousehold: (...a: unknown[]) => mockDelete(...a),
+  // Members & invites sections on the same screen (tested in members-invites-test.tsx).
+  fetchMembers: async () => [],
+  fetchInvites: async () => [],
 }));
 
 beforeEach(() => {

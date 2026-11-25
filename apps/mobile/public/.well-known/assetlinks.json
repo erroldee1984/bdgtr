@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.erroldee.bdgtr",
+      "sha256_cert_fingerprints": [
+        "2C:E0:65:7A:66:7A:5D:00:0C:CC:7F:31:6D:7C:F1:5E:4B:4A:98:91:8B:61:A9:42:0D:94:FA:02:09:78:BA:A8"
+      ]
+    }
+  }
+]

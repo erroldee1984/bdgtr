@@ -44,6 +44,9 @@ jest.mock('@/lib/api', () => {
       return { ...mockServer };
     },
     deleteHousehold: async () => {},
+    // Members & invites sections on the same screen (tested in members-invites-test.tsx).
+    fetchMembers: async () => [],
+    fetchInvites: async () => [],
   };
 });
 

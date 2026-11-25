@@ -1,4 +1,21 @@
-import { ApiError, apiFetch, createHousehold, deleteHousehold, fetchHousehold, fetchMe, updateHousehold } from '../api';
+import {
+  acceptInvite,
+  ApiError,
+  apiFetch,
+  changeMemberRole,
+  createHousehold,
+  createInvite,
+  deleteHousehold,
+  fetchHousehold,
+  fetchInvites,
+  fetchMe,
+  fetchMembers,
+  reissueInvite,
+  removeMember,
+  revokeInvite,
+  transferOwnership,
+  updateHousehold,
+} from '../api';
 import { API_URL } from '../config';
 
 jest.mock('@clerk/expo', () => ({ useAuth: () => ({ getToken: async () => 'tok' }) }));
@@ -134,5 +151,68 @@ describe('household calls', () => {
     serve(200, { household: H });
     await expect(fetchHousehold(async () => null, H.id)).rejects.toMatchObject({ status: 401 });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('member and invite calls', () => {
+  const HID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  const UID = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+  const IID = 'cccccccccccccccccccccccc';
+  const TOKEN = 'x'.repeat(43);
+  const INVITE = { id: IID, email: 'ben@example.com', role: 'member', expiresAt: '2026-12-02T02:00:00.000Z' };
+  const tok = async () => 't';
+  let fetchSpy: jest.SpyInstance;
+  const last = () => {
+    const [url, init] = fetchSpy.mock.calls.at(-1) as [string, RequestInit];
+    return { url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(init.body as string) : undefined };
+  };
+  const serve = (status: number, body?: unknown) =>
+    fetchSpy.mockImplementation(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }));
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+  afterEach(() => fetchSpy.mockRestore());
+
+  it.each([
+    ['fetchMembers', () => fetchMembers(tok, HID), 200, { members: [] }, 'GET', '/members', undefined],
+    ['changeMemberRole', () => changeMemberRole(tok, HID, UID, 'co_owner'), 204, undefined, 'PATCH', `/members/${UID}`, { role: 'co_owner' }],
+    ['removeMember', () => removeMember(tok, HID, UID), 204, undefined, 'DELETE', `/members/${UID}`, undefined],
+    ['transferOwnership', () => transferOwnership(tok, HID, UID), 204, undefined, 'POST', '/members/transfer-ownership', { userId: UID }],
+    ['fetchInvites', () => fetchInvites(tok, HID), 200, { invites: [INVITE] }, 'GET', '/invites', undefined],
+    ['createInvite', () => createInvite(tok, HID, { email: 'ben@example.com', role: 'member' }), 201, { invite: INVITE, token: TOKEN }, 'POST', '/invites', { email: 'ben@example.com', role: 'member' }],
+    ['reissueInvite', () => reissueInvite(tok, HID, IID), 201, { invite: INVITE, token: TOKEN }, 'POST', `/invites/${IID}/reissue`, undefined],
+    ['revokeInvite', () => revokeInvite(tok, HID, IID), 204, undefined, 'DELETE', `/invites/${IID}`, undefined],
+  ] as const)('%s → %s %s for that household', async (_name, run, status, response, method, path, body) => {
+    serve(status, response);
+    await run();
+    expect(last()).toMatchObject({ url: `${API_URL}${path}`, method, body });
+    expect(last().headers).toMatchObject({ 'X-Household-Id': HID, Authorization: 'Bearer t' });
+  });
+
+  it('acceptInvite posts the token with no household header (the invite names it)', async () => {
+    serve(200, { householdId: HID, householdName: 'Dela Cruz', role: 'member' });
+    await expect(acceptInvite(tok, TOKEN)).resolves.toEqual({ householdId: HID, householdName: 'Dela Cruz', role: 'member' });
+    expect(last()).toMatchObject({ url: `${API_URL}/invites/accept`, method: 'POST', body: { token: TOKEN } });
+    expect(last().headers['X-Household-Id']).toBeUndefined();
+  });
+
+  it('a path id is URL-encoded (no path tricks)', async () => {
+    serve(204);
+    await removeMember(tok, HID, '../household');
+    expect(last().url).toBe(`${API_URL}/members/..%2Fhousehold`);
+  });
+
+  it.each([
+    [403, 'email_mismatch'],
+    [410, 'invite_expired'],
+    [429, 'too_many_attempts'],
+  ])('accept failure %i %s → ApiError with that code', async (status, code) => {
+    serve(status, { error: code });
+    await expect(acceptInvite(tok, TOKEN)).rejects.toMatchObject({ status, code });
+  });
+
+  it('rejects a created invite without a valid token (contract check)', async () => {
+    serve(201, { invite: INVITE, token: 'short' });
+    await expect(createInvite(tok, HID, { email: 'ben@example.com', role: 'member' })).rejects.toThrow();
   });
 });

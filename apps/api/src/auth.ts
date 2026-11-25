@@ -11,6 +11,11 @@ export interface AuthContext {
    * Sessions → Customize session token). Null if the claim isn't configured.
    */
   email: string | null;
+  /**
+   * Display name from the optional custom `name` session claim
+   * (`{{user.full_name}}`). Null if not configured or unusable.
+   */
+  name: string | null;
 }
 
 /** Claims we read from a verified token. Anything else is ignored. */
@@ -19,6 +24,7 @@ export interface VerifiedClaims {
   sid?: string | undefined;
   azp?: string | undefined;
   email?: unknown;
+  name?: unknown;
 }
 
 /**
@@ -63,9 +69,17 @@ export function requireAuth<E extends { Variables: AuthVariables } = { Variables
     const email =
       typeof claims.email === 'string' && EMAIL.test(claims.email) ? claims.email.toLowerCase() : null;
 
-    c.set('auth', { userId: claims.sub, sessionId: claims.sid ?? null, email });
+    c.set('auth', { userId: claims.sub, sessionId: claims.sid ?? null, email, name: displayName(claims.name) });
     await next();
   };
+}
+
+/** A usable display name: trimmed, 1–100 characters, no control characters. */
+export function displayName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const name = raw.trim().replace(/\s+/g, ' ');
+  if (name.length === 0 || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) return null;
+  return name;
 }
 
 function unauthorized(c: Parameters<MiddlewareHandler>[0]) {

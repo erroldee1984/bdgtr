@@ -101,6 +101,23 @@ describe('write-web-headers (negative cases)', () => {
     mkdirSync(dist); // for afterEach
   });
 
+  it('rewrites every /invite/<token> link to the one pre-built invite page (200, URL kept)', () => {
+    mkdirSync(join(dist, 'invite'));
+    writeFileSync(join(dist, 'invite', '[token].html'), '<html></html>');
+    run();
+    expect(readFileSync(join(dist, '_redirects'), 'utf8')).toBe('/invite/*  /invite/[token]  200\n');
+  });
+
+  it('no dynamic pages: an empty _redirects (nothing rewritten by accident)', () => {
+    run();
+    expect(readFileSync(join(dist, '_redirects'), 'utf8')).toBe('');
+  });
+
+  it('serves the Android App Links file as JSON', () => {
+    run();
+    expect(readFileSync(join(dist, '_headers'), 'utf8')).toMatch(/\/\.well-known\/assetlinks\.json\n {2}Content-Type: application\/json/);
+  });
+
   it('copies the 404 page when Expo produced one', () => {
     writeFileSync(join(dist, '+not-found.html'), '<html>404</html>');
     run();

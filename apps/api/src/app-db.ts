@@ -2,6 +2,7 @@ import type { Db } from 'mongodb';
 
 import { getDb } from './db.js';
 import { ensureHouseholdIndexes } from './households.js';
+import { ensureInviteIndexes } from './invites.js';
 import { ensureUserIndexes } from './users.js';
 
 let indexesReady: Promise<void> | undefined;
@@ -13,7 +14,7 @@ let indexesReady: Promise<void> | undefined;
  */
 export async function getAppDb(uri: string, dbName: string): Promise<Db> {
   const db = await getDb(uri, dbName);
-  indexesReady ??= Promise.all([ensureUserIndexes(db), ensureHouseholdIndexes(db)]).then((): void => undefined).catch((err) => {
+  indexesReady ??= Promise.all([ensureUserIndexes(db), ensureHouseholdIndexes(db), ensureInviteIndexes(db)]).then((): void => undefined).catch((err) => {
     indexesReady = undefined; // retry on the next request
     throw err;
   });
