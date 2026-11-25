@@ -1,4 +1,6 @@
 import {
+  fetchAlerts,
+  markAlertsRead,
   createCategory,
   createTransaction,
   fetchCategories,
@@ -253,8 +255,11 @@ describe('category, spend and dashboard calls', () => {
     ['updateCategory', () => updateCategory(tok, HID, CID, { name: 'Meals' }), 200, { category: CAT }, 'PATCH', `/categories/${CID}`, { name: 'Meals' }],
     ['removeCategory', () => removeCategory(tok, HID, CID), 204, undefined, 'DELETE', `/categories/${CID}`, undefined],
     ['restoreCategory', () => restoreCategory(tok, HID, CID), 204, undefined, 'POST', `/categories/${CID}/restore`, undefined],
-    ['createTransaction', () => createTransaction(tok, HID, { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }), 201, { transaction: TX }, 'POST', '/transactions', { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }],
+    ['createTransaction', () => createTransaction(tok, HID, { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }), 201, { transaction: TX, alerts: [] }, 'POST', '/transactions', { clientId: TX.clientId, date: TX.date, categoryId: CID, amountMinor: 100 }],
     ['fetchDashboard (this month)', () => fetchDashboard(tok, HID), 200, DASH, 'GET', '/dashboard', undefined],
+    ['fetchAlerts (this month)', () => fetchAlerts(tok, HID), 200, { alerts: [], unreadCount: 0 }, 'GET', '/alerts', undefined],
+    ['fetchAlerts (a month)', () => fetchAlerts(tok, HID, '2026-10'), 200, { alerts: [], unreadCount: 3 }, 'GET', '/alerts?month=2026-10', undefined],
+    ['markAlertsRead', () => markAlertsRead(tok, HID), 204, undefined, 'POST', '/alerts/read', undefined],
     ['fetchDashboard (a month)', () => fetchDashboard(tok, HID, '2026-10'), 200, DASH, 'GET', '/dashboard?month=2026-10', undefined],
   ] as const)('%s → %s %s for that household', async (_name, run, status, response, method, path, body) => {
     serve(status, response);

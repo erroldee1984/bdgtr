@@ -13,6 +13,7 @@ import { useHousehold } from '@/household/household-context';
 import { goBackOrHome } from '@/layout/back-button';
 import { ApiError, createTransaction, fetchCategories } from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
+import { useToast } from '@/toast/toast';
 
 import { DatePickerButton } from './date-picker-button';
 import { dateLabel, quickDates, type SpendFormErrors, validateSpendForm } from './spend-form';
@@ -32,6 +33,7 @@ const SERVER_MESSAGES: Record<string, string> = {
 export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const { getToken } = useAuth();
   const { active } = useHousehold();
+  const toast = useToast();
   const householdId = active?.householdId ?? '';
   const { today, yesterday } = useMemo(() => quickDates(now()), [now]);
 
@@ -79,7 +81,9 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     setErrors({});
     setSaving(true);
     try {
-      await createTransaction(() => getToken(), householdId, result.input);
+      const { alerts } = await createTransaction(() => getToken(), householdId, result.input);
+      // The person who entered it hears about crossed budgets straight away (docs/PLAN.md §6.3).
+      for (const a of alerts) toast.show({ level: a.level, title: a.title, body: a.body });
       goBackOrHome();
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';

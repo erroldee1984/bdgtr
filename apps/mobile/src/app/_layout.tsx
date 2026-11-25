@@ -12,6 +12,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { HouseholdProvider } from '@/household/household-context';
 import { HeaderBackButton } from '@/layout/back-button';
+import { ToastProvider } from '@/toast/toast';
 import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
 import { colors, spacing } from '@/theme/tokens';
 
@@ -52,6 +53,7 @@ export default function RootLayout() {
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
       <HouseholdProvider>
         <ThemeProvider value={navTheme}>
+          <ToastProvider>
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
             <Stack.Screen name="(tabs)" />
@@ -91,6 +93,7 @@ export default function RootLayout() {
               }}
             />
           </Stack>
+          </ToastProvider>
         </ThemeProvider>
       </HouseholdProvider>
     </ClerkProvider>

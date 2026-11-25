@@ -344,7 +344,9 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 - After saving, the API works out threshold crossings, saves `alerts` and **fans them out to every active household member's registered devices** (Android push plus browser Web Push), skipping members who muted this household. The person who entered the spend also sees an in-app toast straight away. Delivery rules are in §2b.
 
 **Threshold rule** (pure function, heavily tested):
-> For the transaction's category and for the household total: moving from below 90% to 90% or more fires **"near"**. Moving from 100% or less to above 100% fires **"over"**. Each fires once per month per scope. A budget of zero or no budget never fires.
+> For the transaction's category and for the household total: reaching 90% or more fires **"near"**; going above 100% fires **"over"**. Each fires once per month per scope (a unique index enforces it). A spend that jumps past both sends only "over", "near" never follows "over" in the same month, and a budget of zero or no budget never fires.
+>
+> The check is "what level has spending reached, and has this household had that alert yet this month?" rather than "did this one spend cross the line?", so simultaneous spends that only together cross a line still produce exactly one alert. Only new spends set off alerts (not edits or deletes).
 
 ### 6.4 Categories
 Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore. **A household always has at least one active category:** new households start with **Groceries**, any household found with none gets Groceries added automatically, and the last active category can't be removed (the API refuses with 409 `last_category`; the app shows Remove disabled on it and says why).
@@ -569,6 +571,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M1b prod | Android sign-in only said "Sign-in didn't complete" when Clerk rejected the app's return link (`resource_missmatch`), so the cause had to be found by hand. Now Clerk's reason code is shown | `apps/mobile/src/components/__tests__/sign-in-test.tsx` |
 | M1a prod | Web CSP blocked Clerk Protect, then its probe hosts, and new sign-ups were rejected (PRs #8, #9); a custom `+html.tsx` once shipped pages without their JavaScript | `apps/mobile/scripts/__tests__/write-web-headers-test.ts` |
 | M1c | Opening or refreshing `/household` (also `/add`, "Create another household") straight from its URL left no way out: no history, so no header back button and Cancel did nothing. Now Back/Cancel go to the dashboard when there's no history | `apps/mobile/src/components/__tests__/back-navigation-test.tsx` (real root layout) |
+| M2b dev | Simultaneous spends that only together crossed 90% sent no alert (each saw the others as "already there"). Now the level reached is judged | `apps/api/src/alerts.test.ts` ("simultaneous spends…") |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 

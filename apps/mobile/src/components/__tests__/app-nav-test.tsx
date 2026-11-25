@@ -24,6 +24,9 @@ jest.mock('@/layout/window-class', () => ({
 }));
 
 /** Simulates the screen width; the width→class mapping itself is tested in window-class-test. */
+let mockUnread = 0;
+jest.mock('@/alerts/unread-alerts', () => ({ useUnreadAlerts: () => ({ count: mockUnread, refresh: () => {}, clear: () => {} }) }));
+
 function mockWidth(width: number) {
   mockClass = windowClassFor(width);
   mockListeners.forEach((cb) => cb());
@@ -180,5 +183,21 @@ describe('AppNav', () => {
       expect(style.minHeight).toBeGreaterThanOrEqual(48);
       expect(style.minWidth).toBeGreaterThanOrEqual(48);
     }
+  });
+
+  it('the Alerts tab shows the unread count, in words for screen readers', async () => {
+    mockUnread = 2;
+    await renderNav();
+    expect(screen.getByLabelText('Alerts, 2 unread')).toBeTruthy();
+    expect(screen.getByText('2', { includeHiddenElements: true })).toBeTruthy(); // visual only; the label says it
+    mockUnread = 0;
+  });
+
+  it('more than 9 unread shows "9+"; none shows no badge', async () => {
+    mockUnread = 14;
+    await renderNav();
+    expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByLabelText('Alerts, 14 unread')).toBeTruthy();
+    mockUnread = 0;
   });
 });
