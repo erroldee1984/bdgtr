@@ -84,14 +84,13 @@ export function registerHouseholdRoutes(app: Hono<AppEnv>, auth: MiddlewareHandl
 
   // Create a household; the caller becomes its House Owner.
   app.post('/households', auth, user, async (c) => {
-    const parsed = await parseJsonBody(c, CreateHouseholdInputSchema);
-    if (!parsed.ok) return parsed.response;
+    const input = await parseJsonBody(c, CreateHouseholdInputSchema);
     const db = await deps.getDb();
     const me = c.get('user');
     if ((await countActiveMemberships(db, me._id)) >= MAX_HOUSEHOLDS_PER_USER) {
       return c.json({ error: 'household_limit' }, 409);
     }
-    const { household, membership } = await createHouseholdWithOwner(db, me._id, parsed.data, deps.now());
+    const { household, membership } = await createHouseholdWithOwner(db, me._id, input, deps.now());
     return c.json<HouseholdResponse>({ household: toHousehold(household, membership) }, 201);
   });
 
@@ -100,10 +99,9 @@ export function registerHouseholdRoutes(app: Hono<AppEnv>, auth: MiddlewareHandl
   );
 
   app.patch('/household', auth, user, requireHousehold(deps, 'manage_household'), async (c) => {
-    const parsed = await parseJsonBody(c, UpdateHouseholdInputSchema);
-    if (!parsed.ok) return parsed.response;
+    const input = await parseJsonBody(c, UpdateHouseholdInputSchema);
     const db = await deps.getDb();
-    const updated = await updateHousehold(db, c.get('household')._id, parsed.data, deps.now());
+    const updated = await updateHousehold(db, c.get('household')._id, input, deps.now());
     if (!updated) return c.json({ error: 'not_found' }, 404);
     return c.json<HouseholdResponse>({ household: toHousehold(updated, c.get('membership')) });
   });

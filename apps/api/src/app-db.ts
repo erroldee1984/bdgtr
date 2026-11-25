@@ -13,7 +13,7 @@ let indexesReady: Promise<void> | undefined;
  */
 export async function getAppDb(uri: string, dbName: string): Promise<Db> {
   const db = await getDb(uri, dbName);
-  indexesReady ??= Promise.all([ensureUserIndexes(db), ensureHouseholdIndexes(db)]).then(() => undefined).catch((err) => {
+  indexesReady ??= Promise.all([ensureUserIndexes(db), ensureHouseholdIndexes(db)]).then((): void => undefined).catch((err) => {
     indexesReady = undefined; // retry on the next request
     throw err;
   });

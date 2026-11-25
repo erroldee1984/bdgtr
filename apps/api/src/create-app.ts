@@ -2,6 +2,7 @@ import type { HealthResponse, MeResponse, ReadyResponse } from '@bdgtr/shared';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
 import type { Db } from 'mongodb';
 
@@ -93,6 +94,8 @@ export function createApp(deps: AppDeps) {
 
   // Generic message only: never leak stack traces, queries or secrets to clients.
   app.onError((err, c) => {
+    // Deliberate HTTP errors (e.g. 400 from input validation) carry their own response.
+    if (err instanceof HTTPException) return err.getResponse();
     logError(err);
     return c.json({ error: 'internal_error' }, 500);
   });
