@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
+import { HouseholdProvider } from '@/household/household-context';
 import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
 import { colors, spacing } from '@/theme/tokens';
 
@@ -48,23 +49,35 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
-      <ThemeProvider value={navTheme}>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="sign-in" />
+      <HouseholdProvider>
+        <ThemeProvider value={navTheme}>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="sign-in" />
+            <Stack.Screen name="onboarding" />
           <Stack.Screen
-            name="add"
+            name="household"
             options={{
-              presentation: 'modal',
               headerShown: true,
-              title: 'Add spend',
+              title: 'Household',
               headerStyle: { backgroundColor: colors.surface },
               headerTintColor: colors.textPrimary,
             }}
           />
-        </Stack>
-      </ThemeProvider>
+            <Stack.Screen
+              name="add"
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Add spend',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.textPrimary,
+              }}
+            />
+          </Stack>
+        </ThemeProvider>
+      </HouseholdProvider>
     </ClerkProvider>
   );
 }

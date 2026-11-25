@@ -1,20 +1,15 @@
 import { useClerk } from '@clerk/expo';
+import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
-const SECTIONS = [
-  'Budgets',
-  'Categories',
-  'Fixed transactions',
-  'Household & members',
-  'Settings',
-] as const;
+const SECTIONS = ['Budgets', 'Categories', 'Fixed transactions', 'Settings'] as const;
 
 export default function MoreScreen() {
   const { signOut } = useClerk();
@@ -22,6 +17,21 @@ export default function MoreScreen() {
 
   return (
     <Screen title="More">
+      <Pressable
+        role="link"
+        accessibilityLabel="Household and members"
+        onPress={() => router.push('/household')}
+        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+      >
+        <MaterialCommunityIcons name="home-group" size={24} color={colors.primaryLight} aria-hidden />
+        <View style={styles.flex}>
+          <AppText variant="bodyStrong">Household & members</AppText>
+          <AppText variant="caption" tone="secondary">
+            Name, budget, members and invites
+          </AppText>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
+      </Pressable>
       {SECTIONS.map((section) => (
         <Card key={section}>
           <AppText variant="bodyStrong">{section}</AppText>
@@ -66,4 +76,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   pressed: { opacity: 0.75 },
+  flex: { flex: 1 },
+  linkCard: {
+    minHeight: MIN_TOUCH + 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.card,
+    backgroundColor: colors.surface,
+  },
 });

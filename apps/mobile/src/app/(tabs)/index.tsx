@@ -1,3 +1,4 @@
+import { formatPHP, ROLE_LABELS } from '@bdgtr/shared';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -6,6 +7,9 @@ import { AccountStatus } from '@/components/account-status';
 import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
+import { useHousehold } from '@/household/household-context';
+import { HouseholdSwitcher } from '@/household/household-switcher';
+import { useActiveHouseholdDetails } from '@/household/use-active-household';
 import { type ApiStatus, checkApiHealthWithRetry } from '@/lib/api-health';
 import { useHydrated } from '@/layout/use-hydrated';
 import { usesNavRail, windowClassFor } from '@/layout/window-class';
@@ -20,6 +24,8 @@ const STATUS_COPY: Record<ApiStatus | 'checking', { text: string; icon: 'check-c
 };
 
 export default function DashboardScreen() {
+  const { active } = useHousehold();
+  const { household } = useActiveHouseholdDetails();
   const [status, setStatus] = useState<ApiStatus | 'checking'>('checking');
   const [attempt, setAttempt] = useState(0);
 
@@ -48,7 +54,19 @@ export default function DashboardScreen() {
     copy.tone === 'success' ? colors.success : copy.tone === 'danger' ? colors.danger : colors.textSecondary;
 
   return (
-    <Screen title="Hi there!" subtitle="Your household dashboard arrives in milestone M2.">
+    <Screen
+      title={active?.householdName ?? 'Home'}
+      subtitle={active ? `${ROLE_LABELS[active.role]} · Your dashboard arrives in milestone M2.` : undefined}
+    >
+      <HouseholdSwitcher />
+      <Card>
+        <AppText variant="caption" tone="secondary">
+          Default monthly budget
+        </AppText>
+        <AppText variant="headline" accessibilityLabel={household ? `Default monthly budget ${formatPHP(household.defaultMonthlyBudgetMinor)}` : 'Loading budget'}>
+          {household ? formatPHP(household.defaultMonthlyBudgetMinor) : '…'}
+        </AppText>
+      </Card>
       <Card>
         <AppText variant="title">Setup check</AppText>
         <AccountStatus />
