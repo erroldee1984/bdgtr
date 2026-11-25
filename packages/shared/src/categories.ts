@@ -59,18 +59,16 @@ export const CATEGORY_COLOURS = [
 ] as const;
 export type CategoryColour = (typeof CATEGORY_COLOURS)[number];
 
-/** Offered to every new household (and to existing ones with no categories yet). */
-export const STARTER_CATEGORIES: readonly { name: string; icon: CategoryIcon; colour: CategoryColour }[] = [
-  { name: 'Groceries', icon: 'cart', colour: '#4ADE80' },
-  { name: 'Dining out', icon: 'food', colour: '#FFB547' },
-  { name: 'Transport', icon: 'car', colour: '#5A94FF' },
-  { name: 'Utilities', icon: 'flash', colour: '#2DD4BF' },
-  { name: 'Rent & housing', icon: 'home', colour: '#C084FC' },
-  { name: 'Health', icon: 'medical-bag', colour: '#FF6B6B' },
-  { name: 'Shopping', icon: 'tshirt-crew', colour: '#F472B6' },
-  { name: 'Entertainment', icon: 'movie', colour: '#FB923C' },
-  { name: 'Others', icon: 'dots-horizontal', colour: '#94A3B8' },
-];
+/**
+ * Every household always has at least one active category. New households
+ * start with this one, and it's added automatically to any household that has
+ * none (e.g. one created before categories existed).
+ */
+export const DEFAULT_CATEGORY: { name: string; icon: CategoryIcon; colour: CategoryColour } = {
+  name: 'Groceries',
+  icon: 'cart',
+  colour: '#4ADE80',
+};
 
 const categoryName = z
   .string({ error: 'Name is required' })

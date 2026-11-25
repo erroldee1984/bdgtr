@@ -19,7 +19,6 @@ import { Screen } from '@/components/screen';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
 import {
-  addStarterCategories,
   ApiError,
   createCategory,
   fetchCategories,
@@ -36,6 +35,7 @@ type Editing = { mode: 'add' } | { mode: 'edit'; category: Category } | null;
 const SERVER_MESSAGES: Record<string, string> = {
   category_exists: 'A category with this name already exists.',
   category_limit: 'This household has too many categories. Remove or reuse one.',
+  last_category: 'A household needs at least one category, so the last one can’t be removed.',
 };
 
 /**
@@ -145,13 +145,6 @@ export function CategoriesManager() {
             {activeCats.length === 0 ? (
               <View style={styles.empty}>
                 <AppText tone="secondary">No categories yet.</AppText>
-                {canManage ? (
-                  <Button
-                    label="Add starter categories"
-                    busy={busy}
-                    onPress={() => void run(() => addStarterCategories(token, householdId), 'Starter categories added.')}
-                  />
-                ) : null}
               </View>
             ) : (
               <View style={styles.list}>
@@ -185,19 +178,27 @@ export function CategoriesManager() {
                     ) : canManage ? (
                       <View style={styles.actions}>
                         <Button label="Edit" compact accessibilityLabel={`Edit ${c.name}`} onPress={() => setEditing({ mode: 'edit', category: c })} />
-                        <Button
-                          label="Remove"
-                          variant="danger"
-                          compact
-                          accessibilityLabel={`Remove ${c.name}`}
-                          onPress={() => setConfirmRemove(c)}
-                        />
+                        {/* A household always keeps at least one category. */}
+                        {activeCats.length > 1 ? (
+                          <Button
+                            label="Remove"
+                            variant="danger"
+                            compact
+                            accessibilityLabel={`Remove ${c.name}`}
+                            onPress={() => setConfirmRemove(c)}
+                          />
+                        ) : null}
                       </View>
                     ) : null}
                   </View>
                 ))}
               </View>
             )}
+            {canManage && activeCats.length === 1 ? (
+              <AppText variant="caption" tone="secondary">
+                A household needs at least one category. Add another before removing this one.
+              </AppText>
+            ) : null}
           </Card>
 
           {removed.length > 0 ? (

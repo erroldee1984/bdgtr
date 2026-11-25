@@ -6,7 +6,7 @@ import {
   type CreateCategoryInput,
   manilaDate,
   addDays,
-  STARTER_CATEGORIES,
+  DEFAULT_CATEGORY,
   type UpdateCategoryInput,
 } from '@bdgtr/shared';
 import { type Db, MongoServerError, ObjectId } from 'mongodb';
@@ -117,11 +117,23 @@ export async function createCategory(
   }
 }
 
-/** Adds the starter set (used for new households, or an existing one with none). */
-export async function addStarterCategories(db: Db, householdId: ObjectId, by: ObjectId, now: Date): Promise<CategoryDoc[]> {
-  const docs = STARTER_CATEGORIES.map((c) => newDoc(householdId, { ...c, defaultBudgetMinor: 0 }, by, now));
-  await db.collection<CategoryDoc>(CATEGORIES).insertMany(docs);
-  return docs;
+export async function countActiveCategories(db: Db, householdId: ObjectId): Promise<number> {
+  return db.collection<CategoryDoc>(CATEGORIES).countDocuments({ householdId, isRemoved: false });
+}
+
+/**
+ * A household always has at least one active category: if it has none (a new
+ * household, or one from before categories existed), add the default
+ * (Groceries). Safe to call concurrently: the unique active-name index lets
+ * only one copy in.
+ */
+export async function ensureDefaultCategory(db: Db, householdId: ObjectId, by: ObjectId, now: Date): Promise<void> {
+  if ((await countActiveCategories(db, householdId)) > 0) return;
+  try {
+    await db.collection<CategoryDoc>(CATEGORIES).insertOne(newDoc(householdId, { ...DEFAULT_CATEGORY, defaultBudgetMinor: 0 }, by, now));
+  } catch (err) {
+    if (!isDuplicateKey(err)) throw err; // someone else just added it
+  }
 }
 
 export type UpdateResult = { doc: CategoryDoc | null; error: 'not_found' | 'category_exists' | null };
@@ -152,12 +164,30 @@ export async function updateCategory(
   }
 }
 
-/** Soft remove. False if there's no such active category. */
-export async function removeCategory(db: Db, householdId: ObjectId, id: ObjectId, now: Date): Promise<boolean> {
-  const res = await db
-    .collection<CategoryDoc>(CATEGORIES)
-    .updateOne({ _id: id, householdId, isRemoved: false }, { $set: { isRemoved: true, removedAt: now, updatedAt: now } });
-  return res.matchedCount === 1;
+/**
+ * Soft remove, never the household's last active category. If two removals
+ * race and would leave none, the later one is undone and refused.
+ */
+export async function removeCategory(
+  db: Db,
+  householdId: ObjectId,
+  id: ObjectId,
+  now: Date,
+): Promise<'ok' | 'not_found' | 'last_category'> {
+  const coll = db.collection<CategoryDoc>(CATEGORIES);
+  const target = await coll.findOne({ _id: id, householdId, isRemoved: false });
+  if (!target) return 'not_found';
+  if ((await countActiveCategories(db, householdId)) <= 1) return 'last_category';
+  const res = await coll.updateOne(
+    { _id: id, householdId, isRemoved: false },
+    { $set: { isRemoved: true, removedAt: now, updatedAt: now } },
+  );
+  if (res.matchedCount !== 1) return 'not_found';
+  if ((await countActiveCategories(db, householdId)) === 0) {
+    await coll.updateOne({ _id: id, householdId }, { $set: { isRemoved: false, removedAt: null, updatedAt: now } });
+    return 'last_category';
+  }
+  return 'ok';
 }
 
 /** Restore a removed category. 'category_exists' if an active one has taken its name meanwhile. */
