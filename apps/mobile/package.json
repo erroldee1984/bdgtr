@@ -38,6 +38,7 @@
   "devDependencies": {
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
+    "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
@@ -50,7 +51,7 @@
     "android": "pnpm --filter @bdgtr/shared build && expo start --android",
     "web": "pnpm --filter @bdgtr/shared build && expo start --web",
     "build:web": "pnpm --filter @bdgtr/shared build && expo export -p web && node scripts/write-web-headers.mjs dist",
-    "test": "jest",
+    "test": "jest --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "dev:web": "pnpm --filter @bdgtr/shared build && expo start --web",
@@ -60,6 +61,23 @@
   "description": "bdgtr app for Android and web (Expo / React Native)",
   "jest": {
     "preset": "jest-expo",
+    "testTimeout": 20000,
+    "maxWorkers": "50%",
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/__tests__/**"
+    ],
+    "coverageReporters": [
+      "text-summary"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 85,
+        "branches": 80,
+        "functions": 75,
+        "lines": 85
+      }
+    },
     "transformIgnorePatterns": [
       "node_modules/(?!(?:\\.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?[/+].*|@expo-google-fonts[/+].*|react-navigation|@react-navigation[/+].*|@sentry[/+]react-native|native-base|react-native-svg|standard-navigation|@bdgtr[/+].*))"
     ]

@@ -90,8 +90,19 @@ export async function createHouseholdWithOwner(
   return { household, membership };
 }
 
+/** How many households the user is in now: active memberships of households that still exist. */
 export async function countActiveMemberships(db: Db, userId: ObjectId): Promise<number> {
-  return db.collection<MembershipDoc>(MEMBERSHIPS).countDocuments({ userId, status: 'active' });
+  const [row] = await db
+    .collection<MembershipDoc>(MEMBERSHIPS)
+    .aggregate<{ n: number }>([
+      { $match: { userId, status: 'active' } },
+      { $lookup: { from: HOUSEHOLDS, localField: 'householdId', foreignField: '_id', as: 'household' } },
+      { $unwind: '$household' },
+      { $match: { 'household.deletedAt': null } }, // deleted households don't count toward the limit
+      { $count: 'n' },
+    ])
+    .toArray();
+  return row?.n ?? 0;
 }
 
 /** The user's active memberships in households that still exist, oldest first. */

@@ -8,6 +8,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-
 
 import { AppText } from '@/components/app-text';
 import { WelcomeHero } from '@/components/welcome-hero';
+import { signInErrorMessage } from '@/lib/sign-in-error';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 // Lets the browser tab hand the OAuth result back to the app and close itself.
@@ -62,7 +63,7 @@ export default function SignInScreen() {
       // No session = the user closed the tab or cancelled: stay here, no error.
     } catch (err) {
       if (__DEV__) console.warn('[sign-in] failed', err);
-      setError("Sign-in didn't complete. Check your connection and try again.");
+      setError(signInErrorMessage(err));
     } finally {
       setBusy(false);
     }

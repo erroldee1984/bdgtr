@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, fetchMe } from '../api';
+import { ApiError, apiFetch, createHousehold, deleteHousehold, fetchHousehold, fetchMe, updateHousehold } from '../api';
 import { API_URL } from '../config';
 
 jest.mock('@clerk/expo', () => ({ useAuth: () => ({ getToken: async () => 'tok' }) }));
@@ -55,5 +55,84 @@ describe('fetchMe', () => {
 
   it('rejects a response that does not match the contract', async () => {
     await expect(fetchMe(async () => 't', respond(200, { user: { id: 'u1' } }))).rejects.toThrow();
+  });
+});
+
+describe('household calls', () => {
+  const H = {
+    id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+    name: 'Dela Cruz',
+    currency: 'PHP',
+    timezone: 'Asia/Manila',
+    defaultMonthlyBudgetMinor: 4_000_000,
+    role: 'owner',
+  };
+  const tok = async () => 't';
+  let fetchSpy: jest.SpyInstance;
+  const lastCall = () => {
+    const [url, init] = fetchSpy.mock.calls.at(-1) as [string, RequestInit];
+    return { url, init, headers: init.headers as Record<string, string> };
+  };
+  const serve = (status: number, body?: unknown) =>
+    fetchSpy.mockImplementation(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }));
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+  afterEach(() => fetchSpy.mockRestore());
+
+  it('createHousehold POSTs the JSON body to /households (no household header)', async () => {
+    serve(201, { household: H });
+    await expect(createHousehold(tok, { name: 'Dela Cruz', defaultMonthlyBudgetMinor: 4_000_000 })).resolves.toEqual(H);
+    const { url, init, headers } = lastCall();
+    expect(url).toBe(`${API_URL}/households`);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ name: 'Dela Cruz', defaultMonthlyBudgetMinor: 4_000_000 });
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(headers['X-Household-Id']).toBeUndefined();
+  });
+
+  it('fetchHousehold names the household in X-Household-Id', async () => {
+    serve(200, { household: H });
+    await expect(fetchHousehold(tok, H.id)).resolves.toEqual(H);
+    expect(lastCall().url).toBe(`${API_URL}/household`);
+    expect(lastCall().headers).toMatchObject({ 'X-Household-Id': H.id, Authorization: 'Bearer t' });
+  });
+
+  it('updateHousehold PATCHes the changes for that household', async () => {
+    serve(200, { household: { ...H, defaultMonthlyBudgetMinor: 1 } });
+    await expect(updateHousehold(tok, H.id, { defaultMonthlyBudgetMinor: 1 })).resolves.toMatchObject({ defaultMonthlyBudgetMinor: 1 });
+    const { init, headers } = lastCall();
+    expect(init.method).toBe('PATCH');
+    expect(headers).toMatchObject({ 'X-Household-Id': H.id, 'Content-Type': 'application/json', Authorization: 'Bearer t' });
+    expect(JSON.parse(init.body as string)).toEqual({ defaultMonthlyBudgetMinor: 1 });
+  });
+
+  it('deleteHousehold sends DELETE and accepts the empty 204 answer', async () => {
+    serve(204);
+    await expect(deleteHousehold(tok, H.id)).resolves.toBeUndefined();
+    expect(lastCall().init.method).toBe('DELETE');
+    expect(lastCall().headers['X-Household-Id']).toBe(H.id);
+  });
+
+  it.each([
+    ['limit reached', () => createHousehold(tok, { name: 'X', defaultMonthlyBudgetMinor: 1 }), 409, 'household_limit'],
+    ['not a member', () => fetchHousehold(tok, H.id), 404, 'not_found'],
+    ['role lacks permission', () => updateHousehold(tok, H.id, { name: 'X' }), 403, 'forbidden'],
+    ['House Member deleting', () => deleteHousehold(tok, H.id), 403, 'forbidden'],
+  ])('%s → ApiError %i %s', async (_label, run, status, code) => {
+    serve(status, { error: code });
+    await expect(run()).rejects.toMatchObject({ status, code });
+  });
+
+  it('rejects a household response that does not match the contract', async () => {
+    serve(200, { household: { ...H, role: 'admin' } });
+    await expect(fetchHousehold(tok, H.id)).rejects.toThrow();
+  });
+
+  it('never calls the API when signed out', async () => {
+    serve(200, { household: H });
+    await expect(fetchHousehold(async () => null, H.id)).rejects.toMatchObject({ status: 401 });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
