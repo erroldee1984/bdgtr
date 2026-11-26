@@ -19,7 +19,8 @@ export function LegalPage({
   children,
 }: {
   title: string;
-  updated: string;
+  /** "Last updated …" (Privacy and Terms). */
+  updated?: string;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -38,9 +39,11 @@ export function LegalPage({
           </AppText>
         </Link>
         <AppText variant="headline">{title}</AppText>
-        <AppText variant="caption" tone="secondary">
-          Last updated {updated}
-        </AppText>
+        {updated ? (
+          <AppText variant="caption" tone="secondary">
+            Last updated {updated}
+          </AppText>
+        ) : null}
         <View style={styles.body}>{children}</View>
         <View style={styles.footer}>
           <Link href="/privacy">
@@ -48,6 +51,9 @@ export function LegalPage({
           </Link>
           <Link href="/terms">
             <AppText tone="accent">Terms</AppText>
+          </Link>
+          <Link href="/download">
+            <AppText tone="accent">Android app</AppText>
           </Link>
         </View>
       </View>
@@ -70,11 +76,12 @@ export function P({ children }: { children: ReactNode }) {
   return <AppText tone="secondary">{children}</AppText>;
 }
 
-export function Bullet({ children }: { children: ReactNode }) {
+/** A list item: "•" by default, or a step number like "1." for steps in order. */
+export function Bullet({ children, marker = '•' }: { children: ReactNode; marker?: string }) {
   return (
     <View style={styles.bullet}>
-      <AppText tone="secondary" aria-hidden>
-        •
+      <AppText tone="secondary" aria-hidden={marker === '•'}>
+        {marker}
       </AppText>
       <AppText tone="secondary" style={styles.flex}>
         {children}
@@ -92,5 +99,5 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   bullet: { flexDirection: 'row', gap: spacing.sm, paddingLeft: spacing.sm },
   flex: { flex: 1 },
-  footer: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.xxl },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, marginTop: spacing.xxl },
 });

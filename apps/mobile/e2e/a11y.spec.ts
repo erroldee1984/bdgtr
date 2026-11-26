@@ -11,6 +11,7 @@ const PAGES = [
   { path: '/sign-in', name: 'Sign in' },
   { path: '/privacy', name: 'Privacy' },
   { path: '/terms', name: 'Terms' },
+  { path: '/download', name: 'Android download' },
   { path: '/invite/not-a-real-token', name: 'Invite link' },
   { path: '/no-such-page', name: 'Not found' },
 ];
@@ -18,7 +19,9 @@ const PAGES = [
 for (const { path, name } of PAGES) {
   test(`${name} (${path}) has no WCAG 2.2 AA violations`, async ({ page }) => {
     await page.goto(path);
-    await page.waitForLoadState('networkidle').catch(() => {}); // Clerk may keep a connection open
+    // Clerk Protect's probe connections can hang, so the network may never go
+    // idle: give it 5 s at most, then check what's on the page.
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
     await page.locator('main, [role="main"]').first().waitFor({ timeout: 15_000 });
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
     const summary = results.violations.map((v) => `${v.id} (${v.impact}): ${v.help}\n  ${v.nodes.map((n) => n.target.join(' ')).join('\n  ')}`);

@@ -156,6 +156,19 @@ Step-by-step Cloudflare instructions will come in M0. §13 has the outline.
 
 **Plan:** ship the APK from our own site in v1, register the free limited-distribution account once it's open to us, and keep the PWA as the zero-install fallback.
 
+**Rechecked 27 Nov 2026 (M6c),** from Google's developer-verification pages and their 19 Nov 2026 post:
+- **Enforcement:** started 30 Sep 2026 in Brazil, Indonesia, Singapore and Thailand. The **global rollout begins January 2027**, expanding to all countries over several months. The Philippines isn't named, so no fixed date yet.
+- **Limited-distribution account:** it's **open now**. It's free, needs no government ID and covers **up to 50 devices** (raised from 20). You register package names, plus their signing keys, in the Android Developer Console (`android.google.com/developerconsole`). Phones are authorised by QR code or link. Keep the signing key safe: losing it means packages can't be registered.
+- **Unregistered apps after enforcement:** a one-time "advanced flow" (developer mode, a no-coaching check, restart, a **one-day wait**), then "Install anyway"; or ADB with no wait. Updates fail while the advanced flow is off.
+- **To do (owner, before 2027):** register `com.erroldee.bdgtr` with the EAS signing key's certificate. This needs the owner's Google account, 2-Step Verification and a payments profile.
+
+**Distribution as built (M6c):**
+- `bdgtr.erroldee.com/download` is a public install guide: numbered steps, Play Protect's "Install anyway", updating, notifications, and the browser alternative.
+- The APK is too big for Cloudflare Pages (25 MB per file; the M4 preview APK was 115 MB), so it's published as a **GitHub Release asset named exactly `bdgtr.apk`**. The page links to `releases/latest/download/bdgtr.apk`.
+- `APK_AVAILABLE` in `src/app/download.tsx` stays `false`, showing "first release is being prepared", until the first release is published.
+- **Each release:** build the APK (production profile), publish a GitHub release with `bdgtr.apk` and its SHA-256 in the notes, then check the download link.
+- **PWA check (M6c):** Chrome's installability check reports no errors (live site and build). The manifest gained `id`, `scope` and long-press shortcuts (Add spend, Spend).
+
 ### 2b. Notifications to all household members
 
 When a spend crosses a threshold (§6.3), the API **fans out the alert to every active member of that household**. That includes the person who entered the spend, minus anyone who has muted alerts.
