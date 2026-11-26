@@ -42,12 +42,21 @@ const mockBills: Category = { id: id(101), name: 'Bills', icon: 'flash', colour:
 let mockItems: FixedTransaction[];
 let mockPosted: Record<string, Record<string, string>>; // month → id → date
 let mockFail: Error | null;
+let mockCategoryError: Error | null;
 const mockCalls: { op: string; body?: unknown; month?: string }[] = [];
 jest.mock('@/lib/api', () => {
   const { ApiError: E } = jest.requireActual('@/lib/api-error');
   return {
     ApiError: E,
-    fetchCategories: async () => [mockGroceries, mockBills],
+    fetchCategories: async () => {
+      mockCalls.push({ op: 'categories' });
+      return [mockGroceries, mockBills];
+    },
+    createCategory: async (_t: unknown, _h: string, input: { name: string }) => {
+      mockCalls.push({ op: 'createCategory', body: input });
+      if (mockCategoryError) throw mockCategoryError;
+      return { ...mockGroceries, id: 'e'.repeat(24), name: input.name, icon: 'help-circle-outline', colour: '#94A3B8' };
+    },
     fetchFixed: async (_t: unknown, _h: string, month: string) => {
       mockCalls.push({ op: 'list', month });
       return mockItems.map((i) => ({ ...i, postedOn: mockPosted[month]?.[i.id] ?? null }));
@@ -89,6 +98,7 @@ beforeEach(() => {
   mockItems = [RENT, NET];
   mockPosted = { '2026-11': { [RENT.id]: '2026-11-05' } };
   mockFail = null;
+  mockCategoryError = null;
   mockCalls.length = 0;
   mockToasts.length = 0;
 });
@@ -196,6 +206,53 @@ describe('add, edit, remove', () => {
     await fireEvent.press(screen.getAllByRole('button', { name: 'Remove' }).at(-1)!); // the dialog's
     await waitFor(() => expect(mockCalls.some((c) => c.op === 'remove' && c.body === RENT.id)).toBe(true));
     expect(await screen.findByText('Rent removed. Spends already added from it stay.')).toBeTruthy();
+  });
+});
+
+describe('quick add a category (same as Add spend)', () => {
+  async function startForm() {
+    await open();
+    await press('Add fixed transaction');
+    await fireEvent.changeText(screen.getByLabelText('Name'), 'Vet');
+    await fireEvent.changeText(screen.getByLabelText('Amount'), '1500');
+    await fireEvent.changeText(screen.getByLabelText('Day of the month'), '10');
+  }
+  async function quickAdd(name: string) {
+    await fireEvent.press(screen.getByLabelText('New category'));
+    await fireEvent.changeText(screen.getByLabelText('New category name'), name);
+    await press('Add');
+  }
+
+  it('asks only for a name, adds it, selects it, and the item saves in it', async () => {
+    await startForm();
+    await quickAdd(' Pet care ');
+    expect(mockCalls.find((c) => c.op === 'createCategory')?.body).toEqual({
+      name: 'Pet care',
+      icon: 'help-circle-outline',
+      colour: '#94A3B8',
+      defaultBudgetMinor: 0,
+    });
+    expect(await screen.findByText('Pet care added and selected.')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Pet care' })).toBeChecked();
+    await press('Save');
+    await waitFor(() => expect(mockCalls.find((c) => c.op === 'create')?.body).toMatchObject({ name: 'Vet', categoryId: 'e'.repeat(24) }));
+  });
+
+  it('an existing name selects that category, no duplicate', async () => {
+    await startForm();
+    await quickAdd('groceries');
+    expect(mockCalls.some((c) => c.op === 'createCategory')).toBe(false);
+    expect(await screen.findByText("Groceries already exists, so it's selected.")).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Groceries' })).toBeChecked();
+  });
+
+  it('a name clash on the server explains it and reloads the categories', async () => {
+    mockCategoryError = new ApiError(409, 'category_exists');
+    await startForm();
+    const before = mockCalls.filter((c) => c.op === 'categories').length;
+    await quickAdd('Pet care');
+    expect(await screen.findByText('A category with this name already exists. Pick it from the list.')).toBeTruthy();
+    await waitFor(() => expect(mockCalls.filter((c) => c.op === 'categories').length).toBe(before + 1));
   });
 });
 

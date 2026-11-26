@@ -7,6 +7,7 @@ import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { TextField } from '@/components/text-field';
+import { QuickAddCategory } from '@/spend/quick-add-category';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 import { type FixedFormErrors, type FixedFormValues, scheduleText, validateFixedForm } from './fixed-form';
@@ -19,6 +20,8 @@ export function FixedFormCard({
   title,
   initial,
   categories,
+  householdId,
+  onCategoriesStale,
   onSave,
   onCancel,
   onRemove,
@@ -26,6 +29,9 @@ export function FixedFormCard({
   title: string;
   initial: FixedFormValues;
   categories: Category[];
+  householdId: string;
+  /** A quick-added name already existed on the server: reload the categories. */
+  onCategoriesStale: () => void;
   onSave: (input: Extract<ReturnType<typeof validateFixedForm>, { ok: true }>['input']) => Promise<string | null>;
   onCancel: () => void;
   onRemove?: () => void;
@@ -43,7 +49,10 @@ export function FixedFormCard({
       return next;
     });
   };
-  const active = categories.filter((c) => !c.isRemoved || c.id === initial.categoryId);
+  const [added, setAdded] = useState<Category[]>([]); // quick-added here, until the list reloads
+  const [quickNote, setQuickNote] = useState<string | null>(null);
+  const all = [...added.filter((a) => !categories.some((c) => c.id === a.id)), ...categories];
+  const active = all.filter((c) => !c.isRemoved || c.id === initial.categoryId);
   const day = Number(v.day);
 
   async function save() {
@@ -92,7 +101,22 @@ export function FixedFormCard({
               </Pressable>
             );
           })}
+          <QuickAddCategory
+            householdId={householdId}
+            categories={all.filter((c) => !c.isRemoved)}
+            onConflict={onCategoriesStale}
+            onPicked={(c, isNew) => {
+              if (isNew) setAdded((list) => [c, ...list]);
+              set({ categoryId: c.id });
+              setQuickNote(isNew ? `${c.name} added and selected.` : `${c.name} already exists, so it's selected.`);
+            }}
+          />
         </View>
+        {quickNote ? (
+          <AppText tone="secondary" aria-live="polite">
+            {quickNote}
+          </AppText>
+        ) : null}
         {errors.category ? (
           <AppText tone="danger" role="alert">
             {errors.category}
