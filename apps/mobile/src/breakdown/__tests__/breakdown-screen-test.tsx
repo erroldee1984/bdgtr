@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 
 import { BreakdownScreen, deleteProblem, listSummary } from '@/breakdown/breakdown-screen';
 import { ApiError } from '@/lib/api-error';
@@ -15,11 +15,7 @@ jest.mock('@clerk/expo', () => {
 });
 
 let mockRole = 'owner';
-let mockWindowClass = 'medium';
-jest.mock('@/layout/window-class', () => ({
-  ...jest.requireActual('@/layout/window-class'),
-  useWindowClass: () => mockWindowClass,
-}));
+
 jest.mock('@/household/household-context', () => ({
   useHousehold: () => ({ active: { householdId: 'h1', householdName: 'Dela Cruz', role: mockRole } }),
 }));
@@ -81,11 +77,8 @@ const B = tx(2, '2026-11-10', 12_000, mockBills, { isYours: false });
 const C = tx(3, '2026-11-12', 90_000, mockGroceries);
 const D = tx(4, '2026-11-01', 30_000, mockGroceries, { isYours: false });
 
-afterEach(() => jest.restoreAllMocks());
-
 beforeEach(async () => {
   mockRole = 'owner';
-  mockWindowClass = 'medium';
   mockTxs = [A, B, C, D];
   mockDeleteError = null;
   mockLoadError = null;
@@ -103,7 +96,7 @@ async function open(month = '2026-11') {
 }
 const rowLabels = () => screen.getAllByRole('button', { name: /^Nov \d+, / }).map((r) => r.props.accessibilityLabel as string);
 const row = (name: RegExp) => screen.getByRole('button', { name });
-const action = (el: ReturnType<typeof row>, actionName: string) => fireEvent(el, 'accessibilityAction', { nativeEvent: { actionName } });
+const press = (name: string | RegExp) => fireEvent.press(screen.getByRole('button', { name }));
 
 describe('the list', () => {
   it('Date · Category · Cost, newest first, with a count and total', async () => {
@@ -144,16 +137,19 @@ describe('the list', () => {
 });
 
 describe('pins (this device only)', () => {
-  it('pin via the screen-reader action → first, under "Pinned", stored per user and household', async () => {
+  it('the pin icon → first, under "Pinned", stored per user and household', async () => {
     await open();
-    await action(row(/^Nov 1,/), 'pin');
+    await press('Pin Nov 1, Groceries, ₱300.00');
     expect(rowLabels()[0]).toBe('Nov 1, Groceries, ₱300.00, pinned');
     expect(screen.getByRole('heading', { name: 'Pinned' })).toBeTruthy();
     expect(screen.getByText('Pinned to the top.')).toBeTruthy();
     await waitFor(async () => expect(JSON.parse((await AsyncStorage.getItem('pins:u:h1'))!)).toEqual({ [D.id]: '2026-11' }));
+    await press('Unpin Nov 1, Groceries, ₱300.00');
+    expect(rowLabels()[0]).toBe('Nov 12, Groceries, ₱900.00');
+    expect(screen.getByText('Unpinned.')).toBeTruthy();
   });
 
-  it('swipe right toggles the pin, no confirmation', async () => {
+  it('swipe right still toggles the pin, no confirmation', async () => {
     await open();
     const i = rowLabels().indexOf('Nov 3, Groceries, ₱500.00');
     await act(async () => mockSwipeables.at(-4 + i)!.onSwipeableOpen('right'));
@@ -175,7 +171,7 @@ describe('pins (this device only)', () => {
   it('filters still apply to pinned rows', async () => {
     await AsyncStorage.setItem('pins:u:h1', JSON.stringify({ [C.id]: '2026-11' }));
     await open();
-    await fireEvent.press(screen.getByRole('button', { name: /^Filters and sort/ }));
+    await press('Filters');
     await fireEvent.press(screen.getByRole('checkbox', { name: 'Bills (removed)' }));
     expect(rowLabels()).toEqual(['Nov 10, Bills, ₱120.00']);
     expect(screen.queryByRole('heading', { name: 'Pinned' })).toBeNull();
@@ -183,14 +179,14 @@ describe('pins (this device only)', () => {
 });
 
 describe('delete', () => {
-  it('swipe left asks first; Delete removes it and its pin', async () => {
+  it('the delete icon asks first; Delete removes it and its pin', async () => {
     await AsyncStorage.setItem('pins:u:h1', JSON.stringify({ [A.id]: '2026-11' }));
     await open();
-    await act(async () => mockSwipeables.at(-4)!.onSwipeableOpen('left')); // pinned A is first
+    await press('Delete Nov 3, Groceries, ₱500.00');
     expect(screen.getByText('Delete this spend?')).toBeTruthy();
     expect(screen.getByText('Nov 3 · Groceries · ₱500.00')).toBeTruthy();
     expect(mockDeleted).toEqual([]);
-    await fireEvent.press(screen.getByRole('button', { name: 'Delete' }));
+    await press('Delete');
     await waitFor(() => expect(mockDeleted).toEqual([A.id]));
     expect(screen.getByText('Deleted Groceries ₱500.00.')).toBeTruthy();
     expect(rowLabels()).toHaveLength(3);
@@ -199,8 +195,8 @@ describe('delete', () => {
 
   it('Cancel keeps it', async () => {
     await open();
-    await action(row(/^Nov 12,/), 'delete');
-    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    await press(/^Delete Nov 12,/);
+    await press('Cancel');
     expect(mockDeleted).toEqual([]);
     expect(rowLabels()).toHaveLength(4);
   });
@@ -208,117 +204,98 @@ describe('delete', () => {
   it('a refused delete explains why and keeps the row', async () => {
     mockDeleteError = new ApiError(500, 'boom');
     await open();
-    await action(row(/^Nov 12,/), 'delete');
-    await fireEvent.press(screen.getByRole('button', { name: 'Delete' }));
+    await press(/^Delete Nov 12,/);
+    await press('Delete');
     expect(await screen.findByText("Couldn't delete. Check your connection and try again.")).toBeTruthy();
     expect(rowLabels()).toHaveLength(4);
   });
 
-  it('House Member: only their own rows can be deleted (no swipe, no action, no menu item)', async () => {
+  it('no swipe to delete: rows have no right-side swipe action and swiping left does nothing', async () => {
+    await open();
+    const swipes = mockSwipeables.slice(-4);
+    expect(swipes.every((s) => s.renderRightActions === undefined)).toBe(true);
+    await act(async () => swipes[0]!.onSwipeableOpen('left'));
+    expect(screen.queryByText('Delete this spend?')).toBeNull();
+    expect(rowLabels()[0]).toBe('Nov 12, Groceries, ₱900.00');
+  });
+
+  it('House Member: a delete icon only on their own rows; pin on every row', async () => {
     mockRole = 'member';
     await open();
-    const actionsOf = (name: RegExp) => (row(name).props.accessibilityActions as { name: string }[]).map((a) => a.name);
-    expect(actionsOf(/^Nov 12,/)).toEqual(['activate', 'pin', 'delete']); // theirs
-    expect(actionsOf(/^Nov 10,/)).toEqual(['activate', 'pin']); // someone else's
-    const swipes = mockSwipeables.slice(-4);
-    expect(swipes.map((s) => typeof s.renderRightActions)).toEqual(['function', 'undefined', 'function', 'undefined']);
-    await act(async () => swipes[1]!.onSwipeableOpen('left'));
-    expect(screen.queryByText('Delete this spend?')).toBeNull();
-    await fireEvent(row(/^Nov 10,/), 'longPress');
-    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
-    expect(screen.getByText(/Only the person who entered this spend/)).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Pin' }));
-    expect(rowLabels()[0]).toBe('Nov 10, Bills, ₱120.00, pinned'); // pinning works for everyone
+    const deletes = screen.getAllByRole('button', { name: /^Delete / }).map((b) => b.props.accessibilityLabel);
+    expect(deletes).toEqual(['Delete Nov 12, Groceries, ₱900.00', 'Delete Nov 3, Groceries, ₱500.00']);
+    expect(screen.getAllByRole('button', { name: /^Pin / })).toHaveLength(4);
+    await press('Pin Nov 10, Bills, ₱120.00');
+    expect(rowLabels()[0]).toBe('Nov 10, Bills, ₱120.00, pinned');
   });
 
-  it('House Owner can delete anyone’s row', async () => {
+  it('House Owner gets a delete icon on every row', async () => {
     await open();
-    expect(mockSwipeables.slice(-4).every((s) => typeof s.renderRightActions === 'function')).toBe(true);
+    expect(screen.getAllByRole('button', { name: /^Delete / })).toHaveLength(4);
   });
 });
 
-describe('long-press menu', () => {
-  it('offers description, pin and delete', async () => {
+describe('no menu', () => {
+  it('no "⋯" buttons, and long-press opens nothing', async () => {
     await open();
+    expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
     await fireEvent(row(/^Nov 3,/), 'longPress');
-    expect(screen.getByText('Nov 3 · Groceries · ₱500.00')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Show description' }));
-    expect(screen.getByText('Weekly market run')).toBeTruthy();
-  });
-
-  it('Delete from the menu still asks for confirmation', async () => {
-    await open();
-    await fireEvent(row(/^Nov 3,/), 'longPress');
-    await fireEvent.press(screen.getByRole('button', { name: 'Delete' }));
-    expect(screen.getByText('Delete this spend?')).toBeTruthy();
+    expect(screen.queryByText('Nov 3 · Groceries · ₱500.00')).toBeNull();
   });
 });
 
-describe('non-swipe ways in', () => {
-  it('phones (Android, compact): swipe hint, no "⋯" buttons', async () => {
-    jest.replaceProperty(Platform, 'OS', 'android');
-    mockWindowClass = 'compact';
+describe('filter and sort icon buttons', () => {
+  it('sit on the count line; one panel at a time', async () => {
     await open();
-    expect(screen.getByText('Swipe right to pin, left to delete. Press and hold for more.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /^More actions for/ })).toBeNull();
+    const filters = screen.getByRole('button', { name: 'Filters' });
+    expect(filters).not.toBeExpanded();
+    await fireEvent.press(filters);
+    expect(screen.getByTestId('filter-panel')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeExpanded();
+    await press('Sort, Newest first by date');
+    expect(screen.getByTestId('sort-panel')).toBeTruthy();
+    expect(screen.queryByTestId('filter-panel')).toBeNull();
+    await press('Sort, Newest first by date');
+    expect(screen.queryByTestId('sort-panel')).toBeNull();
   });
 
-  it('wide screens: a visible "⋯" button opens the menu', async () => {
-    jest.replaceProperty(Platform, 'OS', 'android');
+  it('categories (multi) AND a ₱ range; the filter button says how many are on', async () => {
     await open();
-    expect(screen.queryByText(/Swipe right to pin/)).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: 'More actions for Nov 3, Groceries, ₱500.00' }));
-    expect(screen.getByText('Nov 3 · Groceries · ₱500.00')).toBeTruthy();
-  });
-
-  it('web: "⋯" even on a narrow window, and right-click opens the menu instead of the browser’s', async () => {
-    jest.replaceProperty(Platform, 'OS', 'web');
-    mockWindowClass = 'compact';
-    await open();
-    expect(screen.getAllByRole('button', { name: /^More actions for/ })).toHaveLength(4);
-    const preventDefault = jest.fn();
-    await fireEvent(row(/^Nov 3,/), 'contextMenu', { preventDefault });
-    expect(preventDefault).toHaveBeenCalled();
-    expect(screen.getByText('Nov 3 · Groceries · ₱500.00')).toBeTruthy();
-  });
-});
-
-describe('filters and sort', () => {
-  it('categories (multi) AND a ₱ range; the count shows', async () => {
-    await open();
-    await fireEvent.press(screen.getByRole('button', { name: /^Filters and sort/ }));
+    await press('Filters');
     await fireEvent.press(screen.getByRole('checkbox', { name: 'Groceries' }));
     expect(rowLabels()).toHaveLength(3);
     await fireEvent.changeText(screen.getByLabelText('Min'), '400');
     expect(rowLabels()).toEqual(['Nov 12, Groceries, ₱900.00', 'Nov 3, Groceries, ₱500.00']);
     expect(screen.getByText('Showing 2 of 4 · ₱1,400.00')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /2 filters on/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filters, 2 on' })).toBeTruthy();
   });
 
   it('min above max is flagged and ignored', async () => {
     await open();
-    await fireEvent.press(screen.getByRole('button', { name: /^Filters and sort/ }));
+    await press('Filters');
     await fireEvent.changeText(screen.getByLabelText('Min'), '800');
     await fireEvent.changeText(screen.getByLabelText('Max'), '100');
     expect(screen.getByText('Max must be at least the min amount')).toBeTruthy();
     expect(rowLabels()).toHaveLength(4);
   });
 
-  it('nothing matching → a message and Clear filters', async () => {
+  it('nothing matching → a message and Clear filters; the buttons stay so you can change them', async () => {
     await open();
-    await fireEvent.press(screen.getByRole('button', { name: /^Filters and sort/ }));
+    await press('Filters');
     await fireEvent.changeText(screen.getByLabelText('Min'), '5000');
     expect(screen.getByText('No spends match these filters.')).toBeTruthy();
+    expect(screen.getByText('Showing 0 of 4 · ₱0.00')).toBeTruthy();
     await fireEvent.press(screen.getAllByRole('button', { name: 'Clear filters' })[0]!);
     expect(rowLabels()).toHaveLength(4);
   });
 
   it('sort by cost, then flip the order', async () => {
     await open();
-    await fireEvent.press(screen.getByRole('button', { name: /^Filters and sort/ }));
+    await press(/^Sort,/);
     await fireEvent.press(screen.getByRole('radio', { name: 'Cost' }));
     expect(rowLabels().map((l) => l.split(', ')[2])).toEqual(['₱900.00', '₱500.00', '₱300.00', '₱120.00']);
-    await fireEvent.press(screen.getByRole('button', { name: 'Order: Highest first. Change' }));
+    expect(screen.getByRole('button', { name: 'Sort, Highest first by cost' })).toBeTruthy();
+    await press('Order: Highest first. Change');
     expect(rowLabels().map((l) => l.split(', ')[2])).toEqual(['₱120.00', '₱300.00', '₱500.00', '₱900.00']);
   });
 });

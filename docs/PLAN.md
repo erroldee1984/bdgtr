@@ -376,7 +376,7 @@ Month switcher. Shows the default monthly budget (editable) and this month's val
 - Category defaults aren't shown or edited here; they live under More → Categories
 
 ### 6.8 Monthly Spend Breakdown
-**As built (M4):** the Spend tab (`src/breakdown/`). The month's spends are fetched whole and arranged on the device by `arrangeBreakdown` in `shared/breakdown.ts`, which filters, sorts with stable id tie-breaks, and puts pinned rows first. Pins are stored as `{ transactionId: "YYYY-MM" }` under `pins:<clerkUserId>:<householdId>` with AsyncStorage, which uses localStorage on the web. `prunePins` drops a month's pins whose spend is gone each time that month loads. Sign-out removes every `pins:` key. Filters apply as you change them; an invalid range shows its error and is ignored. The month picker opens from the month name in `MonthSwitcher`, so Budgets and Alerts have it too. The "⋯" button shows on the web and on wide screens; phones show a one-line swipe hint instead.
+**As built (M4):** the Spend tab (`src/breakdown/`). The month's spends are fetched whole and arranged on the device by `arrangeBreakdown` in `shared/breakdown.ts`, which filters, sorts with stable id tie-breaks, and puts pinned rows first. Pins are stored as `{ transactionId: "YYYY-MM" }` under `pins:<clerkUserId>:<householdId>` with AsyncStorage, which uses localStorage on the web. `prunePins` drops a month's pins whose spend is gone each time that month loads. Sign-out removes every `pins:` key. Filters apply as you change them; an invalid range shows its error and is ignored. The month picker opens from the month name in `MonthSwitcher`, so Budgets and Alerts have it too. Filter and Sort are separate icon buttons at the right end of the count/total line, and each opens its own panel (one at a time). The filter button shows a number badge when filters are on.
 - Month selector, defaulting to the current month, with ‹ › arrows and a month picker
 - Filters: category multi-select and a min–max ₱ range (min ≤ max is validated). Combined with AND.
 - Sort: date or cost, ascending or descending. **The member's own pinned rows always come first**, with filters still applied to them.
@@ -385,11 +385,11 @@ Month switcher. Shows the default monthly budget (editable) and this month's val
   - Pins don't sync between a member's devices, and reinstalling or clearing browser data loses them. That's acceptable because pins aren't critical.
   - Pin IDs for transactions that no longer exist are pruned when the month loads. All pin keys for the user are cleared on sign-out, so a shared computer doesn't keep them.
   - Since pinning is applied on the device, the month's filtered list is fetched **whole, without pagination**. A household month is a few hundred rows at most. Pinned-first ordering is a pure function in `shared`.
-- Each row shows **Date · Category · Cost** only
+- Each row shows **Date · Category · Cost**, then a **Pin** icon button and a **Delete** icon button at the right end. These were changed after M4 at the user's request: no "⋯" menu, no long-press or right-click menu, and **no swipe to delete**.
 - Tap a row to open a dialog with its description, or "No description"
-- **Swipe left**: Delete, with a confirmation dialog. **Swipe right**: toggle pin, no confirmation.
-- **House Members** can swipe-delete only rows they entered. On other rows, swipe left does nothing and the menu doesn't offer Delete. Pinning works for everyone.
-- **Non-swipe alternatives** for accessibility and for mouse users: long-press or right-click opens a menu, a visible "⋯" row button on web and wide screens, and TalkBack/ARIA custom actions
+- **Pin icon** (or **swipe right**) toggles the pin, with no confirmation. **Delete icon** asks for confirmation first.
+- **House Members** see the Delete icon only on rows they entered. Other rows keep an empty slot so the columns line up. Pinning works for everyone.
+- Every icon button has a full spoken label, e.g. "Delete Nov 3, Groceries, ₱500.00", and a 48dp target.
 
 ### 6.9 Household & Members
 See §3.
