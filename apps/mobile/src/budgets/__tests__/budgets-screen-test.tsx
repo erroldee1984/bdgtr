@@ -160,7 +160,7 @@ describe('Budgets: allocation and roles', () => {
   it('links to the per-category allocation for the same month, with a summary', async () => {
     await open();
     expect(await screen.findByText('₱8,000.00 of ₱40,000.00 allocated · ₱32,000.00 unallocated')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('link', { name: /Allocate per category/ }));
+    await fireEvent.press(screen.getByRole('link', { name: /Budget per Category/ }));
     expect(await screen.findByText('Allocation screen')).toBeTruthy();
     expect(screen).toHavePathname('/budgets/categories');
     expect(screen).toHaveSearchParams({ month: '2026-11' });

@@ -1,4 +1,4 @@
-/** Budgets → Allocate per category: donut, Defaults | This month, edit, Custom badge and reset. */
+/** Budgets → Budget per Category: the month's donut, each category's budget, Custom badge and reset. */
 import { buildMonthBudgets, type MonthBudgets } from '@bdgtr/shared';
 import { fireEvent, screen, within } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
@@ -51,11 +51,6 @@ jest.mock('@/lib/api', () => {
       delete mockOverrides[id];
       return mockMonth(month);
     },
-    updateCategory: async (_t: unknown, _h: string, id: string, input: { defaultBudgetMinor: number }) => {
-      mockCalls.push(`default ${id} ${input.defaultBudgetMinor}`);
-      mockDefaults[id] = input.defaultBudgetMinor;
-      return {};
-    },
   };
 });
 
@@ -71,41 +66,40 @@ beforeEach(() => {
 const open = () => renderRouter({ 'budgets/categories': CategoryAllocationScreen }, { initialUrl: '/budgets/categories?month=2026-11' });
 const row = (name: string) => screen.getAllByTestId('allocation-row').find((r) => within(r).queryByText(name))!;
 
-describe('Allocate per category', () => {
-  it('opens on this month: the donut says how much is allocated; each row shows default and this month', async () => {
+describe('Budget per Category', () => {
+  it('shows the month at the top only: the donut and each category’s budget, without defaults or the month repeated', async () => {
     await open();
     expect(await screen.findByLabelText('25% of ₱40,000.00 allocated, ₱30,000.00 unallocated')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'This month' }).props.accessibilityState).toMatchObject({ selected: true });
-    expect(within(row('Groceries')).getByText('Default ₱8,000.00')).toBeTruthy();
-    expect(within(row('Groceries')).getByText('November 2026 ₱8,000.00')).toBeTruthy();
+    expect(screen.getByText('November 2026')).toBeTruthy(); // the month switcher
+    expect(screen.getByText('Of the ₱40,000.00 monthly budget')).toBeTruthy();
+    expect(within(row('Groceries')).getByText('₱8,000.00')).toBeTruthy();
+    expect(screen.queryByRole('tab')).toBeNull(); // no Defaults | This month
+    expect(screen.queryByText(/Default ₱/)).toBeNull();
+    expect(screen.queryAllByText(/November 2026/)).toHaveLength(1);
   });
 
-  it('this month: Edit sets an override (Custom badge, donut updates); Reset goes back to the default', async () => {
+  it('Edit sets the category’s budget for the month (Custom badge, donut updates); Reset goes back to the default', async () => {
     await open();
-    await fireEvent.press(await screen.findByLabelText('Edit Groceries for November 2026'));
-    await fireEvent.changeText(screen.getByLabelText('Groceries budget for November 2026'), '12000');
+    await fireEvent.press(await screen.findByLabelText('Edit Groceries'));
+    expect(screen.getByLabelText('Groceries budget').props.value).toBe('8000');
+    await fireEvent.changeText(screen.getByLabelText('Groceries budget'), '12000');
     await fireEvent.press(screen.getByText('Save'));
     expect(mockCalls).toEqual(['month 2026-11 c1 1200000']);
-    expect(await screen.findByText('Groceries budget for November 2026 saved.')).toBeTruthy();
+    expect(await screen.findByText('Groceries budget saved.')).toBeTruthy();
     expect(within(row('Groceries')).getByText('Custom')).toBeTruthy();
-    expect(within(row('Groceries')).getByText('November 2026 ₱12,000.00')).toBeTruthy();
+    expect(within(row('Groceries')).getByText('₱12,000.00')).toBeTruthy();
     expect(screen.getByLabelText('35% of ₱40,000.00 allocated, ₱26,000.00 unallocated')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('Reset Groceries to default'));
-    expect(await screen.findByText('Groceries uses its default in November 2026 again.')).toBeTruthy();
+    expect(await screen.findByText('Groceries uses its default budget again.')).toBeTruthy();
     expect(within(row('Groceries')).queryByText('Custom')).toBeNull();
   });
 
-  it('defaults: Edit changes the category’s default (and its donut)', async () => {
+  it('switching month shows that month’s budgets', async () => {
     await open();
-    await fireEvent.press(await screen.findByRole('tab', { name: 'Defaults' }));
-    expect(screen.queryByLabelText('Reset Groceries to default')).toBeNull();
-    await fireEvent.press(screen.getByLabelText('Edit Transport default'));
-    await fireEvent.changeText(screen.getByLabelText('Transport default budget'), '5000');
-    await fireEvent.press(screen.getByText('Save'));
-    expect(mockCalls).toEqual(['default c2 500000']);
-    expect(await screen.findByText('Transport default saved.')).toBeTruthy();
-    expect(await screen.findByLabelText('32% of ₱40,000.00 allocated, ₱27,000.00 unallocated')).toBeTruthy();
+    await fireEvent.press(await screen.findByLabelText('Next month'));
+    expect(await screen.findByText('December 2026')).toBeTruthy();
+    expect(screen.queryAllByText(/November 2026/)).toHaveLength(0);
   });
 
   it('over-allocated: said in words with the red plus icon (not colour alone)', async () => {
@@ -125,7 +119,7 @@ describe('Allocate per category', () => {
 
   it('a removed category on save is explained', async () => {
     await open();
-    await fireEvent.press(await screen.findByLabelText('Edit Groceries for November 2026'));
+    await fireEvent.press(await screen.findByLabelText('Edit Groceries'));
     mockFail = new ApiError(409, 'category_removed');
     await fireEvent.press(screen.getByText('Save'));
     expect(await screen.findByText('That category was removed.')).toBeTruthy();

@@ -107,7 +107,7 @@ export default function RootLayout() {
               name="budgets/categories"
               options={{
                 headerShown: true,
-                title: 'Allocate per category',
+                title: 'Budget per Category',
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.textPrimary,
                 headerLeft: () => <HeaderBackButton />,
