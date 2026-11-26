@@ -3,7 +3,7 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { type Db, ObjectId } from 'mongodb';
 
 import { monthBudgets, resetCategoryBudget, resetMonthlyBudget, setCategoryBudget, setMonthlyBudget } from './budgets.js';
-import { ensureDefaultCategory, findCategory } from './categories.js';
+import { type CategoryDoc, ensureDefaultCategory, findCategory } from './categories.js';
 import { type AppVariables, requireHousehold } from './household-routes.js';
 import { parseJsonBody } from './validation.js';
 
@@ -31,7 +31,7 @@ export function registerBudgetRoutes(app: Hono<AppEnv>, auth: MiddlewareHandler<
   const answer = async (c: Context<AppEnv>, db: Db, yearMonth: string) => c.json<MonthBudgets>(await monthBudgets(db, c.get('household'), yearMonth));
 
   /** This household's active category from :categoryId, or the error to send. */
-  async function category(c: Context<AppEnv>, db: Db) {
+  async function category(c: Context<AppEnv>, db: Db): Promise<{ doc: CategoryDoc | null; res: Response | null }> {
     const raw = c.req.param('categoryId') ?? '';
     if (!/^[0-9a-f]{24}$/.test(raw)) return { doc: null, res: c.json({ error: 'not_found' }, 404) };
     const doc = await findCategory(db, c.get('household')._id, new ObjectId(raw));
