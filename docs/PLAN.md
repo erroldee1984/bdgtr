@@ -717,7 +717,10 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
   - A refusal (4xx) goes to **Needs attention** (Alerts tab) with the reason, and **Retry** / **Discard**. 401 pauses sending; 5xx and network errors retry later. Any server answer clears "offline".
 - **Categories** are cached (`cached.ts`, `fetchWithCache`), so Add spend opens offline.
 - **What people see:** an offline banner on every screen, "Waiting to be sent" with **Pending** badges on Spend, and a warning before signing out with unsent spends.
-- **Changed from the design above:** a spend whose category was removed while offline is **not** accepted. The server refuses removed categories, so it goes to Needs attention ("enter it again with another category"). Editing a queued spend isn't offered yet (Discard and re-enter).
+- **Changed from the design above:** a spend whose category was removed while offline is **not** accepted. The server refuses removed categories, so it goes to Needs attention ("enter it again with another category"). **Editing a waiting spend (added later):** Spend → "Waiting to be sent" has **Edit** (opens Add spend pre-filled, `/add?pending=<clientId>`) and **Discard** (asks first).
+- An edit keeps the **same clientId**, since the server never had it.
+- Refused while that spend is being sent.
+- Refused for spends queued after a **timeout** (`uncertain`): those may have reached the server already, which would keep the original under that clientId. The app says to let it send, then edit it in Spend.
 
 **Part 2 (built): offline viewing.**
 - `useCachedLoader` keeps an encrypted copy of what Dashboard, Spend (transactions and categories), Budgets/Budget per Category and Alerts last loaded. Copies are per person and household. Only **this month and last month** are kept (`isCachedMonth`).

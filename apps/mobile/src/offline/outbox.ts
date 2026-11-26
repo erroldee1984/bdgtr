@@ -19,6 +19,12 @@ export const OutboxItemSchema = z.object({
   state: z.enum(['pending', 'needs_attention']),
   /** Why the server refused it (needs_attention). */
   problem: z.string().nullable(),
+  /**
+   * Queued because the server didn't answer in time, so it may already have
+   * arrived. Such a spend can't be edited here: the server would keep the
+   * original under the same clientId. Missing on older entries = false.
+   */
+  uncertain: z.boolean().optional(),
 });
 export type OutboxItem = z.infer<typeof OutboxItemSchema>;
 

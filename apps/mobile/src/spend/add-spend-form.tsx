@@ -2,11 +2,12 @@ import { CategorySchema, type Category, categoriesForEntry, can } from '@bdgtr/s
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { amountText } from '@/budgets/budget-amount-editor';
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { TextField } from '@/components/text-field';
@@ -21,6 +22,12 @@ import { useToast } from '@/toast/toast';
 import { DatePickerButton } from './date-picker-button';
 import { QuickAddCategory } from './quick-add-category';
 import { dateLabel, quickDates, type SpendFormErrors, validateSpendForm } from './spend-form';
+
+const EDIT_MESSAGES = {
+  sending: "It's being sent right now. Try again in a moment.",
+  uncertain: 'This one may already have reached the server, so it can’t be changed here. Let it send, then edit it in Spend.',
+  gone: 'It has already been sent or removed. Once it shows in Spend, you can change it there.',
+} as const;
 
 const SERVER_MESSAGES: Record<string, string> = {
   category_removed: 'That category was just removed. Choose another one.',
@@ -44,7 +51,10 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const [quickNote, setQuickNote] = useState<string | null>(null);
   const { today, yesterday } = useMemo(() => quickDates(now()), [now]);
 
-  const clientId = useRef(Crypto.randomUUID()).current;
+  // /add?pending=<clientId>: edit a spend that's still waiting to be sent (Android, offline).
+  const { pending } = useLocalSearchParams<{ pending?: string }>();
+  const editing = pending ? outbox.items.find((i) => i.clientId === pending) : undefined;
+  const clientId = useRef(pending ?? Crypto.randomUUID()).current;
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [version, setVersion] = useState(0);
@@ -56,6 +66,20 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const [errors, setErrors] = useState<SpendFormErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [prefilled, setPrefilled] = useState(false);
+
+  // Fill the form from the waiting spend once the outbox has it (adjusting
+  // state while rendering, as React recommends, rather than in an effect).
+  if (editing && !prefilled) {
+    setPrefilled(true);
+    setDate(editing.input.date);
+    setCategoryId(editing.input.categoryId);
+    setAmount(amountText(editing.input.amountMinor));
+    if (editing.input.description) {
+      setShowDescription(true);
+      setDescription(editing.input.description);
+    }
+  }
 
   useEffect(() => {
     if (!householdId) return;
@@ -72,7 +96,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       alive = false;
     };
   }, [getToken, userId, householdId, version]);
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const reload = () => setVersion((v) => v + 1);
 
   const maxDate = useMemo(() => {
     const [y, m, d] = today.split('-').map(Number);
@@ -87,6 +111,16 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       return;
     }
     setErrors({});
+    if (pending) {
+      const outcome = await outbox.editPending(pending, result.input);
+      if (outcome === 'saved') {
+        toast.show({ level: 'near', title: 'Changes saved on this phone', body: "It will be sent when you're back online." });
+        goBackOrHome();
+        return;
+      }
+      setServerError(EDIT_MESSAGES[outcome]);
+      return;
+    }
     setSaving(true);
     try {
       const { queued, alerts } = await outbox.saveSpend(householdId, result.input);
@@ -146,6 +180,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {pending ? <Stack.Screen options={{ title: 'Edit waiting spend' }} /> : null}
       <View style={styles.section}>
         <TextField
           label="Amount"

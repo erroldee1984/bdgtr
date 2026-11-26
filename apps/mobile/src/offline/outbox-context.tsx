@@ -13,6 +13,13 @@ import { OFFLINE_SUPPORTED } from './vault';
 /** A save that doesn't answer in this long is treated as offline and queued. */
 export const SAVE_TIMEOUT_MS = 15_000;
 
+/** No answer in time: a network-type failure (so it's retried), but the request may have arrived. */
+class TimeoutError extends TypeError {
+  override name = 'TimeoutError';
+}
+
+export type EditResult = 'saved' | 'sending' | 'uncertain' | 'gone';
+
 /** Why the server refused a queued spend, in words. */
 export function refusalText(err: ApiError): string {
   if (err.code === 'category_removed' || err.code === 'category_not_found') return 'Its category was removed. Discard it and enter it again with another category.';
@@ -30,6 +37,12 @@ interface OutboxValue {
   /** Saves a spend: straight to the server, or queued on this phone when offline. */
   saveSpend: (householdId: string, input: CreateTransactionInput) => Promise<{ queued: boolean; alerts: Alert[] }>;
   syncNow: () => void;
+  /**
+   * Changes a spend that's still waiting (same clientId: the server never had
+   * it). Refused while it's being sent, if it may already have arrived
+   * ('uncertain'), or if it's no longer waiting.
+   */
+  editPending: (clientId: string, input: CreateTransactionInput) => Promise<EditResult>;
   /** Screens report what their last load found: showing a saved copy means offline. */
   noteNetwork: (online: boolean) => void;
   retry: (clientId: string) => void;
@@ -41,7 +54,7 @@ const Ctx = createContext<OutboxValue | null>(null);
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new TypeError('Request timed out')), ms);
+    const t = setTimeout(() => reject(new TimeoutError('Request timed out')), ms);
     p.then(
       (v) => (clearTimeout(t), resolve(v)),
       (e: unknown) => (clearTimeout(t), reject(e)),
@@ -63,6 +76,8 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
   const user = OFFLINE_SUPPORTED && isSignedIn && userId ? userId : null;
   const itemsRef = useRef<OutboxItem[]>(NONE);
   const syncing = useRef(false);
+  /** The spend being sent right now (not editable until that finishes). */
+  const inFlight = useRef<string | null>(null);
   const failures = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const items = loaded?.userId === user ? loaded.items : NONE;
@@ -100,6 +115,7 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
       for (;;) {
         const next = [...itemsRef.current].filter((i) => i.state === 'pending').sort((a, b) => a.savedAt.localeCompare(b.savedAt))[0];
         if (!next) break;
+        inFlight.current = next.clientId;
         try {
           const res = await withTimeout(createTransaction(() => getTokenRef.current(), next.householdId, next.input), timeoutMs);
           alerts.push(...res.alerts);
@@ -130,6 +146,7 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
       }
     } finally {
       syncing.current = false;
+      inFlight.current = null;
     }
     if (sent > 0) {
       toastRef.current.show({ level: 'near', title: `${sent} ${sent === 1 ? 'spend' : 'spends'} sent`, body: 'Saved while offline, now added for everyone.' });
@@ -178,7 +195,16 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
         return { queued: false, alerts };
       } catch (err) {
         if (!isRetryableNetworkError(err)) throw err;
-        const item: OutboxItem = { clientId: input.clientId, householdId, input, savedAt: new Date().toISOString(), attempts: 0, state: 'pending', problem: null };
+        const item: OutboxItem = {
+          clientId: input.clientId,
+          householdId,
+          input,
+          savedAt: new Date().toISOString(),
+          attempts: 0,
+          state: 'pending',
+          problem: null,
+          uncertain: err instanceof TimeoutError,
+        };
         await write([...itemsRef.current.filter((i) => i.clientId !== input.clientId), item]);
         setOffline(true);
         failures.current++;
@@ -195,6 +221,22 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
     },
     [write, sync],
   );
+  const editPending = useCallback<OutboxValue['editPending']>(
+    async (clientId, input) => {
+      if (inFlight.current === clientId) return 'sending';
+      const item = itemsRef.current.find((i) => i.clientId === clientId);
+      if (!item) return 'gone';
+      if (item.uncertain) return 'uncertain';
+      await write(
+        itemsRef.current.map((i) =>
+          i.clientId === clientId ? { ...i, input: { ...input, clientId }, state: 'pending' as const, problem: null } : i,
+        ),
+      );
+      void sync();
+      return 'saved';
+    },
+    [write, sync],
+  );
   const discard = useCallback((clientId: string) => void write(itemsRef.current.filter((i) => i.clientId !== clientId)), [write]);
   const syncNow = useCallback(() => void sync(), [sync]);
   const noteNetwork = useCallback(
@@ -207,8 +249,8 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
   );
 
   const value = useMemo(
-    () => ({ items, offline, saveSpend, syncNow, noteNetwork, retry, discard }),
-    [items, offline, saveSpend, syncNow, noteNetwork, retry, discard],
+    () => ({ items, offline, saveSpend, syncNow, editPending, noteNetwork, retry, discard }),
+    [items, offline, saveSpend, syncNow, editPending, noteNetwork, retry, discard],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -223,6 +265,7 @@ export function useOutbox(): OutboxValue {
       offline: false,
       saveSpend: async (householdId, input) => ({ queued: false, alerts: (await createTransaction(() => getToken(), householdId, input)).alerts }),
       syncNow: () => {},
+      editPending: async () => 'gone' as const,
       noteNetwork: () => {},
       retry: () => {},
       discard: () => {},
