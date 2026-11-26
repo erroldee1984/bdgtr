@@ -29,6 +29,9 @@ export interface AlertDoc {
   budgetMinor: number;
   spentMinor: number;
   triggeredBy: ObjectId;
+  /** Fixed-transaction notices: the item and the day it was due. */
+  fixedTransactionId?: ObjectId;
+  dueDate?: string;
   /** The spend behind it; null for a "due today" notice. */
   transactionId: ObjectId | null;
   /** True for a further alert in a category already at that level this month. */
@@ -37,6 +40,9 @@ export interface AlertDoc {
 }
 
 export const ALERTS = 'alerts';
+// Collection names from fixed.ts, repeated to avoid a circular import (fixed.ts imports this file).
+const FIXED_COLLECTION = 'fixedTransactions';
+const FIXED_POSTINGS_COLLECTION = 'fixedPostings';
 
 export async function ensureAlertIndexes(db: Db): Promise<void> {
   const alerts = db.collection<AlertDoc>(ALERTS);
@@ -139,7 +145,7 @@ export function readCutoff(membership: MembershipDoc): Date {
   return lastRead && lastRead > membership.joinedAt ? lastRead : membership.joinedAt;
 }
 
-export function toAlert(doc: AlertDoc, cutoff: Date, triggeredBy: string | null): Alert {
+export function toAlert(doc: AlertDoc, cutoff: Date, triggeredBy: string | null, canAdd = false): Alert {
   return {
     id: doc._id.toHexString(),
     yearMonth: doc.yearMonth,
@@ -148,6 +154,9 @@ export function toAlert(doc: AlertDoc, cutoff: Date, triggeredBy: string | null)
     categoryId: doc.categoryId?.toHexString() ?? null,
     title: doc.title,
     body: doc.body,
+    fixedTransactionId: doc.fixedTransactionId?.toHexString() ?? null,
+    dueDate: doc.dueDate ?? null,
+    canAdd,
     triggeredBy,
     createdAt: doc.createdAt.toISOString(),
     unread: doc.createdAt > cutoff,
@@ -159,8 +168,29 @@ function visibleTo(role: Role): Record<string, unknown> {
   return role === 'member' ? { audience: { $ne: 'managers' } } : {};
 }
 
+/**
+ * "Due today" reminders that can still be added with one tap: it's still the
+ * due day (`today`, Manila), the item hasn't been added that month and still
+ * exists. Ids of the alerts, for the House Owner and Co-Owners only.
+ */
+async function addableReminders(db: Db, docs: AlertDoc[], today: string, role: Role): Promise<Set<string>> {
+  if (role === 'member') return new Set();
+  const due = docs.filter((d) => d.kind === 'fixed_due' && d.dueDate === today && d.fixedTransactionId);
+  if (due.length === 0) return new Set();
+  const ids = due.map((d) => d.fixedTransactionId!);
+  const [items, postings] = await Promise.all([
+    db.collection(FIXED_COLLECTION).find({ _id: { $in: ids }, isRemoved: false }, { projection: { _id: 1 } }).toArray(),
+    db.collection(FIXED_POSTINGS_COLLECTION).find({ fixedTransactionId: { $in: ids }, yearMonth: today.slice(0, 7) }).toArray(),
+  ]);
+  const live = new Set(items.map((i) => (i._id as ObjectId).toHexString()));
+  const added = new Set(postings.map((p) => (p.fixedTransactionId as ObjectId).toHexString()));
+  return new Set(
+    due.filter((d) => live.has(d.fixedTransactionId!.toHexString()) && !added.has(d.fixedTransactionId!.toHexString())).map((d) => d._id.toHexString()),
+  );
+}
+
 /** A month's alerts the member may see, newest first, with who triggered each budget alert. */
-export async function listAlerts(db: Db, householdId: ObjectId, yearMonth: string, cutoff: Date, role: Role): Promise<Alert[]> {
+export async function listAlerts(db: Db, householdId: ObjectId, yearMonth: string, cutoff: Date, role: Role, today: string): Promise<Alert[]> {
   const docs = await db
     .collection<AlertDoc>(ALERTS)
     .find({ householdId, yearMonth, ...visibleTo(role) })
@@ -169,7 +199,10 @@ export async function listAlerts(db: Db, householdId: ObjectId, yearMonth: strin
   const ids = [...new Set(docs.map((d) => d.triggeredBy.toHexString()))].map((h) => new ObjectId(h));
   const users = await db.collection<UserDoc>(USERS).find({ _id: { $in: ids } }).toArray();
   const names = new Map(users.map((u) => [u._id.toHexString(), u.displayName ?? u.email ?? null]));
-  return docs.map((d) => toAlert(d, cutoff, (d.kind ?? 'budget') === 'budget' ? (names.get(d.triggeredBy.toHexString()) ?? null) : null));
+  const addable = await addableReminders(db, docs, today, role);
+  return docs.map((d) =>
+    toAlert(d, cutoff, (d.kind ?? 'budget') === 'budget' ? (names.get(d.triggeredBy.toHexString()) ?? null) : null, addable.has(d._id.toHexString())),
+  );
 }
 
 export async function countUnread(db: Db, householdId: ObjectId, cutoff: Date, role: Role): Promise<number> {

@@ -241,7 +241,7 @@ export function registerSpendingRoutes(
     const householdId = c.get('household')._id;
     const cutoff = readCutoff(c.get('membership'));
     const role = c.get('membership').role;
-    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, month, cutoff, role), countUnread(db, householdId, cutoff, role)]);
+    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, month, cutoff, role, manilaDate(deps.now())), countUnread(db, householdId, cutoff, role)]);
     return c.json<AlertsResponse>({ alerts, unreadCount });
   });
 

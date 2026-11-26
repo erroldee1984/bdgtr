@@ -123,6 +123,14 @@ export const AlertSchema = z.object({
   categoryId: z.string().nullable(),
   title: z.string(),
   body: z.string(),
+  /** Fixed-transaction notices: the item, and the day it was due (YYYY-MM-DD). */
+  fixedTransactionId: z.string().nullable().default(null),
+  dueDate: z.string().nullable().default(null),
+  /**
+   * "Due today" reminders only: true while it can still be added with one tap
+   * (still its due day in Manila, not added this month, item not removed).
+   */
+  canAdd: z.boolean().default(false),
   /** Who entered the spend that crossed the line (name, else email). */
   triggeredBy: z.string().nullable(),
   createdAt: z.iso.datetime(),

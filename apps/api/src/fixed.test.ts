@@ -319,6 +319,14 @@ describe('auto-post cron (00:15 Manila)', () => {
   });
 });
 
+describe('alerts.ts collection names', () => {
+  it('match fixed.ts (repeated there to avoid a circular import)', async () => {
+    const src = (await import('node:fs')).readFileSync(new URL('./alerts.ts', import.meta.url), 'utf8');
+    expect(src).toContain(`const FIXED_COLLECTION = '${FIXED}'`);
+    expect(src).toContain(`const FIXED_POSTINGS_COLLECTION = '${FIXED_POSTINGS}'`);
+  });
+});
+
 describe('hasCronSecret', () => {
   it('exact Bearer match only', () => {
     expect(hasCronSecret(`Bearer ${SECRET}`, SECRET)).toBe(true);
@@ -408,6 +416,66 @@ describe('7:00 AM notices', () => {
     expect(await (await notices()).json()).toMatchObject({ date: '2026-11-30', due: 1 });
     expect(await (await notices()).json()).toMatchObject({ due: 0 });
     expect(pushed).toHaveLength(1);
+  });
+
+  describe('"Add it now" on a due-today reminder (canAdd)', () => {
+    async function remind() {
+      clock = new Date('2026-11-20T02:00:00.000Z');
+      const { h, groceries } = await setup();
+      const item = await addFixed(h, groceries, { name: 'Tuition', amountMinor: 2_500_000, autoPostEnabled: false });
+      clock = new Date('2026-11-24T23:00:00.000Z'); // 25 Nov 07:00 Manila
+      await notices();
+      const reminder = async (who = 'owner') => (await alertsFor(who, h)).alerts.find((a) => a.kind === 'fixed_due');
+      return { h, item, reminder };
+    }
+
+    it('on the due day, not yet added: canAdd, with the item and date to add', async () => {
+      const { item, reminder } = await remind();
+      clock = new Date('2026-11-25T10:00:00.000Z'); // 18:00 Manila, still the 25th
+      expect(await reminder()).toMatchObject({ canAdd: true, fixedTransactionId: item.id, dueDate: '2026-11-25' });
+    });
+
+    it('once added (the button posts it for that date), the button goes', async () => {
+      const { h, item, reminder } = await remind();
+      const res = await call('owner', 'POST', '/fixed-transactions/bulk-post', { householdId: h, body: { date: '2026-11-25', items: [{ id: item.id, clientId: uuid() }] } });
+      expect(res.status).toBe(201);
+      expect((await spends(h)).map((t) => [t.date, t.amountMinor])).toEqual([['2026-11-25', 2_500_000]]);
+      expect((await reminder())?.canAdd).toBe(false);
+    });
+
+    it('added earlier in the month counts as added too', async () => {
+      clock = new Date('2026-11-20T02:00:00.000Z');
+      const { h, groceries } = await setup();
+      const item = await addFixed(h, groceries, { name: 'Tuition', autoPostEnabled: false });
+      clock = new Date('2026-11-24T23:00:00.000Z');
+      await notices();
+      await call('owner', 'POST', '/fixed-transactions/bulk-post', { householdId: h, body: { date: '2026-11-25', items: [{ id: item.id, clientId: uuid() }] } });
+      expect((await alertsFor('owner', h)).alerts[0]!.canAdd).toBe(false);
+    });
+
+    it('the day after (Manila), the button goes', async () => {
+      const { reminder } = await remind();
+      clock = new Date('2026-11-25T16:00:00.000Z'); // 26 Nov 00:00 Manila
+      expect((await reminder())?.canAdd).toBe(false);
+    });
+
+    it('a removed item has no button', async () => {
+      const { h, item, reminder } = await remind();
+      await call('owner', 'DELETE', `/fixed-transactions/${item.id}`, { householdId: h });
+      expect((await reminder())?.canAdd).toBe(false);
+    });
+
+    it('"added automatically" notices never have one', async () => {
+      clock = new Date('2026-11-20T02:00:00.000Z');
+      const { h, groceries } = await setup();
+      await addFixed(h, groceries, { amountMinor: 100_000 });
+      clock = new Date('2026-11-24T16:15:00.000Z');
+      await cron();
+      clock = new Date('2026-11-24T23:00:00.000Z');
+      await notices();
+      const [a] = (await alertsFor('owner', h)).alerts;
+      expect(a).toMatchObject({ kind: 'fixed_added', canAdd: false });
+    });
   });
 
   it('muted members get no push but still see it in Alerts', async () => {

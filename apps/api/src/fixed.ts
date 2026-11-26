@@ -334,6 +334,8 @@ export async function sendFixedNotices(db: Db, today: string, now: Date, sendPus
     budgetMinor: 0,
     spentMinor: 0,
     triggeredBy: item.createdBy,
+    fixedTransactionId: item._id,
+    dueDate: today,
     transactionId,
     repeat: false,
     createdAt: now,
