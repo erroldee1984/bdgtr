@@ -23,7 +23,7 @@ jest.mock('@/household/household-context', () => ({
   }),
 }));
 
-type A = { id: string; yearMonth: string; level: 'near' | 'over'; categoryId: string | null; title: string; body: string; triggeredBy: string | null; createdAt: string; unread: boolean };
+type A = { id: string; yearMonth: string; kind?: string; level: 'near' | 'over'; categoryId: string | null; title: string; body: string; triggeredBy: string | null; createdAt: string; unread: boolean };
 let mockAlerts: A[];
 let mockLastRead = '1970-01-01T00:00:00.000Z';
 let mockFail = false;
@@ -106,6 +106,18 @@ describe('Alerts screen', () => {
     expect(within(rows[0]!).getByText('New')).toBeTruthy(); // still marked while you look
   });
 
+  it('fixed-transaction notices show with their own wording and no "after a spend by"', async () => {
+    mockAlerts = [
+      { ...alert('n1', 'near', '2026-11', '2026-11-25T23:00:00.000Z'), kind: 'fixed_added', title: 'Added automatically · Rent', body: 'body rent', triggeredBy: null },
+      { ...alert('n2', 'near', '2026-11', '2026-11-25T23:00:00.000Z'), kind: 'fixed_due', title: 'Due today · Tuition', body: 'body tuition', triggeredBy: null },
+    ];
+    await open();
+    await act(async () => router.push('/alerts'));
+    const rows = await screen.findAllByTestId('alert-row');
+    expect(rows.map((r) => within(r).getByText(/·/).props.children)).toEqual(['Added automatically · Rent', 'Due today · Tuition']);
+    expect(screen.queryByText(/after a spend by/)).toBeNull();
+  });
+
   it('previous month via the arrow; next is disabled at the current month', async () => {
     await open();
     await act(async () => router.push('/alerts'));
@@ -121,7 +133,7 @@ describe('Alerts screen', () => {
     mockAlerts = [];
     await open();
     await act(async () => router.push('/alerts'));
-    expect(await screen.findByText('No budget alerts this month.')).toBeTruthy();
+    expect(await screen.findByText('No alerts this month.')).toBeTruthy();
   });
 
   it('a load failure offers Try again, which recovers', async () => {

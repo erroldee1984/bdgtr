@@ -5,7 +5,9 @@ import {
   FixedTransactionResponseSchema,
   FixedTransactionsResponseSchema,
   HouseholdResponseSchema,
+  AlertsResponseSchema,
   BulkPostResponseSchema,
+  type PushPayload,
   TransactionsResponseSchema,
 } from '@bdgtr/shared';
 import { type Db, MongoClient, ObjectId } from 'mongodb';
@@ -21,6 +23,7 @@ import { autoPostClientId, ensureFixedIndexes, FIXED, FIXED_POSTINGS } from './f
 import { hasCronSecret } from './fixed-routes.js';
 import { ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js';
 import { ensureInviteIndexes, INVITES } from './invites.js';
+import { PUSH_SUBSCRIPTIONS, type PushSubscriptionDoc } from './push.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureTransactionIndexes, TRANSACTIONS } from './transactions.js';
 import { ensureUserIndexes, USERS } from './users.js';
@@ -49,15 +52,25 @@ afterAll(async () => {
 
 beforeEach(async () => {
   clock = new Date('2026-11-25T02:00:00.000Z');
+  pushed.length = 0;
   await Promise.all(
-    [USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, MONTHLY_BUDGETS, CATEGORY_BUDGETS, FIXED, FIXED_POSTINGS].map((c) =>
+    [USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, MONTHLY_BUDGETS, CATEGORY_BUDGETS, FIXED, FIXED_POSTINGS, PUSH_SUBSCRIPTIONS].map((c) =>
       db.collection(c).deleteMany({}),
     ),
   );
 });
 
+/** Every push "sent", as [device label, payload]. */
+const pushed: [string, PushPayload][] = [];
 function makeApp(cronSecret: string | null = SECRET) {
   return createApp({
+    push: {
+      publicKey: null,
+      send: async (d: PushSubscriptionDoc, payload: PushPayload) => {
+        pushed.push([d.deviceLabel, payload]);
+        return 'sent';
+      },
+    },
     allowedOrigins: ['https://bdgtr.erroldee.com'],
     pingDb: async () => true,
     getDb: async () => db,
@@ -75,8 +88,8 @@ function call(who: string, method: string, path: string, { body, householdId }: 
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   return app.request(path, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-const cron = (auth: string | null = `Bearer ${SECRET}`, body?: unknown, a = app) =>
-  a.request('/internal/cron/fixed-postings', {
+const cron = (auth: string | null = `Bearer ${SECRET}`, body?: unknown, a = app, path = '/internal/cron/fixed-postings') =>
+  a.request(path, {
     method: 'POST',
     headers: { ...(auth ? { Authorization: auth } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -312,5 +325,101 @@ describe('hasCronSecret', () => {
     expect(hasCronSecret(`Bearer ${SECRET}x`, SECRET)).toBe(false);
     expect(hasCronSecret('Bearer ', SECRET)).toBe(false);
     expect(hasCronSecret(undefined, SECRET)).toBe(false);
+  });
+});
+
+describe('7:00 AM notices', () => {
+  const notices = (auth: string | null = `Bearer ${SECRET}`, body?: unknown, a = app) => cron(auth, body, a, '/internal/cron/fixed-notices');
+  const alertsFor = async (who: string, h: string) =>
+    AlertsResponseSchema.parse(await (await call(who, 'GET', '/alerts?month=2026-11', { householdId: h })).json());
+  async function phone(clerkId: string, label: string) {
+    const user = await db.collection(USERS).findOne({ clerkUserId: clerkId });
+    await db.collection(PUSH_SUBSCRIPTIONS).insertOne({
+      _id: new ObjectId(),
+      userId: user!._id,
+      kind: 'expo',
+      endpoint: `ExponentPushToken[${label}]`,
+      deviceLabel: label,
+      createdAt: clock,
+      lastSeenAt: clock,
+    });
+  }
+
+  it('need the secret, like the other jobs', async () => {
+    expect((await notices(null)).status).toBe(401);
+    expect((await notices(`Bearer ${SECRET}`, undefined, makeApp(null))).status).toBe(503);
+  });
+
+  it('"Added automatically" goes to everyone in the household, at 7:00 not at 00:15', async () => {
+    clock = new Date('2026-11-20T02:00:00.000Z'); // the household is set up before the 25th
+    const { h, groceries } = await setup();
+    await phone('owner', 'owner-phone');
+    await phone('mem-owner', 'member-phone');
+    await addFixed(h, groceries, { amountMinor: 100_000 }); // auto, due on the 25th
+    clock = new Date('2026-11-24T16:15:00.000Z'); // 25 Nov 00:15 Manila
+    await cron();
+    expect(pushed).toEqual([]); // nothing at midnight (₱1,000 crosses no budget)
+
+    clock = new Date('2026-11-24T23:00:00.000Z'); // 25 Nov 07:00 Manila
+    expect(await (await notices()).json()).toEqual({ date: '2026-11-25', added: 1, due: 0 });
+    expect(pushed.map(([d, p]) => [d, p.title, p.body])).toEqual([
+      ['owner-phone', 'Added automatically · Rent', "Dela Cruz household: Rent (₱1,000, Groceries) was added as today's spend."],
+      ['member-phone', 'Added automatically · Rent', "Dela Cruz household: Rent (₱1,000, Groceries) was added as today's spend."],
+    ]);
+    for (const who of ['owner', 'mem-owner']) {
+      const { alerts, unreadCount } = await alertsFor(who, h);
+      expect(alerts.map((a) => [a.kind, a.title, a.triggeredBy])).toEqual([['fixed_added', 'Added automatically · Rent', null]]);
+      expect(unreadCount).toBe(1);
+    }
+  });
+
+  it('"Due today" (not added automatically) goes only to the House Owner and Co-Owners', async () => {
+    const { h, groceries } = await setup();
+    await phone('owner', 'owner-phone');
+    await phone('mem-owner', 'member-phone');
+    await addFixed(h, groceries, { name: 'Tuition', amountMinor: 2_500_000, autoPostEnabled: false });
+    clock = new Date('2026-11-24T23:00:00.000Z');
+    expect(await (await notices()).json()).toEqual({ date: '2026-11-25', added: 0, due: 1 });
+    expect(pushed.map(([d, p]) => [d, p.title, p.body])).toEqual([
+      ['owner-phone', 'Due today · Tuition', 'Dela Cruz household: Tuition (₱25,000, Groceries) is due today. Add it in Fixed transactions.'],
+    ]);
+    expect((await alertsFor('owner', h)).alerts.map((a) => a.kind)).toEqual(['fixed_due']);
+    const member = await alertsFor('mem-owner', h);
+    expect(member.alerts).toEqual([]);
+    expect(member.unreadCount).toBe(0);
+    expect(await spends(h)).toEqual([]); // a reminder adds nothing
+  });
+
+  it('no reminder for an item already added this month, or not due today, or removed', async () => {
+    const { h, groceries } = await setup();
+    const paid = await addFixed(h, groceries, { name: 'Paid', autoPostEnabled: false });
+    await call('owner', 'POST', '/fixed-transactions/bulk-post', { householdId: h, body: { date: '2026-11-03', items: [{ id: paid.id, clientId: uuid() }] } });
+    await addFixed(h, groceries, { name: 'Later', autoPostEnabled: false, dayOfMonth: 28 });
+    const gone = await addFixed(h, groceries, { name: 'Gone', autoPostEnabled: false });
+    await call('owner', 'DELETE', `/fixed-transactions/${gone.id}`, { householdId: h });
+    expect(await (await notices()).json()).toEqual({ date: '2026-11-25', added: 0, due: 0 });
+  });
+
+  it('a re-run sends nothing again; days 29–31 remind on the last day of a short month', async () => {
+    const { h, groceries } = await setup();
+    await phone('owner', 'owner-phone');
+    await addFixed(h, groceries, { name: 'Rent', autoPostEnabled: false, dayOfMonth: 31 });
+    clock = new Date('2026-11-29T23:00:00.000Z'); // 30 Nov 07:00 Manila
+    expect(await (await notices()).json()).toMatchObject({ date: '2026-11-30', due: 1 });
+    expect(await (await notices()).json()).toMatchObject({ due: 0 });
+    expect(pushed).toHaveLength(1);
+  });
+
+  it('muted members get no push but still see it in Alerts', async () => {
+    const { h, groceries } = await setup();
+    await phone('mem-owner', 'member-phone');
+    await call('mem-owner', 'PATCH', '/membership/me', { householdId: h, body: { alertsMuted: true } });
+    await addFixed(h, groceries, { amountMinor: 100_000 });
+    clock = new Date('2026-11-24T16:15:00.000Z');
+    await cron();
+    clock = new Date('2026-11-24T23:00:00.000Z');
+    await notices();
+    expect(pushed).toEqual([]);
+    expect((await alertsFor('mem-owner', h)).alerts).toHaveLength(1);
   });
 });

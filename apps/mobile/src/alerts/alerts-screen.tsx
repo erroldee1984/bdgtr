@@ -66,7 +66,7 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
   const current = result?.key === key ? result : null;
 
   return (
-    <Screen title="Alerts" subtitle="Budget alerts for this household">
+    <Screen title="Alerts" subtitle="Budget alerts and fixed-transaction notices for this household">
       <MonthSwitcher month={month} onChange={setMonth} max={thisMonth} />
 
       {current?.error ? (
@@ -80,15 +80,16 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
         <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading alerts" />
       ) : current.alerts.length === 0 ? (
         <Card>
-          <AppText tone="secondary">No budget alerts this month.</AppText>
+          <AppText tone="secondary">No alerts this month.</AppText>
         </Card>
       ) : (
         current.alerts.map((a) => {
           const over = a.level === 'over';
+          const icon = a.kind === 'fixed_added' ? 'calendar-check' : a.kind === 'fixed_due' ? 'calendar-clock' : over ? 'alert' : 'alert-circle-outline';
           return (
             <Card key={a.id} testID="alert-row">
               <View style={styles.titleRow}>
-                <MaterialCommunityIcons name={over ? 'alert' : 'alert-circle-outline'} size={22} color={over ? colors.danger : colors.primaryLight} aria-hidden />
+                <MaterialCommunityIcons name={icon} size={22} color={over ? colors.danger : colors.primaryLight} aria-hidden />
                 <AppText variant="bodyStrong" tone={over ? 'danger' : 'primary'} style={styles.flex}>
                   {a.title}
                 </AppText>

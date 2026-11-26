@@ -213,13 +213,19 @@ export async function fanOutAlerts(
   try {
     const members = await db
       .collection<MembershipDoc>(MEMBERSHIPS)
-      .find({ householdId: household._id, status: 'active', alertsMuted: { $ne: true } }, { projection: { userId: 1 } })
+      .find({ householdId: household._id, status: 'active', alertsMuted: { $ne: true } }, { projection: { userId: 1, role: 1 } })
       .toArray();
     const devices = await db
       .collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS)
       .find({ userId: { $in: members.map((m) => m.userId) } })
       .toArray();
-    const jobs = alerts.flatMap((a) => devices.map(async (d) => ({ d, result: await send(d, alertPayload(household, a)) })));
+    // Managers-only alerts ("due today" reminders) skip House Members' devices.
+    const managers = new Set(members.filter((m) => m.role !== 'member').map((m) => m.userId.toHexString()));
+    const jobs = alerts.flatMap((a) =>
+      devices
+        .filter((d) => a.audience !== 'managers' || managers.has(d.userId.toHexString()))
+        .map(async (d) => ({ d, result: await send(d, alertPayload(household, a)) })),
+    );
     const results = (await Promise.allSettled(jobs)).flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
     const gone = [...new Set(results.filter((r) => r.result === 'gone').map((r) => r.d._id.toHexString()))].map((h) => new ObjectId(h));
     if (gone.length) await db.collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS).deleteMany({ _id: { $in: gone } });

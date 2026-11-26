@@ -1,4 +1,4 @@
-import { type Alert, type AlertLevel, formatAlert, levelReached } from '@bdgtr/shared';
+import { type Alert, type AlertKind, type AlertLevel, formatAlert, levelReached, type Role } from '@bdgtr/shared';
 import { type Db, MongoServerError, ObjectId } from 'mongodb';
 
 import { effectiveBudgets } from './budgets.js';
@@ -16,6 +16,10 @@ export interface AlertDoc {
   _id: ObjectId;
   householdId: ObjectId;
   yearMonth: string;
+  /** Missing on alerts from before notices existed: those are budget alerts. */
+  kind?: AlertKind;
+  /** Who it's for. Missing = everyone. 'managers' = House Owner and Co-Owners only. */
+  audience?: 'all' | 'managers';
   /** 'total', or the category id (hex). */
   scope: string;
   level: AlertLevel;
@@ -25,7 +29,8 @@ export interface AlertDoc {
   budgetMinor: number;
   spentMinor: number;
   triggeredBy: ObjectId;
-  transactionId: ObjectId;
+  /** The spend behind it; null for a "due today" notice. */
+  transactionId: ObjectId | null;
   /** True for a further alert in a category already at that level this month. */
   repeat: boolean;
   createdAt: Date;
@@ -108,6 +113,8 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
       householdId: household._id,
       yearMonth: tx.yearMonth,
       scope: c.scope,
+      kind: 'budget',
+      audience: 'all',
       level,
       categoryId: c.categoryId,
       ...formatAlert({ householdName: household.name, categoryName: c.categoryName, level, budgetMinor: c.budget, spentMinor: c.after, repeat }),
@@ -136,6 +143,7 @@ export function toAlert(doc: AlertDoc, cutoff: Date, triggeredBy: string | null)
   return {
     id: doc._id.toHexString(),
     yearMonth: doc.yearMonth,
+    kind: doc.kind ?? 'budget',
     level: doc.level,
     categoryId: doc.categoryId?.toHexString() ?? null,
     title: doc.title,
@@ -146,17 +154,26 @@ export function toAlert(doc: AlertDoc, cutoff: Date, triggeredBy: string | null)
   };
 }
 
-/** A month's alerts, newest first, with who triggered each one. */
-export async function listAlerts(db: Db, householdId: ObjectId, yearMonth: string, cutoff: Date): Promise<Alert[]> {
-  const docs = await db.collection<AlertDoc>(ALERTS).find({ householdId, yearMonth }).sort({ createdAt: -1, _id: -1 }).toArray();
+/** House Members don't see managers-only alerts (e.g. "due today" reminders). */
+function visibleTo(role: Role): Record<string, unknown> {
+  return role === 'member' ? { audience: { $ne: 'managers' } } : {};
+}
+
+/** A month's alerts the member may see, newest first, with who triggered each budget alert. */
+export async function listAlerts(db: Db, householdId: ObjectId, yearMonth: string, cutoff: Date, role: Role): Promise<Alert[]> {
+  const docs = await db
+    .collection<AlertDoc>(ALERTS)
+    .find({ householdId, yearMonth, ...visibleTo(role) })
+    .sort({ createdAt: -1, _id: -1 })
+    .toArray();
   const ids = [...new Set(docs.map((d) => d.triggeredBy.toHexString()))].map((h) => new ObjectId(h));
   const users = await db.collection<UserDoc>(USERS).find({ _id: { $in: ids } }).toArray();
   const names = new Map(users.map((u) => [u._id.toHexString(), u.displayName ?? u.email ?? null]));
-  return docs.map((d) => toAlert(d, cutoff, names.get(d.triggeredBy.toHexString()) ?? null));
+  return docs.map((d) => toAlert(d, cutoff, (d.kind ?? 'budget') === 'budget' ? (names.get(d.triggeredBy.toHexString()) ?? null) : null));
 }
 
-export async function countUnread(db: Db, householdId: ObjectId, cutoff: Date): Promise<number> {
-  return db.collection<AlertDoc>(ALERTS).countDocuments({ householdId, createdAt: { $gt: cutoff } });
+export async function countUnread(db: Db, householdId: ObjectId, cutoff: Date, role: Role): Promise<number> {
+  return db.collection<AlertDoc>(ALERTS).countDocuments({ householdId, createdAt: { $gt: cutoff }, ...visibleTo(role) });
 }
 
 export async function markAlertsRead(db: Db, membershipId: ObjectId, now: Date): Promise<void> {
