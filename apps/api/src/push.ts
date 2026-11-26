@@ -1,4 +1,4 @@
-import type { Device, PushPayload, RegisterDeviceInput } from '@bdgtr/shared';
+import { ANDROID_ALERT_CHANNEL, deviceAddress, type Device, type PushPayload, type RegisterDeviceInput } from '@bdgtr/shared';
 import { type Db, ObjectId } from 'mongodb';
 import { sendNotification, WebPushError } from 'web-push';
 
@@ -10,9 +10,11 @@ import { MEMBERSHIPS } from './households.js';
 export interface PushSubscriptionDoc {
   _id: ObjectId;
   userId: ObjectId;
-  kind: 'webpush';
+  kind: 'webpush' | 'expo';
+  /** The device's address: a browser's push endpoint, or the app's Expo push token. */
   endpoint: string;
-  keys: { p256dh: string; auth: string };
+  /** Browsers only. */
+  keys?: { p256dh: string; auth: string };
   deviceLabel: string;
   createdAt: Date;
   lastSeenAt: Date;
@@ -40,17 +42,17 @@ export function toDevice(d: PushSubscriptionDoc): Device {
 }
 
 /**
- * Registers this browser for the signed-in person. The same browser
- * re-registering updates its row; a browser last used by someone else
- * (a shared computer) now belongs to whoever signed in.
+ * Registers this browser or phone for the signed-in person. The same device
+ * re-registering updates its row; a device last used by someone else
+ * (a shared computer or phone) now belongs to whoever signed in.
  */
 export async function registerDevice(db: Db, userId: ObjectId, input: RegisterDeviceInput, now: Date): Promise<PushSubscriptionDoc> {
+  const endpoint = deviceAddress(input);
+  const set: Partial<PushSubscriptionDoc> = { userId, kind: input.kind, deviceLabel: input.deviceLabel, lastSeenAt: now };
+  if (input.kind === 'webpush') set.keys = input.subscription!.keys;
   const doc = await db.collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS).findOneAndUpdate(
-    { endpoint: input.subscription.endpoint },
-    {
-      $set: { userId, kind: 'webpush', keys: input.subscription.keys, deviceLabel: input.deviceLabel, lastSeenAt: now },
-      $setOnInsert: { endpoint: input.subscription.endpoint, createdAt: now },
-    },
+    { endpoint },
+    { $set: set, $setOnInsert: { endpoint, createdAt: now } },
     { upsert: true, returnDocument: 'after' },
   );
   return doc!;
@@ -78,6 +80,7 @@ export type PushSender = (device: PushSubscriptionDoc, payload: PushPayload) => 
 export function createWebPushSender(vapid: { publicKey: string; privateKey: string; subject: string }): PushSender {
   return async (device, payload) => {
     try {
+      if (!device.keys) return 'failed';
       await sendNotification({ endpoint: device.endpoint, keys: device.keys }, JSON.stringify(payload), {
         vapidDetails: vapid,
         TTL: 24 * 60 * 60,
@@ -89,6 +92,86 @@ export function createWebPushSender(vapid: { publicKey: string; privateKey: stri
       if (err instanceof WebPushError && (err.statusCode === 404 || err.statusCode === 410)) return 'gone';
       return 'failed';
     }
+  };
+}
+
+/** Expo's push service, which hands notifications to Firebase Cloud Messaging for Android. */
+export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+/** The message Expo delivers to the Android app for one alert. */
+export function expoMessage(token: string, payload: PushPayload) {
+  return {
+    to: token,
+    title: payload.title,
+    body: payload.body,
+    data: { type: payload.type, level: payload.level, householdId: payload.householdId, url: payload.url, tag: payload.tag },
+    channelId: ANDROID_ALERT_CHANNEL,
+    priority: payload.level === 'over' ? 'high' : 'default',
+    sound: 'default',
+    ttl: 24 * 60 * 60,
+  };
+}
+
+interface ExpoTicket {
+  status?: string;
+  details?: { error?: string };
+}
+
+/**
+ * Expo push sender (Android). Always posts to Expo's fixed address; the token
+ * only goes in the body. "DeviceNotRegistered" = the app was uninstalled or
+ * the token is no longer valid. The access token is optional (Expo's
+ * "enhanced security" setting) and is a secret.
+ */
+export function createExpoPushSender(opts: { accessToken?: string | undefined; fetch?: typeof fetch } = {}): PushSender {
+  const doFetch = opts.fetch ?? fetch;
+  return async (device, payload) => {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      if (opts.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
+      const res = await doFetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify([expoMessage(device.endpoint, payload)]),
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!res.ok) return 'failed';
+      const body = (await res.json()) as { data?: ExpoTicket[] };
+      const ticket = Array.isArray(body?.data) ? body.data[0] : undefined;
+      if (ticket?.status === 'ok') return 'sent';
+      if (ticket?.details?.error === 'DeviceNotRegistered') return 'gone';
+      return 'failed';
+    } catch {
+      return 'failed';
+    }
+  };
+}
+
+/** Picks the right sender for each device. A kind that isn't set up counts as a failed send. */
+export function createPushSender(senders: { webpush: PushSender | null; expo: PushSender | null }): PushSender {
+  return async (device, payload) => {
+    const send = device.kind === 'expo' ? senders.expo : senders.webpush;
+    return send ? send(device, payload) : 'failed';
+  };
+}
+
+/** Push set-up from the environment: browsers need VAPID keys; the Android app always works through Expo. */
+export function pushFromEnv(env: {
+  VAPID_PUBLIC_KEY?: string | undefined;
+  VAPID_PRIVATE_KEY?: string | undefined;
+  VAPID_SUBJECT?: string | undefined;
+  EXPO_ACCESS_TOKEN?: string | undefined;
+}): { publicKey: string | null; send: PushSender } {
+  const vapid =
+    env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT
+      ? { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT }
+      : null;
+  return {
+    publicKey: vapid ? vapid.publicKey : null,
+    send: createPushSender({
+      webpush: vapid ? createWebPushSender(vapid) : null,
+      expo: createExpoPushSender({ accessToken: env.EXPO_ACCESS_TOKEN }),
+    }),
   };
 }
 

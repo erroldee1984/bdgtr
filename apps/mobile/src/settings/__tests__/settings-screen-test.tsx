@@ -1,6 +1,7 @@
 /** More → Settings: notifications on this device, muting a household, your devices. */
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
+import { Platform } from 'react-native';
 
 import { SettingsScreen } from '@/settings/settings-screen';
 
@@ -51,9 +52,17 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  jest.restoreAllMocks(); // puts Platform.OS back
+});
+
 const open = () => renderRouter({ index: SettingsScreen }, { initialUrl: '/' });
 
-describe('Settings: this device', () => {
+describe('Settings: this device (website)', () => {
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'web');
+  });
+
   it('off → Turn on asks the browser (from the click) and confirms', async () => {
     await open();
     await fireEvent.press(await screen.findByText('Turn on notifications'));
@@ -93,6 +102,57 @@ describe('Settings: this device', () => {
     await open();
     await fireEvent.press(await screen.findByText('Turn on notifications'));
     expect(await screen.findByText(/blocking notifications from bdgtr/)).toBeTruthy();
+  });
+
+  it('a browser without notifications says which browsers work', async () => {
+    mockStatus = 'unsupported';
+    await open();
+    expect(await screen.findByText(/Try Chrome, Edge, Firefox or Safari/)).toBeTruthy();
+  });
+});
+
+describe('Settings: this device (Android app)', () => {
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+  });
+
+  it('off → Turn on (Android asks) and confirms for this phone', async () => {
+    await open();
+    expect(await screen.findByText('Get budget alerts on this phone, even when bdgtr isn’t open.')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Turn on notifications'));
+    expect(mockEnable).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Notifications turned on for this phone.')).toBeTruthy();
+    expect(screen.getByText('Turn off on this phone')).toBeTruthy();
+  });
+
+  it('on → Turn off on this phone', async () => {
+    mockStatus = 'on';
+    await open();
+    await fireEvent.press(await screen.findByText('Turn off on this phone'));
+    expect(await screen.findByText('Notifications turned off for this phone.')).toBeTruthy();
+  });
+
+  it('turning off fails (offline) → says so and stays on, the button works again', async () => {
+    mockStatus = 'on';
+    mockDisable.mockRejectedValue(new TypeError('Network request failed'));
+    await open();
+    await fireEvent.press(await screen.findByText('Turn off on this phone'));
+    expect(await screen.findByText("Couldn't turn off notifications. Check your connection and try again.")).toBeTruthy();
+    expect(screen.getByText('Notifications are on for this phone. Budget alerts arrive even when bdgtr isn’t open.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Turn off on this phone' }).props.accessibilityState).toMatchObject({ busy: false });
+  });
+
+  it('blocked in Android settings → explains where to allow it, no button', async () => {
+    mockStatus = 'blocked';
+    await open();
+    expect(await screen.findByText(/Settings → Apps → bdgtr → Notifications/)).toBeTruthy();
+    expect(screen.queryByText('Turn on notifications')).toBeNull();
+  });
+
+  it('a device without notifications (emulator) → points to the Alerts tab', async () => {
+    mockStatus = 'unsupported';
+    await open();
+    expect(await screen.findByText(/Alerts still show in the Alerts tab/)).toBeTruthy();
   });
 });
 

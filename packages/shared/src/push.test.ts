@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  deviceAddress,
   deviceLabelFromUserAgent,
   isAllowedPushEndpoint,
   RegisterDeviceInputSchema,
@@ -9,6 +10,7 @@ import {
 
 const P256 = 'B'.repeat(87);
 const AUTH = 'a'.repeat(22);
+const TOKEN = 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]';
 const sub = (endpoint: string) => ({ endpoint, expirationTime: null, keys: { p256dh: P256, auth: AUTH } });
 
 describe('isAllowedPushEndpoint (the server only talks to real push services)', () => {
@@ -37,6 +39,12 @@ describe('RegisterDeviceInputSchema', () => {
   it('accepts a browser push subscription with a label', () => {
     const r = RegisterDeviceInputSchema.parse({ kind: 'webpush', subscription: sub('https://fcm.googleapis.com/fcm/send/x'), deviceLabel: ' Chrome on Windows ' });
     expect(r.deviceLabel).toBe('Chrome on Windows');
+    expect(deviceAddress(r)).toBe('https://fcm.googleapis.com/fcm/send/x');
+  });
+
+  it.each([TOKEN, 'ExpoPushToken[abc-DEF_123]'])('accepts the Android app’s Expo push token %s', (token) => {
+    const r = RegisterDeviceInputSchema.parse({ kind: 'expo', expoPushToken: token, deviceLabel: 'Samsung Galaxy A54' });
+    expect(deviceAddress(r)).toBe(token);
   });
 
   it.each([
@@ -48,6 +56,13 @@ describe('RegisterDeviceInputSchema', () => {
     ['label too long', { kind: 'webpush', subscription: sub('https://fcm.googleapis.com/x'), deviceLabel: 'x'.repeat(61) }],
     ['choosing the owner in the body', { kind: 'webpush', subscription: sub('https://fcm.googleapis.com/x'), deviceLabel: 'x', userId: 'someone' }],
     ['overlong endpoint', { kind: 'webpush', subscription: sub(`https://fcm.googleapis.com/${'x'.repeat(1000)}`), deviceLabel: 'x' }],
+    ['a browser without its subscription', { kind: 'webpush', deviceLabel: 'x' }],
+    ['a browser with an Expo token too', { kind: 'webpush', subscription: sub('https://fcm.googleapis.com/x'), expoPushToken: TOKEN, deviceLabel: 'x' }],
+    ['the app without its token', { kind: 'expo', deviceLabel: 'x' }],
+    ['the app with a browser subscription', { kind: 'expo', subscription: sub('https://fcm.googleapis.com/x'), deviceLabel: 'x' }],
+    ['the app with a URL instead of a token', { kind: 'expo', expoPushToken: 'https://169.254.169.254/', deviceLabel: 'x' }],
+    ['a token with extra text', { kind: 'expo', expoPushToken: `${TOKEN} x`, deviceLabel: 'x' }],
+    ['an empty token', { kind: 'expo', expoPushToken: 'ExponentPushToken[]', deviceLabel: 'x' }],
   ])('rejects %s', (_label, input) => {
     expect(RegisterDeviceInputSchema.safeParse(input).success).toBe(false);
   });

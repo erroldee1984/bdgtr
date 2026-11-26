@@ -161,7 +161,8 @@ When a spend crosses a threshold (§6.3), the API **fans out the alert to every 
 
 | Where the member is | How the alert arrives |
 |---|---|
-| Android app (open, background or closed) | System notification through Expo Push → FCM. Tapping it opens the Dashboard for that household. |
+| Android app (background or closed) | System notification through Expo Push → FCM on the "Budget alerts" channel. Tapping it opens the Alerts tab for that household. |
+| Android app (open and in front) | **In-app toast** instead of a duplicate system notification, plus the Alerts list badge |
 | Browser tab open on `bdgtr.erroldee.com` | **In-app toast** (top-right "growl" on desktop, top banner on phones), announced to screen readers, plus the Alerts list badge |
 | Browser closed, or the tab in the background (Chrome, Edge, Firefox on desktop or Android) | **Web Push system notification**, the OS-level "growl", shown by the service worker even when no tab is open |
 | Safari on iPhone or iPad | Web Push only works once the site is **added to the Home Screen** (installed PWA, iOS 16.4+). Otherwise, in-app toast only. |
@@ -177,6 +178,10 @@ When a spend crosses a threshold (§6.3), the API **fans out the alert to every 
 - **Multiple households:** the alert carries `householdId`, and tapping it switches to that household.
 - **Security and privacy (built in M2b-2):** the server only delivers to the real push services (Google FCM, Mozilla, Microsoft WNS, Apple), never to an arbitrary address a client sends. Signing out forgets this browser and unsubscribes it, and on sign-in an already-subscribed browser is re-registered to whoever is signed in, so a shared computer never shows the previous person's alerts. VAPID keys: public/subject as plain Vercel variables, private key as a Vercel secret (and separate local-development keys in `apps/api/.env`). The VAPID subject is the website address, not a personal email.
 - **Foreground:** if the app is open and in front, the service worker hands the alert to the page as a toast instead of showing a system notification; the same alert from the save's reply and a push is shown once.
+- **Android (built in M2b-3):** More → Settings → "Turn on notifications" creates the "Budget alerts" channel (Android 13 only prompts once a channel exists), asks Android's permission, gets the Expo push token and registers it as an `expo` device (label e.g. "Samsung SM-A546E", never the phone's personal name). The token is remembered in secure storage; "on" means permission granted and a registered token.
+  - The server sends only to Expo's fixed address (`exp.host`); the token goes in the body and must match `ExponentPushToken[…]`. `DeviceNotRegistered` deletes the device. An Expo access token is optional (`EXPO_ACCESS_TOKEN`, a Vercel secret, only if "enhanced security for push" is turned on).
+  - Turning it off when the server can't be reached says so and stays on, since alerts would keep arriving. Signing out while offline drops the phone's push registration instead, so the previous person's alerts stop. App start and sign-in re-register a switched-on phone to whoever is signed in and pick up a rotated token.
+  - Firebase: `google-services.json` is not committed. EAS builds get it from the `GOOGLE_SERVICES_JSON` file variable (`app.config.ts` adds it when present). The FCM V1 service-account key is uploaded to EAS credentials and never stored in the repo.
 
 ---
 

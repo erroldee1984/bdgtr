@@ -124,3 +124,8 @@ export function onForegroundAlert(handler: (alert: { level: 'near' | 'over'; tit
   navigator.serviceWorker.addEventListener('message', listener);
   return () => navigator.serviceWorker.removeEventListener('message', listener);
 }
+
+/** Browsers: the service worker opens the alert's page itself (public/sw.js). */
+export function onNotificationTap(_open: (path: string) => void): () => void {
+  return () => {};
+}

@@ -9,7 +9,7 @@ import { serve } from '@hono/node-server';
 import { getAppDb } from './app-db.js';
 import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
-import { createWebPushSender } from './push.js';
+import { pushFromEnv } from './push.js';
 import { closeDb, pingDb } from './db.js';
 import { EnvError, loadEnv } from './env.js';
 
@@ -26,16 +26,13 @@ try {
   throw err;
 }
 
-const { MONGODB_URI, MONGODB_DB, ALLOWED_ORIGINS, PORT, CLERK_JWT_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = env;
+const { MONGODB_URI, MONGODB_DB, ALLOWED_ORIGINS, PORT, CLERK_JWT_KEY, VAPID_PUBLIC_KEY } = env;
 const app = createApp({
   allowedOrigins: ALLOWED_ORIGINS,
   pingDb: () => pingDb(MONGODB_URI, MONGODB_DB),
   getDb: () => getAppDb(MONGODB_URI, MONGODB_DB),
   verifyToken: CLERK_JWT_KEY ? createClerkVerifier(CLERK_JWT_KEY) : null,
-  push:
-    VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_SUBJECT
-      ? { publicKey: VAPID_PUBLIC_KEY, send: createWebPushSender({ publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY, subject: VAPID_SUBJECT }) }
-      : null,
+  push: pushFromEnv(env),
 });
 if (!VAPID_PUBLIC_KEY) console.warn('VAPID keys not set: browser notifications are off.');
 if (!CLERK_JWT_KEY) console.warn('CLERK_JWT_KEY not set: signed-in routes will answer 503.');

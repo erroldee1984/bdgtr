@@ -8,7 +8,7 @@ import {
   MembershipSettingsSchema,
   type PushPayload,
 } from '@bdgtr/shared';
-import { type Db, MongoClient } from 'mongodb';
+import { type Db, MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -19,7 +19,19 @@ import { createApp } from './create-app.js';
 import { loadEnv } from './env.js';
 import { ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js';
 import { ensureInviteIndexes, INVITES } from './invites.js';
-import { ensurePushIndexes, MAX_DEVICES_PER_USER, PUSH_SUBSCRIPTIONS, type PushSubscriptionDoc, type SendResult } from './push.js';
+import {
+  createExpoPushSender,
+  createPushSender,
+  createWebPushSender,
+  ensurePushIndexes,
+  EXPO_PUSH_URL,
+  MAX_DEVICES_PER_USER,
+  PUSH_SUBSCRIPTIONS,
+  pushFromEnv,
+  type PushSender,
+  type PushSubscriptionDoc,
+  type SendResult,
+} from './push.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureTransactionIndexes, TRANSACTIONS } from './transactions.js';
 import { ensureUserIndexes, USERS } from './users.js';
@@ -86,6 +98,13 @@ const device = (n: string, label = `Chrome ${n}`) => ({
   subscription: { endpoint: endpoint(n), expirationTime: null as number | null, keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) } },
   deviceLabel: label,
 });
+const TOKEN = (n: string) => `ExponentPushToken[${n}]`;
+const phone = (n: string, label = `Pixel ${n}`) => ({ kind: 'expo', expoPushToken: TOKEN(n), deviceLabel: label });
+const registerPhone = async (who: string, n: string) => {
+  const res = await call(who, 'POST', '/push-subscriptions', { body: phone(n) });
+  expect([200, 201]).toContain(res.status);
+  return DeviceResponseSchema.parse(await res.json()).device;
+};
 const register = async (who: string, n: string) => {
   const res = await call(who, 'POST', '/push-subscriptions', { body: device(n) });
   expect([200, 201]).toContain(res.status);
@@ -176,6 +195,165 @@ describe('devices', () => {
   it('401 without sign-in', async () => {
     expect((await app.request('/push-subscriptions')).status).toBe(401);
     expect((await app.request('/push-subscriptions', { method: 'POST', body: '{}' })).status).toBe(401);
+  });
+});
+
+describe('Android app (Expo push token)', () => {
+  it('registers the phone; re-registering updates it; it shows as an app device', async () => {
+    expect((await call('ana', 'POST', '/push-subscriptions', { body: phone('p1', 'Pixel 8') })).status).toBe(201);
+    expect((await call('ana', 'POST', '/push-subscriptions', { body: phone('p1', 'Google Pixel 8') })).status).toBe(200);
+    const devices = await devicesOf('ana');
+    expect(devices.map((d) => [d.kind, d.deviceLabel])).toEqual([['expo', 'Google Pixel 8']]);
+    const row = await db.collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS).findOne({});
+    expect(row).toMatchObject({ kind: 'expo', endpoint: TOKEN('p1') });
+    expect(row!.keys).toBeUndefined();
+  });
+
+  it('a phone handed to someone else moves to whoever signed in; sign-out forgets it by its token', async () => {
+    await registerPhone('ana', 'shared');
+    await registerPhone('ben', 'shared');
+    expect(await devicesOf('ana')).toEqual([]);
+    expect((await call('ana', 'POST', '/push-subscriptions/unregister', { body: { endpoint: TOKEN('shared') } })).status).toBe(204);
+    expect((await devicesOf('ben')).length).toBe(1); // not ana's to forget
+    expect((await call('ben', 'POST', '/push-subscriptions/unregister', { body: { endpoint: TOKEN('shared') } })).status).toBe(204);
+    expect(await devicesOf('ben')).toEqual([]);
+  });
+
+  it.each([
+    ['a URL as the token', { kind: 'expo', expoPushToken: 'https://169.254.169.254/', deviceLabel: 'x' }],
+    ['no token', { kind: 'expo', deviceLabel: 'x' }],
+    ['a browser without its subscription', { kind: 'webpush', expoPushToken: TOKEN('x'), deviceLabel: 'x' }],
+  ])('400 for %s; nothing stored', async (_label, body) => {
+    expect((await call('ana', 'POST', '/push-subscriptions', { body })).status).toBe(400);
+    expect(await db.collection(PUSH_SUBSCRIPTIONS).countDocuments()).toBe(0);
+  });
+
+  it('phones count towards the device limit too', async () => {
+    for (let i = 0; i < MAX_DEVICES_PER_USER; i++) await registerPhone('ana', `p${i}`);
+    expect((await call('ana', 'POST', '/push-subscriptions', { body: device('laptop') })).status).toBe(409);
+  });
+
+  it('alerts reach phones and browsers alike', async () => {
+    const { h, groceries } = await setup();
+    await registerPhone('owner', 'owner-phone');
+    await register('mem', 'mem-laptop');
+    await spend('mem', h, groceries, 95_000);
+    expect(sent.map((s) => s.endpoint).sort()).toEqual([TOKEN('owner-phone'), endpoint('mem-laptop')].sort());
+  });
+
+  it('an uninstalled app (Expo says the device is gone) is removed', async () => {
+    const { h, groceries } = await setup();
+    await registerPhone('owner', 'old-phone');
+    behaviour[TOKEN('old-phone')] = 'gone';
+    await spend('mem', h, groceries, 95_000);
+    expect(await devicesOf('owner')).toEqual([]);
+  });
+
+  it('browser push not set up on the server: phones still get alerts', async () => {
+    const phonesOnly = createApp({ ...base, push: { publicKey: null, send: createPushSender({ webpush: null, expo: fakeSend }) } });
+    expect((await phonesOnly.request('/push/vapid-public-key')).status).toBe(503);
+    const { h, groceries } = await setup();
+    await registerPhone('owner', 'phone');
+    await register('owner', 'laptop');
+    const { status } = await spend('mem', h, groceries, 95_000, phonesOnly);
+    expect(status).toBe(201);
+    expect(sent.map((s) => s.endpoint)).toEqual([TOKEN('phone')]);
+    expect((await devicesOf('owner')).length).toBe(2); // the browser failed, it isn't "gone"
+  });
+});
+
+describe('Expo push sender', () => {
+  const doc = (endpoint = TOKEN('abc')): PushSubscriptionDoc => ({
+    _id: new ObjectId(),
+    userId: new ObjectId(),
+    kind: 'expo',
+    endpoint,
+    deviceLabel: 'Pixel',
+    createdAt: clock,
+    lastSeenAt: clock,
+  });
+  const payload: PushPayload = {
+    type: 'alert',
+    title: 'Over budget · Groceries',
+    body: 'Dela Cruz household is over its ₱1,000 Groceries budget by ₱100',
+    level: 'over',
+    householdId: 'h1',
+    url: '/alerts?household=h1',
+    tag: 'alert-h1-c1',
+  };
+  /** A fake Expo push service answering with `answer` (or failing the request). */
+  function expo(answer: { status?: number; json?: unknown; throws?: boolean }) {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fake = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      if (answer.throws) throw new TypeError('fetch failed');
+      return new Response(JSON.stringify(answer.json ?? {}), { status: answer.status ?? 200 });
+    }) as unknown as typeof fetch;
+    return { fake, calls };
+  }
+
+  it('posts the alert to Expo’s fixed address for the Android channel; ok → sent', async () => {
+    const { fake, calls } = expo({ json: { data: [{ status: 'ok', id: 'x' }] } });
+    expect(await createExpoPushSender({ fetch: fake })(doc(), payload)).toBe('sent');
+    expect(calls[0]!.url).toBe(EXPO_PUSH_URL);
+    expect(calls[0]!.url).toBe('https://exp.host/--/api/v2/push/send');
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual([
+      {
+        to: TOKEN('abc'),
+        title: payload.title,
+        body: payload.body,
+        data: { type: 'alert', level: 'over', householdId: 'h1', url: '/alerts?household=h1', tag: 'alert-h1-c1' },
+        channelId: 'budget-alerts',
+        priority: 'high',
+        sound: 'default',
+        ttl: 86_400,
+      },
+    ]);
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it('"nearly at budget" is normal priority', async () => {
+    const { fake, calls } = expo({ json: { data: [{ status: 'ok' }] } });
+    await createExpoPushSender({ fetch: fake })(doc(), { ...payload, level: 'near' });
+    expect(JSON.parse(calls[0]!.init.body as string)[0].priority).toBe('default');
+  });
+
+  it('sends the access token only when one is set', async () => {
+    const { fake, calls } = expo({ json: { data: [{ status: 'ok' }] } });
+    await createExpoPushSender({ fetch: fake, accessToken: 'tok_1234567890abcdefghij' })(doc(), payload);
+    expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe('Bearer tok_1234567890abcdefghij');
+  });
+
+  it.each([
+    ['DeviceNotRegistered → gone', { json: { data: [{ status: 'error', details: { error: 'DeviceNotRegistered' } }] } }, 'gone'],
+    ['another error → failed', { json: { data: [{ status: 'error', details: { error: 'InvalidCredentials' } }] } }, 'failed'],
+    ['an HTTP error → failed', { status: 500, json: { errors: [{ code: 'INTERNAL' }] } }, 'failed'],
+    ['an unexpected answer → failed', { json: { data: 'nope' } }, 'failed'],
+    ['no answer at all → failed', { json: null }, 'failed'],
+    ['network down → failed', { throws: true }, 'failed'],
+  ])('%s (never throws)', async (_label, answer, expected) => {
+    expect(await createExpoPushSender({ fetch: expo(answer).fake })(doc(), payload)).toBe(expected);
+  });
+
+  it('picks the sender by device kind; a kind that isn’t set up counts as failed', async () => {
+    const used: string[] = [];
+    const fake = (name: string): PushSender => async () => (used.push(name), 'sent');
+    const both = createPushSender({ webpush: fake('web'), expo: fake('expo') });
+    expect(await both(doc(), payload)).toBe('sent');
+    expect(await both({ ...doc(endpoint('b')), kind: 'webpush', keys: { p256dh: 'p', auth: 'a' } }, payload)).toBe('sent');
+    expect(used).toEqual(['expo', 'web']);
+    expect(await createPushSender({ webpush: null, expo: null })(doc(), payload)).toBe('failed');
+  });
+
+  it('a browser row without keys is not sent (Web Push)', async () => {
+    const web = createWebPushSender({ publicKey: 'B'.repeat(87), privateKey: 'k'.repeat(43), subject: 'https://bdgtr.erroldee.com' });
+    expect(await web({ ...doc(endpoint('nokeys')), kind: 'webpush' }, payload)).toBe('failed');
+  });
+
+  it('from the environment: browser push needs VAPID keys; the app works without them', () => {
+    expect(pushFromEnv({}).publicKey).toBeNull();
+    expect(pushFromEnv({ VAPID_PUBLIC_KEY: 'B'.repeat(87), VAPID_PRIVATE_KEY: 'k'.repeat(43), VAPID_SUBJECT: 'https://x.example' }).publicKey).toBe('B'.repeat(87));
+    expect(typeof pushFromEnv({}).send).toBe('function');
   });
 });
 
@@ -300,5 +478,12 @@ describe('configuration', () => {
     }
     expect(message).toMatch(/VAPID/);
     expect(message).not.toContain('k'.repeat(43));
+  });
+  it('the Expo access token is optional; a malformed one is refused without echoing it', () => {
+    expect(loadEnv(env).EXPO_ACCESS_TOKEN).toBeUndefined();
+    expect(loadEnv({ ...env, EXPO_ACCESS_TOKEN: '' }).EXPO_ACCESS_TOKEN).toBeUndefined();
+    expect(loadEnv({ ...env, EXPO_ACCESS_TOKEN: 'abcdefghij_KLMNOPQRST-1234' }).EXPO_ACCESS_TOKEN).toBe('abcdefghij_KLMNOPQRST-1234');
+    expect(() => loadEnv({ ...env, EXPO_ACCESS_TOKEN: 'has spaces and $ecret!' })).toThrow(/EXPO_ACCESS_TOKEN/);
+    expect(() => loadEnv({ ...env, EXPO_ACCESS_TOKEN: 'has spaces and $ecret!' })).not.toThrow(/\$ecret/);
   });
 });
