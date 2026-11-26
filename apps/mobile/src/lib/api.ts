@@ -19,6 +19,8 @@ import {
   CategoryResponseSchema,
   type CreateCategoryInput,
   type CreateTransactionInput,
+  type Transaction,
+  TransactionsResponseSchema,
   type Dashboard,
   DashboardSchema,
   type UpdateCategoryInput,
@@ -208,6 +210,18 @@ export async function createTransaction(
   return CreateTransactionResponseSchema.parse(
     await apiFetch('/transactions', getToken, inHousehold(householdId, json('POST', input))),
   );
+}
+
+/** Every spend in a month, unfiltered: the app filters, sorts and pins (docs/PLAN.md §6.8). */
+export async function fetchTransactions(getToken: GetToken, householdId: string, month: string): Promise<Transaction[]> {
+  return TransactionsResponseSchema.parse(
+    await apiFetch(`/transactions?month=${encodeURIComponent(month)}`, getToken, inHousehold(householdId)),
+  ).transactions;
+}
+
+/** Deletes a spend. House Members get 403 for one they didn't enter. */
+export async function deleteTransaction(getToken: GetToken, householdId: string, id: string): Promise<void> {
+  await apiFetch(`/transactions/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, { method: 'DELETE' }));
 }
 
 /** A month's alerts (default: this month) plus the unread count across all months. */

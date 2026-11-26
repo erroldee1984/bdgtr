@@ -1,4 +1,5 @@
 /** Household switcher (dashboard header) and the More screen. */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
@@ -100,6 +101,18 @@ describe('More screen', () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockOrder).toEqual(['forget-this-browser', 'sign-out']);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('Sign out forgets every pin on this device (shared computers, PLAN §6.8) and nothing else', async () => {
+    await AsyncStorage.multiSet([
+      ['pins:u1:h1', '{"a":"2026-11"}'],
+      ['pins:u2:h2', '{"b":"2026-10"}'],
+      ['other', 'kept'],
+    ]);
+    await renderMore();
+    await fireEvent.press(screen.getByText('Sign out'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+    expect(await AsyncStorage.getAllKeys()).toEqual(['other']);
   });
 
   it('a failed sign-out says so (instead of failing silently) and can be retried', async () => {

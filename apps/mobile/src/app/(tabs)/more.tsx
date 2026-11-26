@@ -8,6 +8,7 @@ import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { SetupCheck } from '@/components/setup-check';
+import { clearAllPins } from '@/breakdown/pins';
 import { forgetPushOnSignOut } from '@/notifications/device-push';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
@@ -99,6 +100,7 @@ export default function MoreScreen() {
           try {
             // Stop this browser getting this account's alerts (shared computers).
             await forgetPushOnSignOut(() => getToken());
+            await clearAllPins(); // pins stay on a device only while signed in (PLAN §6.8)
             await signOut(); // RequireSignIn then redirects to /sign-in
           } catch {
             setSignOutError(true);
