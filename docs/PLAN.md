@@ -579,12 +579,14 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M1a prod | Web CSP blocked Clerk Protect, then its probe hosts, and new sign-ups were rejected (PRs #8, #9); a custom `+html.tsx` once shipped pages without their JavaScript | `apps/mobile/scripts/__tests__/write-web-headers-test.ts` |
 | M1c | Opening or refreshing `/household` (also `/add`, "Create another household") straight from its URL left no way out: no history, so no header back button and Cancel did nothing. Now Back/Cancel go to the dashboard when there's no history | `apps/mobile/src/components/__tests__/back-navigation-test.tsx` (real root layout) |
 | M2b dev | Simultaneous spends that only together crossed 90% sent no alert (each saw the others as "already there"). Now the level reached is judged | `apps/api/src/alerts.test.ts` ("simultaneous spends…") |
+| M2b-3 PR | The Vercel preview failed to build (TS2339: no `.ok`/`.json` on fetch's `Response`): Vercel's build doesn't see the global fetch types, though local checks did. API code now describes the fetch it uses (`FetchLike`) | `apps/api/scripts/verify-deploy-build.mjs` (`pnpm --filter @bdgtr/api verify:deploy`, in CI) fails on API source using `typeof fetch` / `RequestInit` |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
 **Writing app (Jest) tests:**
+- Made-up tokens and keys in tests should look fake (e.g. `'x'.repeat(24)`): realistic random-looking strings trip the CI secret scan.
 - Mocked hooks must return the **same** functions and objects on every render, like the real ones (Clerk's `useAuth`, `useFetchMe`). A new function per render makes effects refetch forever and the test hangs.
-- React Native Testing Library v14: `render`, `rerender` and `fireEvent.*` are async, so always `await` them. `rerender` needs a **new** element (`app()`), not the same object.
+- React Native Testing Library v14: `render`, `rerender`, `fireEvent.*` and `act` are async, so always `await` them (an un-awaited `act` leaves the next test rendering nothing). `rerender` needs a **new** element (`app()`), not the same object.
 
 | Area | Happy path | Negative |
 |---|---|---|

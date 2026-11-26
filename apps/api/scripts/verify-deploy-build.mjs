@@ -8,7 +8,7 @@
  * import the compiled entry with plain Node and call /health.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -25,6 +25,20 @@ const shadowing = ['app', 'index', 'server', 'src/app']
 if (shadowing.length > 0) {
   console.error(
     `verify-deploy-build: FAILED, Vercel would use ${shadowing[0]} as the entry instead of src/index.ts. Rename it.`,
+  );
+  process.exit(1);
+}
+
+// Vercel's build doesn't see the types behind the global fetch (its Response
+// had no .ok / .json: TS2339), though our local check does. So API code
+// describes the fetch it needs (FetchLike in src/push.ts) instead.
+const fetchTyped = readdirSync(join(apiDir, 'src'), { recursive: true })
+  .map(String)
+  .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.includes('test-utils'))
+  .filter((f) => /\btypeof fetch\b|\bRequestInit\b/.test(readFileSync(join(apiDir, 'src', f), 'utf8')));
+if (fetchTyped.length > 0) {
+  console.error(
+    `verify-deploy-build: FAILED, ${fetchTyped.join(', ')} use the global fetch types, which Vercel's build doesn't see. Use FetchLike (src/push.ts).`,
   );
   process.exit(1);
 }

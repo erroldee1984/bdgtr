@@ -112,6 +112,15 @@ export function expoMessage(token: string, payload: PushPayload) {
   };
 }
 
+/**
+ * The bit of fetch the Expo sender uses. Spelled out rather than relying on the
+ * global Response type, which Vercel's build doesn't see (TS2339 on .ok/.json).
+ */
+export type FetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
+) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
+
 interface ExpoTicket {
   status?: string;
   details?: { error?: string };
@@ -123,8 +132,8 @@ interface ExpoTicket {
  * the token is no longer valid. The access token is optional (Expo's
  * "enhanced security" setting) and is a secret.
  */
-export function createExpoPushSender(opts: { accessToken?: string | undefined; fetch?: typeof fetch } = {}): PushSender {
-  const doFetch = opts.fetch ?? fetch;
+export function createExpoPushSender(opts: { accessToken?: string | undefined; fetch?: FetchLike } = {}): PushSender {
+  const doFetch: FetchLike = opts.fetch ?? (globalThis.fetch as unknown as FetchLike);
   return async (device, payload) => {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
