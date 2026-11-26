@@ -14,6 +14,7 @@ import { AppText } from '@/components/app-text';
 import { HouseholdProvider } from '@/household/household-context';
 import { HeaderBackButton } from '@/layout/back-button';
 import { PushBridge } from '@/notifications/push-bridge';
+import { OutboxProvider } from '@/offline/outbox-context';
 import { SkipToContent } from '@/components/skip-to-content';
 import { ToastProvider } from '@/toast/toast';
 import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
@@ -59,6 +60,7 @@ export default function RootLayout() {
         <HouseholdProvider>
           <ThemeProvider value={navTheme}>
             <ToastProvider>
+              <OutboxProvider>
               <PushBridge />
             <SkipToContent />
               <StatusBar style="light" />
@@ -145,6 +147,7 @@ export default function RootLayout() {
                   }}
                 />
               </Stack>
+              </OutboxProvider>
             </ToastProvider>
           </ThemeProvider>
         </HouseholdProvider>

@@ -18,6 +18,11 @@ jest.mock('@/household/household-context', () => ({
 jest.mock('@react-native-community/datetimepicker', () => ({ DateTimePickerAndroid: { open: jest.fn() } }));
 let mockUuid = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `00000000-0000-4000-8000-${String(++mockUuid).padStart(12, '0')}` }));
+let mockOutbox: unknown = null; // set to stand in for the offline outbox in one test
+jest.mock('@/offline/outbox-context', () => {
+  const actual = jest.requireActual('@/offline/outbox-context');
+  return { ...actual, useOutbox: () => mockOutbox ?? actual.useOutbox() };
+});
 const mockShow = jest.fn();
 jest.mock('@/toast/toast', () => ({ useToast: () => ({ show: mockShow }) }));
 const mockCategories = jest.fn();
@@ -62,6 +67,21 @@ async function fillAndSave(amount = '1,234.50', category = 'Transport') {
 }
 
 describe('Add spend', () => {
+  it('offline (Android): saved on this phone, says so, and goes back like a normal save', async () => {
+    const saveSpend = jest.fn(async () => ({ queued: true, alerts: [] }));
+    mockOutbox = { items: [], offline: true, saveSpend, syncNow: () => {}, retry: () => {}, discard: () => {} };
+    try {
+      await open();
+      await fillAndSave();
+      await screen.findByText('Dashboard');
+      expect(saveSpend).toHaveBeenCalledWith('h1', expect.objectContaining({ amountMinor: 123_450 }));
+      expect(mockShow).toHaveBeenCalledWith({ level: 'near', title: 'Saved on this phone', body: "You're offline. It will be sent when you're back online." });
+      expect(mockCreate).not.toHaveBeenCalled();
+    } finally {
+      mockOutbox = null;
+    }
+  });
+
   it('categories: most used first, removed ones not offered', async () => {
     await open();
     const group = await screen.findByLabelText('Category');

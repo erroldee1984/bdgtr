@@ -609,6 +609,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M5a dev | On the fixed-transaction form, a field's error stayed after you corrected it, so its hint (e.g. "Every month on the 12th") stayed hidden until the next Save | `apps/mobile/src/fixed/__tests__/fixed-screen-test.tsx` ("a corrected field drops its error") |
 | M5b CI | CI on `main` failed at random: with no cached MongoDB test binary, several API test files downloaded it at once and raced over its lock file (`UnableToUnlockLockfileError`) | `apps/api/vitest.global-setup.ts` downloads it once before any file starts; verified by running the suite with an empty binary cache |
 | M6b CI | The website's "Skip to content" link could be reached with Tab but **Enter did nothing**: react-native-web only fires `onPress` for clicks on a `role="link"` with no `href`. Now Enter and Space activate it | `apps/mobile/src/components/__tests__/skip-to-content-test.tsx` (keyboard), `apps/mobile/e2e/a11y.spec.ts` (real browser: Tab then Enter moves focus to the content) |
+| Offline dev | After the server refused a queued spend (e.g. 403), the banner still said "You're offline": only successful sends cleared it, though any answer proves the connection works | `apps/mobile/src/offline/__tests__/outbox-test.tsx` ("refused … Retry resends, Discard drops") |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
@@ -692,6 +693,20 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 - Android hands the file to the share sheet. On web it downloads directly.
 
 ### Offline capabilities
+
+**Being built (after M6b), Android app only.** The owner decided the website stays online-only and never stores spending data, so the web rows below don't apply.
+
+**Part 1 (built): offline entry.** In `src/offline/`:
+- **`vault.ts`** keeps offline data in AsyncStorage, encrypted with XChaCha20-Poly1305 (`@noble/ciphers`, pure JS: no new native module). The 256-bit key is held in the Android Keystore through expo-secure-store. UTF-8 is handled in JS (`utf8.ts`) because Hermes may lack `TextDecoder`. Unreadable or tampered data reads as missing. Sign-out clears it.
+- **`outbox-context.tsx`** handles saving and sending:
+  - Add spend tries the server. If there's no connection, or no answer within 15 s, the spend is queued instead, and the person sees "Saved on this phone".
+  - The queue sends oldest first on app start, when the app comes back to the front, after 5 s / 15 s / 30 s / 1 min / 5 min waits, and on "Send now". The idempotent `clientId` makes a repeat harmless.
+  - A refusal (4xx) goes to **Needs attention** (Alerts tab) with the reason, and **Retry** / **Discard**. 401 pauses sending; 5xx and network errors retry later. Any server answer clears "offline".
+- **Categories** are cached (`cached.ts`, `fetchWithCache`), so Add spend opens offline.
+- **What people see:** an offline banner on every screen, "Waiting to be sent" with **Pending** badges on Spend, and a warning before signing out with unsent spends.
+- **Changed from the design above:** a spend whose category was removed while offline is **not** accepted. The server refuses removed categories, so it goes to Needs attention ("enter it again with another category"). Editing a queued spend isn't offered yet (Discard and re-enter).
+
+**Part 2 (next): offline viewing.** Dashboard, Spend, Budgets and Alerts show the last synced data with "Showing data from …", and totals include pending spends.
 
 **Goal:** with no connection, a member can still **see the last data they synced** and **enter transactions**, which **send automatically** once the connection returns. Setup tools (categories, budgets, fixed transactions, members) stay online-only, as you asked for.
 

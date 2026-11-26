@@ -1,9 +1,10 @@
-import { type Category, categoriesForEntry, can } from '@bdgtr/shared';
+import { CategorySchema, type Category, categoriesForEntry, can } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { z } from 'zod';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
@@ -11,7 +12,9 @@ import { Button } from '@/components/button';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
 import { goBackOrHome } from '@/layout/back-button';
-import { ApiError, createTransaction, fetchCategories } from '@/lib/api';
+import { ApiError, fetchCategories } from '@/lib/api';
+import { cacheName, fetchWithCache } from '@/offline/cached';
+import { useOutbox } from '@/offline/outbox-context';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 import { useToast } from '@/toast/toast';
 
@@ -32,8 +35,9 @@ const SERVER_MESSAGES: Record<string, string> = {
  * server returns the first copy instead of saving it twice.
  */
 export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const { active } = useHousehold();
+  const outbox = useOutbox();
   const toast = useToast();
   const householdId = active?.householdId ?? '';
   const canManage = !!active && can(active.role, 'manage_budget_data');
@@ -56,8 +60,9 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   useEffect(() => {
     if (!householdId) return;
     let alive = true;
-    fetchCategories(() => getToken(), householdId)
-      .then((c) => {
+    // Kept on the phone too, so a spend can be added offline (docs/PLAN.md §15).
+    fetchWithCache(userId ? cacheName(userId, householdId, 'categories') : null, () => fetchCategories(() => getToken(), householdId), z.array(CategorySchema))
+      .then(({ data: c }) => {
         if (!alive) return;
         setCategories(categoriesForEntry(c));
         setLoadError(false);
@@ -66,7 +71,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     return () => {
       alive = false;
     };
-  }, [getToken, householdId, version]);
+  }, [getToken, userId, householdId, version]);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   const maxDate = useMemo(() => {
@@ -84,7 +89,10 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     setErrors({});
     setSaving(true);
     try {
-      const { alerts } = await createTransaction(() => getToken(), householdId, result.input);
+      const { queued, alerts } = await outbox.saveSpend(householdId, result.input);
+      if (queued) {
+        toast.show({ level: 'near', title: 'Saved on this phone', body: "You're offline. It will be sent when you're back online." });
+      }
       // The person who entered it hears about crossed budgets straight away (docs/PLAN.md §6.3).
       for (const a of alerts) toast.show({ level: a.level, title: a.title, body: a.body });
       goBackOrHome();

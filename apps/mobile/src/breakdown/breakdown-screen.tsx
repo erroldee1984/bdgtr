@@ -20,6 +20,7 @@ import { Dialog } from '@/components/dialog';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
 import { useHousehold } from '@/household/household-context';
+import { WaitingSpends } from '@/offline/waiting-spends';
 import { ApiError } from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
@@ -116,6 +117,7 @@ export function BreakdownScreen() {
   return (
     <Screen title="Spend" subtitle="Monthly spend breakdown">
       <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setMessage(null))} />
+      {active ? <WaitingSpends householdId={active.householdId} month={month} categories={categories} /> : null}
 
       {message ? (
         <AppText tone={message.tone} role={message.tone === 'danger' ? 'alert' : undefined} aria-live="polite">
