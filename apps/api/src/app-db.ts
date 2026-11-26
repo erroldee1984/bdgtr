@@ -3,6 +3,7 @@ import type { Db } from 'mongodb';
 import { getDb } from './db.js';
 import { ensureHouseholdIndexes } from './households.js';
 import { ensureAlertIndexes } from './alerts.js';
+import { ensureBudgetIndexes } from './budgets.js';
 import { ensureCategoryIndexes } from './categories.js';
 import { ensureInviteIndexes } from './invites.js';
 import { ensurePushIndexes } from './push.js';
@@ -26,6 +27,7 @@ export async function getAppDb(uri: string, dbName: string): Promise<Db> {
     ensureTransactionIndexes(db),
     ensureAlertIndexes(db),
     ensurePushIndexes(db),
+    ensureBudgetIndexes(db),
   ]).then((): void => undefined).catch((err) => {
     indexesReady = undefined; // retry on the next request
     throw err;

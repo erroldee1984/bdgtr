@@ -5,6 +5,8 @@ import {
   DevicesResponseSchema,
   type MembershipSettings,
   MembershipSettingsSchema,
+  type MonthBudgets,
+  MonthBudgetsSchema,
   type RegisterDeviceInput,
   type UpdateMembershipSettings,
   VapidKeyResponseSchema,
@@ -261,4 +263,48 @@ export async function updateMembershipSettings(
   input: UpdateMembershipSettings,
 ): Promise<MembershipSettings> {
   return MembershipSettingsSchema.parse(await apiFetch('/membership/me', getToken, inHousehold(householdId, json('PATCH', input))));
+}
+
+// --- Budgets for a month (docs/PLAN.md §6.6, §6.7). Each change answers with the month's budgets. ---
+
+export async function fetchBudgets(getToken: GetToken, householdId: string, month: string): Promise<MonthBudgets> {
+  return MonthBudgetsSchema.parse(await apiFetch(`/budgets?month=${encodeURIComponent(month)}`, getToken, inHousehold(householdId)));
+}
+
+export async function setMonthlyBudget(getToken: GetToken, householdId: string, month: string, budgetMinor: number): Promise<MonthBudgets> {
+  return MonthBudgetsSchema.parse(
+    await apiFetch(`/budgets/monthly/${encodeURIComponent(month)}`, getToken, inHousehold(householdId, json('PUT', { budgetMinor }))),
+  );
+}
+
+/** "Reset to default" for the month's total. */
+export async function resetMonthlyBudget(getToken: GetToken, householdId: string, month: string): Promise<MonthBudgets> {
+  return MonthBudgetsSchema.parse(await apiFetch(`/budgets/monthly/${encodeURIComponent(month)}`, getToken, inHousehold(householdId, { method: 'DELETE' })));
+}
+
+export async function setCategoryMonthBudget(
+  getToken: GetToken,
+  householdId: string,
+  month: string,
+  categoryId: string,
+  budgetMinor: number,
+): Promise<MonthBudgets> {
+  return MonthBudgetsSchema.parse(
+    await apiFetch(
+      `/budgets/categories/${encodeURIComponent(month)}/${encodeURIComponent(categoryId)}`,
+      getToken,
+      inHousehold(householdId, json('PUT', { budgetMinor })),
+    ),
+  );
+}
+
+/** "Reset to default" for one category this month. */
+export async function resetCategoryMonthBudget(getToken: GetToken, householdId: string, month: string, categoryId: string): Promise<MonthBudgets> {
+  return MonthBudgetsSchema.parse(
+    await apiFetch(
+      `/budgets/categories/${encodeURIComponent(month)}/${encodeURIComponent(categoryId)}`,
+      getToken,
+      inHousehold(householdId, { method: 'DELETE' }),
+    ),
+  );
 }

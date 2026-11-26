@@ -1,6 +1,7 @@
 import { type Alert, type AlertLevel, formatAlert, levelReached } from '@bdgtr/shared';
 import { type Db, MongoServerError, ObjectId } from 'mongodb';
 
+import { effectiveBudgets } from './budgets.js';
 import { CATEGORIES, type CategoryDoc } from './categories.js';
 import type { HouseholdDoc, MembershipDoc } from './households.js';
 import { MEMBERSHIPS } from './households.js';
@@ -70,9 +71,10 @@ async function spentInMonth(db: Db, householdId: ObjectId, yearMonth: string, ca
  */
 export async function recordCrossings(db: Db, household: HouseholdDoc, tx: TransactionDoc, now: Date): Promise<AlertDoc[]> {
   const category = await db.collection<CategoryDoc>(CATEGORIES).findOne({ _id: tx.categoryId, householdId: household._id });
-  const [categorySpent, totalSpent] = await Promise.all([
+  const [categorySpent, totalSpent, budgets] = await Promise.all([
     spentInMonth(db, household._id, tx.yearMonth, tx.categoryId),
     spentInMonth(db, household._id, tx.yearMonth),
+    effectiveBudgets(db, household, tx.yearMonth), // the spend's month: its overrides, else the defaults
   ]);
 
   const candidates: { scope: string; categoryId: ObjectId | null; categoryName: string | null; budget: number; after: number }[] = [];
@@ -81,11 +83,11 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
       scope: category._id.toHexString(),
       categoryId: category._id,
       categoryName: category.name,
-      budget: category.defaultBudgetMinor,
+      budget: budgets.categoryMinor(category),
       after: categorySpent,
     });
   }
-  candidates.push({ scope: 'total', categoryId: null, categoryName: null, budget: household.defaultMonthlyBudgetMinor, after: totalSpent });
+  candidates.push({ scope: 'total', categoryId: null, categoryName: null, budget: budgets.totalMinor, after: totalSpent });
 
   const created: AlertDoc[] = [];
   const insert = async (doc: AlertDoc): Promise<boolean> => {

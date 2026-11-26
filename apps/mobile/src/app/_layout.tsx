@@ -94,6 +94,26 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="budgets/index"
+              options={{
+                headerShown: true,
+                title: 'Budgets',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.textPrimary,
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
+            <Stack.Screen
+              name="budgets/categories"
+              options={{
+                headerShown: true,
+                title: 'Allocate per category',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.textPrimary,
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
+            <Stack.Screen
               name="add"
               options={{
                 presentation: 'modal',
