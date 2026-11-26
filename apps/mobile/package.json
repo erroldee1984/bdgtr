@@ -72,7 +72,7 @@
       "./jest.setup.js"
     ],
     "testTimeout": 20000,
-    "maxWorkers": "50%",
+    "maxWorkers": 4,
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",
       "!src/**/__tests__/**"

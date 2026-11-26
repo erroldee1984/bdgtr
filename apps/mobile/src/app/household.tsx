@@ -8,6 +8,7 @@ import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { RequireSignIn } from '@/components/require-sign-in';
 import { Screen } from '@/components/screen';
+import { TwoPane } from '@/components/two-pane';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
 import { type HouseholdFormErrors, validateHouseholdForm } from '@/household/household-form';
@@ -158,8 +159,16 @@ function HouseholdEditor({
         )}
       </Card>
 
-      <MembersSection household={household} onHouseholdChanged={onChanged} />
-      {can(household.role, 'manage_members') ? <InvitesSection household={household} /> : null}
+      {can(household.role, 'manage_members') ? (
+        <TwoPane
+          mainFlex={1}
+          sideFlex={1}
+          main={<MembersSection household={household} onHouseholdChanged={onChanged} />}
+          side={<InvitesSection household={household} />}
+        />
+      ) : (
+        <MembersSection household={household} onHouseholdChanged={onChanged} />
+      )}
 
       {canDelete ? (
         <Card style={styles.danger}>
