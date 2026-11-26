@@ -19,6 +19,8 @@ import { Card } from '@/components/card';
 import { Dialog } from '@/components/dialog';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
+import { isTwoPane, TwoPane } from '@/components/two-pane';
+import { useWindowClass } from '@/layout/window-class';
 import { useHousehold } from '@/household/household-context';
 import { ApiError } from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
@@ -113,6 +115,68 @@ export function BreakdownScreen() {
     setRange(NO_RANGE);
   };
 
+  const wide = isTwoPane(useWindowClass(), 'expanded');
+  // Wide screens show filters and sort beside the list, always open (no toggle icons).
+  const filterPanel = (
+    <FilterPanel
+      categories={categories}
+      categoryIds={categoryIds}
+      onToggleCategory={(id) => setCategoryIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
+      range={range}
+      rangeResult={rangeResult}
+      onRangeChange={setRange}
+      onClear={clearFilters}
+    />
+  );
+
+  // The count and total, with the filter/sort icons on narrow screens.
+  const toolbar = transactions ? (
+    <View style={styles.toolbar}>
+      <AppText variant="caption" tone="secondary" aria-live="polite" style={styles.flex}>
+        {listSummary(rows.length, transactions.length, shownSum)}
+      </AppText>
+      {wide ? null : (
+        <>
+          <Pressable
+            role="button"
+            accessibilityLabel={filterCount ? `Filters, ${filterCount} on` : 'Filters'}
+            accessibilityState={{ expanded: panel === 'filter' }}
+            onPress={() => setPanel(panel === 'filter' ? null : 'filter')}
+            style={({ pressed }) => [styles.iconButton, panel === 'filter' && styles.iconButtonOn, pressed && styles.pressed]}
+          >
+            <MaterialCommunityIcons
+              name="filter-variant"
+              size={24}
+              color={filterCount ? colors.primaryLight : colors.textPrimary}
+              aria-hidden
+            />
+            {filterCount ? (
+              <View style={styles.badge} aria-hidden>
+                <AppText variant="caption" style={styles.badgeText}>
+                  {String(filterCount)}
+                </AppText>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable
+            role="button"
+            accessibilityLabel={`Sort, ${orderLabel(sort)}${sort.by === 'amount' ? ' by cost' : ' by date'}`}
+            accessibilityState={{ expanded: panel === 'sort' }}
+            onPress={() => setPanel(panel === 'sort' ? null : 'sort')}
+            style={({ pressed }) => [styles.iconButton, panel === 'sort' && styles.iconButtonOn, pressed && styles.pressed]}
+          >
+            <MaterialCommunityIcons
+              name={sort.dir === 'desc' ? 'sort-descending' : 'sort-ascending'}
+              size={24}
+              color={colors.textPrimary}
+              aria-hidden
+            />
+          </Pressable>
+        </>
+      )}
+    </View>
+  ) : null;
+
   return (
     <Screen title="Spend" subtitle="Monthly spend breakdown">
       <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setMessage(null))} />
@@ -139,94 +203,89 @@ export function BreakdownScreen() {
       ) : null}
 
       {transactions && transactions.length > 0 ? (
-        <>
-          <View style={styles.toolbar}>
-            <AppText variant="caption" tone="secondary" aria-live="polite" style={styles.flex}>
-              {listSummary(rows.length, transactions.length, shownSum)}
-            </AppText>
-            <Pressable
-              role="button"
-              accessibilityLabel={filterCount ? `Filters, ${filterCount} on` : 'Filters'}
-              accessibilityState={{ expanded: panel === 'filter' }}
-              onPress={() => setPanel(panel === 'filter' ? null : 'filter')}
-              style={({ pressed }) => [styles.iconButton, panel === 'filter' && styles.iconButtonOn, pressed && styles.pressed]}
-            >
-              <MaterialCommunityIcons
-                name="filter-variant"
-                size={24}
-                color={filterCount ? colors.primaryLight : colors.textPrimary}
-                aria-hidden
-              />
-              {filterCount ? (
-                <View style={styles.badge} aria-hidden>
-                  <AppText variant="caption" style={styles.badgeText}>
-                    {String(filterCount)}
-                  </AppText>
+        wide ? (
+          <TwoPane
+            main={
+              <>
+                {toolbar}
+                {!transactions || transactions.length === 0 ? null : rows.length === 0 ? (
+                  <Card>
+                    <AppText tone="secondary">No spends match these filters.</AppText>
+                    <Button label="Clear filters" icon="filter-remove-outline" compact onPress={clearFilters} />
+                  </Card>
+                ) : (
+                  <>
+                    <View style={styles.list} role="list" aria-label="Spends">
+                      {rows.map((r, i) => (
+                        <View key={r.tx.id} role="listitem">
+                          {pinnedCount > 0 && (i === 0 || i === pinnedCount) ? (
+                            <AppText variant="caption" tone="secondary" style={styles.groupHead} role="heading">
+                              {i === 0 ? 'Pinned' : 'Everything else'}
+                            </AppText>
+                          ) : null}
+                          <BreakdownRow
+                            tx={r.tx}
+                            category={byId.get(r.tx.categoryId)}
+                            pinned={r.pinned}
+                            canDelete={canDelete(r.tx)}
+                            onAction={onAction}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </>
+            }
+            side={
+              <>
+                <Card>{filterPanel}</Card>
+                <Card>
+                  <SortPanel sort={sort} onSortChange={setSort} />
+                </Card>
+              </>
+            }
+          />
+        ) : (
+          <>
+            {toolbar}
+            {panel === 'filter' ? (
+              <Card>{filterPanel}</Card>
+            ) : panel === 'sort' ? (
+              <Card>
+                <SortPanel sort={sort} onSortChange={setSort} />
+              </Card>
+            ) : null}
+            {!transactions || transactions.length === 0 ? null : rows.length === 0 ? (
+              <Card>
+                <AppText tone="secondary">No spends match these filters.</AppText>
+                <Button label="Clear filters" icon="filter-remove-outline" compact onPress={clearFilters} />
+              </Card>
+            ) : (
+              <>
+                <View style={styles.list} role="list" aria-label="Spends">
+                  {rows.map((r, i) => (
+                    <View key={r.tx.id} role="listitem">
+                      {pinnedCount > 0 && (i === 0 || i === pinnedCount) ? (
+                        <AppText variant="caption" tone="secondary" style={styles.groupHead} role="heading">
+                          {i === 0 ? 'Pinned' : 'Everything else'}
+                        </AppText>
+                      ) : null}
+                      <BreakdownRow
+                        tx={r.tx}
+                        category={byId.get(r.tx.categoryId)}
+                        pinned={r.pinned}
+                        canDelete={canDelete(r.tx)}
+                        onAction={onAction}
+                      />
+                    </View>
+                  ))}
                 </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              role="button"
-              accessibilityLabel={`Sort, ${orderLabel(sort)}${sort.by === 'amount' ? ' by cost' : ' by date'}`}
-              accessibilityState={{ expanded: panel === 'sort' }}
-              onPress={() => setPanel(panel === 'sort' ? null : 'sort')}
-              style={({ pressed }) => [styles.iconButton, panel === 'sort' && styles.iconButtonOn, pressed && styles.pressed]}
-            >
-              <MaterialCommunityIcons
-                name={sort.dir === 'desc' ? 'sort-descending' : 'sort-ascending'}
-                size={24}
-                color={colors.textPrimary}
-                aria-hidden
-              />
-            </Pressable>
-          </View>
-          {panel === 'filter' ? (
-            <Card>
-              <FilterPanel
-                categories={categories}
-                categoryIds={categoryIds}
-                onToggleCategory={(id) => setCategoryIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
-                range={range}
-                rangeResult={rangeResult}
-                onRangeChange={setRange}
-                onClear={clearFilters}
-              />
-            </Card>
-          ) : panel === 'sort' ? (
-            <Card>
-              <SortPanel sort={sort} onSortChange={setSort} />
-            </Card>
-          ) : null}
-        </>
+              </>
+            )}
+          </>
+        )
       ) : null}
-
-      {!transactions || transactions.length === 0 ? null : rows.length === 0 ? (
-        <Card>
-          <AppText tone="secondary">No spends match these filters.</AppText>
-          <Button label="Clear filters" icon="filter-remove-outline" compact onPress={clearFilters} />
-        </Card>
-      ) : (
-        <>
-          <View style={styles.list} role="list" aria-label="Spends">
-            {rows.map((r, i) => (
-              <View key={r.tx.id} role="listitem">
-                {pinnedCount > 0 && (i === 0 || i === pinnedCount) ? (
-                  <AppText variant="caption" tone="secondary" style={styles.groupHead} role="heading">
-                    {i === 0 ? 'Pinned' : 'Everything else'}
-                  </AppText>
-                ) : null}
-                <BreakdownRow
-                  tx={r.tx}
-                  category={byId.get(r.tx.categoryId)}
-                  pinned={r.pinned}
-                  canDelete={canDelete(r.tx)}
-                  onAction={onAction}
-                />
-              </View>
-            ))}
-          </View>
-        </>
-      )}
 
       {details ? (
         <Dialog

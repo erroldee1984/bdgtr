@@ -7,6 +7,7 @@ import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
+import { TwoPane } from '@/components/two-pane';
 import { SpendChart } from '@/dashboard/spend-chart';
 import { greetingName, monthLabel } from '@/dashboard/format';
 import { useDashboard } from '@/dashboard/use-dashboard';
@@ -38,44 +39,51 @@ export default function DashboardScreen() {
           <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading this month" />
         )
       ) : (
-        <>
-          <Card>
-            <AppText variant="caption" tone="secondary">
-              Remaining this month
-            </AppText>
-            {dashboard.remainingMinor < 0 ? (
-              // Over budget: bold, red, an icon AND words (never colour alone).
-              <View style={styles.overRow} accessible accessibilityLabel={`Over budget by ${formatPHP(-dashboard.remainingMinor)}`}>
-                <MaterialCommunityIcons name="alert" size={28} color={colors.danger} aria-hidden />
-                <AppText variant="headline" tone="danger">{`Over by ${formatPHP(-dashboard.remainingMinor)}`}</AppText>
-              </View>
-            ) : (
-              <AppText variant="headline" accessibilityLabel={`Remaining ${formatPHP(dashboard.remainingMinor)}`}>
-                {formatPHP(dashboard.remainingMinor)}
+        <TwoPane
+          from="medium"
+          mainFlex={1}
+          sideFlex={1}
+          main={
+            <Card>
+              <AppText variant="caption" tone="secondary">
+                Remaining this month
               </AppText>
-            )}
-            <View style={styles.tiles}>
-              <View style={styles.tile} accessible accessibilityLabel={`Total budget ${formatPHP(dashboard.totalBudgetMinor)}`}>
-                <MaterialCommunityIcons name="wallet-outline" size={20} color={colors.primaryLight} aria-hidden />
-                <AppText variant="caption" tone="secondary">
-                  Budget
+              {dashboard.remainingMinor < 0 ? (
+                // Over budget: bold, red, an icon AND words (never colour alone).
+                <View style={styles.overRow} accessible accessibilityLabel={`Over budget by ${formatPHP(-dashboard.remainingMinor)}`}>
+                  <MaterialCommunityIcons name="alert" size={28} color={colors.danger} aria-hidden />
+                  <AppText variant="headline" tone="danger">{`Over by ${formatPHP(-dashboard.remainingMinor)}`}</AppText>
+                </View>
+              ) : (
+                <AppText variant="headline" accessibilityLabel={`Remaining ${formatPHP(dashboard.remainingMinor)}`}>
+                  {formatPHP(dashboard.remainingMinor)}
                 </AppText>
-                <AppText variant="bodyStrong">{formatPHP(dashboard.totalBudgetMinor)}</AppText>
+              )}
+              <View style={styles.tiles}>
+                <View style={styles.tile} accessible accessibilityLabel={`Total budget ${formatPHP(dashboard.totalBudgetMinor)}`}>
+                  <MaterialCommunityIcons name="wallet-outline" size={20} color={colors.primaryLight} aria-hidden />
+                  <AppText variant="caption" tone="secondary">
+                    Budget
+                  </AppText>
+                  <AppText variant="bodyStrong">{formatPHP(dashboard.totalBudgetMinor)}</AppText>
+                </View>
+                <View style={styles.tile} accessible accessibilityLabel={`Spent ${formatPHP(dashboard.spentMinor)}`}>
+                  <MaterialCommunityIcons name="cash-minus" size={20} color={colors.primaryLight} aria-hidden />
+                  <AppText variant="caption" tone="secondary">
+                    Spent
+                  </AppText>
+                  <AppText variant="bodyStrong">{formatPHP(dashboard.spentMinor)}</AppText>
+                </View>
               </View>
-              <View style={styles.tile} accessible accessibilityLabel={`Spent ${formatPHP(dashboard.spentMinor)}`}>
-                <MaterialCommunityIcons name="cash-minus" size={20} color={colors.primaryLight} aria-hidden />
-                <AppText variant="caption" tone="secondary">
-                  Spent
-                </AppText>
-                <AppText variant="bodyStrong">{formatPHP(dashboard.spentMinor)}</AppText>
-              </View>
-            </View>
-            <Button label="Add spend" variant="primary" icon="plus" onPress={() => router.push('/add')} />
-          </Card>
-          <Card>
-            <SpendChart categories={dashboard.categories} />
-          </Card>
-        </>
+              <Button label="Add spend" variant="primary" icon="plus" onPress={() => router.push('/add')} />
+            </Card>
+          }
+          side={
+            <Card>
+              <SpendChart categories={dashboard.categories} />
+            </Card>
+          }
+        />
       )}
     </Screen>
   );
