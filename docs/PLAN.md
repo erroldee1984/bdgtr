@@ -374,6 +374,7 @@ Add, edit (name, icon, colour, default budget) and remove, with confirmation exp
 - **7:00 AM notices** (`POST /internal/cron/fixed-notices`, same secret, called by the 07:00 Worker run with the daily summary; chosen over 00:15 so phones don't buzz at midnight):
   - **Added automatically** → the whole household: "Dela Cruz household: Rent (₱15,000, Housing) was added as today's spend."
   - **Due today**, for items *not* added automatically that fall due today and haven't been added this month → **House Owner and Co-Owners only** (`audience: 'managers'`; House Members don't see it in Alerts or get the push): "… is due today. Add it in Fixed transactions."
+  - **"Add it now"** on a due-today reminder in the Alerts tab adds the item as a spend on its due day with one tap (the bulk-add call for that one item). The API decides when it shows (`canAdd`): only for the House Owner and Co-Owners, only on the due day in Manila, only while the item hasn't been added that month (by any route) and still exists. A retry reuses the same clientId, so it can't add twice.
   - Both are stored in the Alerts tab (`kind: fixed_added | fixed_due`, with their own icons) and pushed like budget alerts. Muted members get no push. One per item, day and kind, so re-runs send nothing new. Notices use level `near` (neutral) so app builds from before `kind` existed still read them.
 - The add/edit form has the same **"+ New category"** quick add as Add spend: it asks only for a name, and an existing name just selects that category.
 - House Members see the list read-only.

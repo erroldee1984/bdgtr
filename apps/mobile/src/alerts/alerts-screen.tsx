@@ -2,7 +2,8 @@ import { type Alert, manilaDate, yearMonthOf } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import * as Crypto from 'expo-crypto';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
@@ -11,7 +12,9 @@ import { Card } from '@/components/card';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
 import { useHousehold } from '@/household/household-context';
-import { fetchAlerts, markAlertsRead } from '@/lib/api';
+import { fixedProblem } from '@/fixed/fixed-screen';
+import { bulkPostFixed, fetchAlerts, markAlertsRead } from '@/lib/api';
+import { useToast } from '@/toast/toast';
 import { colors, spacing } from '@/theme/tokens';
 
 import { useUnreadAlerts } from './unread-alerts';
@@ -22,8 +25,9 @@ const WHEN = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', 
 export { shiftMonth } from '@/components/month-switcher';
 
 /**
- * Alerts (docs/PLAN.md §6.10): the month's budget alerts, newest first, with
- * who triggered each one. Opening the screen marks them read (the tab badge
+ * Alerts (docs/PLAN.md §6.10): the month's budget alerts and fixed-transaction
+ * notices, newest first, with who triggered each budget alert. A "due today"
+ * reminder has "Add it now" while it's still its day and not yet added. Opening the screen marks them read (the tab badge
  * clears); the ones that were new stay marked "New" until you leave.
  */
 export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
@@ -40,6 +44,11 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
   const [month, setMonth] = useState(thisMonth);
   const [result, setResult] = useState<{ key: string; alerts: Alert[] | null; error: boolean } | null>(null);
   const key = `${householdId}:${month}`;
+  const toast = useToast();
+  const [adding, setAdding] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  // One clientId per reminder, so a retry after a dropped connection can't add it twice.
+  const clientIds = useRef(new Map<string, string>());
 
   const load = useCallback(() => {
     if (!householdId) return () => {};
@@ -65,9 +74,38 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
 
   const current = result?.key === key ? result : null;
 
+  /** "Add it now" on a due-today reminder: adds the item as a spend on its due day. */
+  async function addNow(a: Alert) {
+    if (!householdId || !a.fixedTransactionId || !a.dueDate) return;
+    const name = a.title.replace(/^Due today · /, '');
+    const clientId = clientIds.current.get(a.id) ?? Crypto.randomUUID();
+    clientIds.current.set(a.id, clientId);
+    setAdding(a.id);
+    setMessage(null);
+    try {
+      const { alerts } = await bulkPostFixed(() => getToken(), householdId, {
+        date: a.dueDate,
+        items: [{ id: a.fixedTransactionId, clientId }],
+      });
+      for (const x of alerts) toast.show({ level: x.level, title: x.title, body: x.body });
+      setResult((r) => (r?.alerts ? { ...r, alerts: r.alerts.map((x) => (x.id === a.id ? { ...x, canAdd: false } : x)) } : r));
+      setMessage({ tone: 'success', text: `${name} added as today's spend.` });
+    } catch (err) {
+      setMessage({ tone: 'danger', text: fixedProblem(err).replace("Couldn't save", `Couldn't add ${name}`) });
+    } finally {
+      setAdding(null);
+    }
+  }
+
   return (
     <Screen title="Alerts" subtitle="Budget alerts and fixed-transaction notices for this household">
-      <MonthSwitcher month={month} onChange={setMonth} max={thisMonth} />
+      <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setMessage(null))} max={thisMonth} />
+
+      {message ? (
+        <AppText tone={message.tone} role={message.tone === 'danger' ? 'alert' : undefined} aria-live="polite">
+          {message.text}
+        </AppText>
+      ) : null}
 
       {current?.error ? (
         <Card>
@@ -102,6 +140,17 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
                 ) : null}
               </View>
               <AppText>{a.body}</AppText>
+              {a.kind === 'fixed_due' && a.canAdd ? (
+                <Button
+                  label="Add it now"
+                  icon="plus"
+                  variant="primary"
+                  compact
+                  busy={adding === a.id}
+                  accessibilityLabel={`Add ${a.title.replace(/^Due today · /, '')} now`}
+                  onPress={() => void addNow(a)}
+                />
+              ) : null}
               <AppText variant="caption" tone="secondary">
                 {`${WHEN.format(new Date(a.createdAt))}${a.triggeredBy ? ` · after a spend by ${a.triggeredBy}` : ''}`}
               </AppText>
