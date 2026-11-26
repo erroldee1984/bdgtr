@@ -37,6 +37,7 @@ import {
 } from './categories.js';
 import { countUnread, listAlerts, markAlertsRead, readCutoff, recordCrossings, toAlert } from './alerts.js';
 import { type AppVariables, requireHousehold } from './household-routes.js';
+import { fanOutAlerts, type PushSender } from './push.js';
 import {
   createTransaction,
   deleteTransaction,
@@ -55,6 +56,8 @@ type AppEnv = { Variables: AppVariables };
 interface Deps {
   getDb: () => Promise<Db>;
   now: () => Date;
+  /** Delivers alerts to members' devices; null when push isn't configured. */
+  sendPush: PushSender | null;
 }
 
 function idParam(c: Context<AppEnv>, name: string): ObjectId | null {
@@ -176,9 +179,11 @@ export function registerSpendingRoutes(
 
     const { doc, created } = await createTransaction(db, householdId, input, me, now);
     if (!created) return c.json<CreateTransactionResponse>({ transaction: toTransaction(doc, me), alerts: [] }, 200);
-    // Thresholds crossed by this spend (docs/PLAN.md §6.3). Pushing them to every
-    // member's devices arrives in M2b-2/3; the person who entered it sees a toast now.
+    // Thresholds crossed by this spend (docs/PLAN.md §6.3): to every member's
+    // devices (never throws; an outage doesn't fail the saved spend), and back to
+    // the person who entered it for an in-app toast.
     const alerts = await recordCrossings(db, c.get('household'), doc, now);
+    await fanOutAlerts(db, c.get('household'), alerts, deps.sendPush);
     const cutoff = readCutoff(c.get('membership'));
     return c.json<CreateTransactionResponse>(
       { transaction: toTransaction(doc, me), alerts: alerts.map((a) => toAlert(a, cutoff, null)) },

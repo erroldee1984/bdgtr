@@ -43,7 +43,19 @@ const EnvSchema = z.object({
     .refine((v) => v === undefined || /-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----/.test(v.replace(/\\n/g, '\n')), {
       message: 'CLERK_JWT_KEY must be the PEM public key from Clerk (-----BEGIN PUBLIC KEY----- …)',
     }),
-});
+  // Web Push (VAPID). Optional: without them browser notifications are off.
+  // The private key is a secret (Vercel env var / local .env only).
+  VAPID_PUBLIC_KEY: z.string().regex(/^[A-Za-z0-9_-]{87}$/, 'VAPID_PUBLIC_KEY must be a base64url P-256 public key').optional(),
+  VAPID_PRIVATE_KEY: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'VAPID_PRIVATE_KEY must be a base64url P-256 private key').optional(),
+  VAPID_SUBJECT: z
+    .string()
+    .regex(/^(mailto:|https:\/\/)\S+$/, 'VAPID_SUBJECT must be a mailto: or https:// contact')
+    .optional(),
+}).refine(
+  (e) => [e.VAPID_PUBLIC_KEY, e.VAPID_PRIVATE_KEY, e.VAPID_SUBJECT].every((v) => v === undefined) ||
+    [e.VAPID_PUBLIC_KEY, e.VAPID_PRIVATE_KEY, e.VAPID_SUBJECT].every((v) => v !== undefined),
+  { message: 'Set all three of VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT, or none' },
+);
 
 export type Env = z.infer<typeof EnvSchema>;
 

@@ -5,6 +5,7 @@ import { ensureHouseholdIndexes } from './households.js';
 import { ensureAlertIndexes } from './alerts.js';
 import { ensureCategoryIndexes } from './categories.js';
 import { ensureInviteIndexes } from './invites.js';
+import { ensurePushIndexes } from './push.js';
 import { ensureTransactionIndexes } from './transactions.js';
 import { ensureUserIndexes } from './users.js';
 
@@ -24,6 +25,7 @@ export async function getAppDb(uri: string, dbName: string): Promise<Db> {
     ensureCategoryIndexes(db),
     ensureTransactionIndexes(db),
     ensureAlertIndexes(db),
+    ensurePushIndexes(db),
   ]).then((): void => undefined).catch((err) => {
     indexesReady = undefined; // retry on the next request
     throw err;

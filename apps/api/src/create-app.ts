@@ -10,6 +10,8 @@ import { requireAuth, type VerifyToken } from './auth.js';
 import { type AppVariables, registerHouseholdRoutes } from './household-routes.js';
 import { listMembershipsForUser } from './households.js';
 import { registerMemberRoutes } from './member-routes.js';
+import type { PushSender } from './push.js';
+import { registerPushRoutes } from './push-routes.js';
 import { registerSpendingRoutes } from './spending-routes.js';
 
 export interface AppDeps {
@@ -25,6 +27,8 @@ export interface AppDeps {
   authorizedParties?: string[];
   /** Injectable clock for tests. */
   now?: () => Date;
+  /** Web Push: the public key browsers subscribe with, and how to send. Null/absent = off. */
+  push?: { publicKey: string; send: PushSender } | null;
   /** Error reporter; defaults to console.error. Must not receive request bodies (PII). */
   logError?: (err: unknown) => void;
 }
@@ -82,7 +86,8 @@ export function createApp(deps: AppDeps) {
 
   const { loadUser } = registerHouseholdRoutes(app, auth, { getDb: deps.getDb, now });
   registerMemberRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
-  registerSpendingRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
+  registerSpendingRoutes(app, auth, loadUser, { getDb: deps.getDb, now, sendPush: deps.push?.send ?? null });
+  registerPushRoutes(app, auth, loadUser, { getDb: deps.getDb, now, vapidPublicKey: deps.push?.publicKey ?? null });
 
   // Signed-in user and their households. Creates the user record on first sign-in.
   app.get('/me', auth, loadUser, async (c) => {
