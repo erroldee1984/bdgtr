@@ -315,7 +315,7 @@ PUT/DELETE /budgets/categories/:yearMonth/:categoryId [OC]     { budgetMinor } �
        (built in M3) Defaults are edited where they live: PATCH /household (monthly) and
        PATCH /categories/:id (per category). Setting a month to the default's own value
        stores no override. Every change answers with the month's budgets.
-GET    /alerts?month= [OCM]
+GET    /alerts?month= [OCM]                   budget alerts + fixed notices (kind); House Members don't get managers-only ones
 PATCH  /membership/me [OCM]                  { alertsMuted, dailyDigestEnabled }
 
 # Device push registration (no X-Household-Id)
@@ -324,7 +324,8 @@ GET    /push-subscriptions                   DELETE /push-subscriptions/:id   (o
 GET    /push/vapid-public-key
 
 # Internal
-POST   /internal/cron/fixed-postings         (Authorization: Bearer CRON_SECRET)
+POST   /internal/cron/fixed-postings         (Authorization: Bearer CRON_SECRET) 00:15 Manila
+POST   /internal/cron/fixed-notices          (Authorization: Bearer CRON_SECRET) 07:00 Manila
 POST   /internal/cron/daily-digest           (Authorization: Bearer CRON_SECRET)
 ```
 
@@ -370,6 +371,10 @@ Add, edit (name, icon, colour, default budget) and remove, with confirmation exp
 - **Alerts:** spends added these ways raise budget alerts like any spend. Auto-posted ones are recorded as entered by the person who created the item.
 - **Bulk add:** "Select to add", tick items, pick a date (its month drives the "already added" flags), then "Add N transactions". If any were already added that month, a dialog offers **Skip them** (only when some aren't repeats), **Add again** or **Cancel**.
 - Removing an item is a soft remove, and spends already added from it stay.
+- **7:00 AM notices** (`POST /internal/cron/fixed-notices`, same secret, called by the 07:00 Worker run with the daily summary; chosen over 00:15 so phones don't buzz at midnight):
+  - **Added automatically** → the whole household: "Dela Cruz household: Rent (₱15,000, Housing) was added as today's spend."
+  - **Due today**, for items *not* added automatically that fall due today and haven't been added this month → **House Owner and Co-Owners only** (`audience: 'managers'`; House Members don't see it in Alerts or get the push): "… is due today. Add it in Fixed transactions."
+  - Both are stored in the Alerts tab (`kind: fixed_added | fixed_due`, with their own icons) and pushed like budget alerts. Muted members get no push. One per item, day and kind, so re-runs send nothing new. Notices use level `near` (neutral) so app builds from before `kind` existed still read them.
 - The add/edit form has the same **"+ New category"** quick add as Add spend: it asks only for a name, and an existing name just selects that category.
 - House Members see the list read-only.
 - CRUD list: name, category, amount, day of month, auto-post toggle

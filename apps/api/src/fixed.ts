@@ -4,17 +4,18 @@ import {
   type CreateFixedInput,
   type FixedTransaction,
   fixedPostingDate,
+  formatFixedNotice,
   isDueOn,
   type UpdateFixedInput,
   yearMonthOf,
 } from '@bdgtr/shared';
 import { type Db, MongoServerError, ObjectId } from 'mongodb';
 
-import { recordCrossings, type AlertDoc } from './alerts.js';
+import { ALERTS, recordCrossings, type AlertDoc } from './alerts.js';
 import { CATEGORIES, type CategoryDoc } from './categories.js';
 import { HOUSEHOLDS, type HouseholdDoc } from './households.js';
 import { fanOutAlerts, type PushSender } from './push.js';
-import { createTransaction, type TransactionDoc } from './transactions.js';
+import { createTransaction, TRANSACTIONS, type TransactionDoc } from './transactions.js';
 
 /** docs/PLAN.md §4: soft-removed, never deleted, so past postings still resolve. */
 export interface FixedDoc {
@@ -243,5 +244,112 @@ export async function autoPostDue(db: Db, today: string, now: Date, sendPush: Pu
     if (created) result.posted++;
     else result.alreadyPosted++;
   }
+  return result;
+}
+
+export interface NoticeResult {
+  date: string;
+  added: number;
+  due: number;
+}
+
+/**
+ * The 7:00 AM notices for fixed transactions (docs/PLAN.md §6.5), for `today`
+ * (Manila):
+ * - "Added automatically" to the whole household, for each spend auto-posted today;
+ * - "Due today" to the House Owner and Co-Owners, for each item that isn't
+ *   added automatically, falls due today and hasn't been added this month.
+ * Each is stored in the Alerts tab and pushed (muted members get no push).
+ * Safe to run again: a notice is recorded once per item, day and kind.
+ */
+export async function sendFixedNotices(db: Db, today: string, now: Date, sendPush: PushSender | null): Promise<NoticeResult> {
+  const yearMonth = yearMonthOf(today);
+  const day = Number(today.slice(8, 10));
+  const lastDay = fixedPostingDate(yearMonth, 31) === today;
+  const [autoSpends, manualCandidates] = await Promise.all([
+    db.collection<TransactionDoc>(TRANSACTIONS).find({ source: 'fixed-auto', date: today }).toArray(),
+    db
+      .collection<FixedDoc>(FIXED)
+      .find({ autoPostEnabled: false, isRemoved: false, dayOfMonth: lastDay ? { $gte: day } : day })
+      .toArray(),
+  ]);
+  const manualDue = manualCandidates.filter((d) => isDueOn(d.dayOfMonth, today));
+  const alreadyAdded = new Set(
+    (
+      await db
+        .collection<FixedPostingDoc>(FIXED_POSTINGS)
+        .find({ fixedTransactionId: { $in: manualDue.map((d) => d._id) }, yearMonth })
+        .toArray()
+    ).map((p) => p.fixedTransactionId.toHexString()),
+  );
+  const due = manualDue.filter((d) => !alreadyAdded.has(d._id.toHexString()));
+
+  const autoItemIds = autoSpends.flatMap((t) => (t.fixedTransactionId ? [t.fixedTransactionId] : []));
+  const [autoItems, households, categories] = await Promise.all([
+    db.collection<FixedDoc>(FIXED).find({ _id: { $in: autoItemIds } }).toArray(), // removed since 00:15 still counts
+    db
+      .collection<HouseholdDoc>(HOUSEHOLDS)
+      .find({ _id: { $in: [...autoSpends.map((t) => t.householdId), ...due.map((d) => d.householdId)] }, deletedAt: null })
+      .toArray(),
+    db
+      .collection<CategoryDoc>(CATEGORIES)
+      .find({ _id: { $in: [...autoSpends.map((t) => t.categoryId), ...due.map((d) => d.categoryId)] } })
+      .toArray(),
+  ]);
+  const itemById = new Map(autoItems.map((d) => [d._id.toHexString(), d]));
+  const householdById = new Map(households.map((h) => [h._id.toHexString(), h]));
+  const categoryName = (id: ObjectId) => categories.find((c) => c._id.equals(id))?.name ?? null;
+
+  const byHousehold = new Map<string, AlertDoc[]>();
+  const result: NoticeResult = { date: today, added: 0, due: 0 };
+  const record = async (doc: AlertDoc): Promise<boolean> => {
+    try {
+      await db.collection<AlertDoc>(ALERTS).insertOne(doc);
+    } catch (err) {
+      if (err instanceof MongoServerError && err.code === 11000) return false; // sent on an earlier run
+      throw err;
+    }
+    const k = doc.householdId.toHexString();
+    byHousehold.set(k, [...(byHousehold.get(k) ?? []), doc]);
+    return true;
+  };
+  const notice = (
+    kind: 'fixed_added' | 'fixed_due',
+    household: HouseholdDoc,
+    item: FixedDoc,
+    amountMinor: number,
+    categoryId: ObjectId,
+    transactionId: ObjectId | null,
+  ): AlertDoc => ({
+    _id: new ObjectId(),
+    householdId: household._id,
+    yearMonth,
+    kind,
+    audience: kind === 'fixed_due' ? 'managers' : 'all',
+    // One per item, day and kind (the unique first-alert index makes a re-run a no-op).
+    scope: `${kind}:${item._id.toHexString()}:${today}`,
+    level: 'near',
+    categoryId,
+    ...formatFixedNotice({ kind, householdName: household.name, itemName: item.name, amountMinor, categoryName: categoryName(categoryId) }),
+    budgetMinor: 0,
+    spentMinor: 0,
+    triggeredBy: item.createdBy,
+    transactionId,
+    repeat: false,
+    createdAt: now,
+  });
+
+  for (const tx of autoSpends) {
+    const household = householdById.get(tx.householdId.toHexString());
+    const item = tx.fixedTransactionId ? itemById.get(tx.fixedTransactionId.toHexString()) : undefined;
+    if (!household || !item) continue;
+    if (await record(notice('fixed_added', household, item, tx.amountMinor, tx.categoryId, tx._id))) result.added++;
+  }
+  for (const item of due) {
+    const household = householdById.get(item.householdId.toHexString());
+    if (!household) continue;
+    if (await record(notice('fixed_due', household, item, item.amountMinor, item.categoryId, null))) result.due++;
+  }
+  for (const [hid, alerts] of byHousehold) await fanOutAlerts(db, householdById.get(hid)!, alerts, sendPush);
   return result;
 }

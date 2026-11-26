@@ -87,9 +87,37 @@ export function formatAlert(input: {
   };
 }
 
+/**
+ * What an alert is about. Fixed-transaction notices (docs/PLAN.md §6.5) go out
+ * with the 7:00 AM run: "added automatically" to the whole household, "due
+ * today" (items not added automatically) to the House Owner and Co-Owners.
+ * Notices use level 'near', the neutral, polite style, so app builds from
+ * before notices existed still read them.
+ */
+export const ALERT_KINDS = ['budget', 'fixed_added', 'fixed_due'] as const;
+export type AlertKind = (typeof ALERT_KINDS)[number];
+
+/** Wording for a fixed-transaction notice: household first, never the description. */
+export function formatFixedNotice(input: {
+  kind: 'fixed_added' | 'fixed_due';
+  householdName: string;
+  itemName: string;
+  amountMinor: number;
+  categoryName: string | null;
+}): { title: string; body: string } {
+  const who = householdLabel(input.householdName);
+  const what = `${input.itemName} (${pesos(input.amountMinor)}${input.categoryName ? `, ${input.categoryName}` : ''})`;
+  if (input.kind === 'fixed_added') {
+    return { title: `Added automatically · ${input.itemName}`, body: `${who}: ${what} was added as today's spend.` };
+  }
+  return { title: `Due today · ${input.itemName}`, body: `${who}: ${what} is due today. Add it in Fixed transactions.` };
+}
+
 export const AlertSchema = z.object({
   id: z.string(),
   yearMonth: z.string(),
+  /** Older servers sent no kind: those were all budget alerts. */
+  kind: z.enum(ALERT_KINDS).default('budget'),
   level: z.enum(ALERT_LEVELS),
   /** Null for the household total. */
   categoryId: z.string().nullable(),

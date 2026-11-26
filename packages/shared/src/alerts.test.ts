@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatAlert, householdLabel, levelReached, percentUsed } from './alerts.ts';
+import { AlertSchema, formatAlert, formatFixedNotice, householdLabel, levelReached, percentUsed } from './alerts.ts';
 
 describe('levelReached (threshold rule, docs/PLAN.md §6.3)', () => {
   const B = 100_000; // ₱1,000 budget
@@ -81,5 +81,33 @@ describe('formatAlert (household-first wording, no descriptions)', () => {
       title: 'Nearly at budget · Groceries',
       body: 'Dela Cruz household has used 95% of its ₱1,000 Groceries budget',
     });
+  });
+});
+
+describe('formatFixedNotice', () => {
+  const base = { householdName: 'Dela Cruz', itemName: 'Rent', amountMinor: 1_500_000, categoryName: 'Housing' };
+  it('added automatically', () => {
+    expect(formatFixedNotice({ ...base, kind: 'fixed_added' })).toEqual({
+      title: 'Added automatically · Rent',
+      body: "Dela Cruz household: Rent (₱15,000, Housing) was added as today's spend.",
+    });
+  });
+  it('due today', () => {
+    expect(formatFixedNotice({ ...base, kind: 'fixed_due', amountMinor: 150_050 })).toEqual({
+      title: 'Due today · Rent',
+      body: 'Dela Cruz household: Rent (₱1,500.50, Housing) is due today. Add it in Fixed transactions.',
+    });
+  });
+  it('no doubled "household"; a missing category is left out', () => {
+    expect(formatFixedNotice({ ...base, householdName: 'Santos Household', categoryName: null, kind: 'fixed_due' }).body).toBe(
+      'Santos Household: Rent (₱15,000) is due today. Add it in Fixed transactions.',
+    );
+  });
+});
+
+describe('AlertSchema kind', () => {
+  it('an alert without a kind (older server) reads as a budget alert', () => {
+    const a = AlertSchema.parse({ id: 'a', yearMonth: '2026-11', level: 'near', categoryId: null, title: 't', body: 'b', triggeredBy: null, createdAt: '2026-11-26T00:00:00.000Z', unread: false });
+    expect(a.kind).toBe('budget');
   });
 });

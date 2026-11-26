@@ -240,7 +240,8 @@ export function registerSpendingRoutes(
     const db = await deps.getDb();
     const householdId = c.get('household')._id;
     const cutoff = readCutoff(c.get('membership'));
-    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, month, cutoff), countUnread(db, householdId, cutoff)]);
+    const role = c.get('membership').role;
+    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, month, cutoff, role), countUnread(db, householdId, cutoff, role)]);
     return c.json<AlertsResponse>({ alerts, unreadCount });
   });
 

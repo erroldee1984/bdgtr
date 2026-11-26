@@ -136,7 +136,9 @@ export function FixedFormCard({
         <View style={styles.flex}>
           <AppText variant="bodyStrong">Add automatically</AppText>
           <AppText variant="caption" tone="secondary">
-            Added as a spend just after midnight on its day
+            {v.autoPost
+              ? 'Added as a spend just after midnight on its day. Everyone in the household is told at 7 AM.'
+              : 'Not added for you: the House Owner and Co-Owners get a reminder at 7 AM on its day.'}
           </AppText>
         </View>
         <Switch

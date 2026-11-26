@@ -31,6 +31,7 @@ import {
   listFixed,
   postFixed,
   removeFixed,
+  sendFixedNotices,
   toFixed,
   updateFixed,
 } from './fixed.js';
@@ -161,22 +162,41 @@ export function registerFixedRoutes(app: Hono<AppEnv>, auth: MiddlewareHandler<A
 
   // --- Scheduler (Cloudflare Worker cron, docs/PLAN.md §1) ---
 
-  app.post('/internal/cron/fixed-postings', async (c) => {
-    if (!deps.cronSecret) return c.json({ error: 'cron_not_configured' }, 503);
-    if (!hasCronSecret(c.req.header('Authorization'), deps.cronSecret)) return c.json({ error: 'unauthorized' }, 401);
+  /**
+   * Checks the secret and works out the Manila date to run for: today, or an
+   * optional { date } from the last 7 days (re-running a missed day). Returns
+   * a Response to send instead when the call is refused.
+   */
+  async function cronDate(c: Context<AppEnv>): Promise<{ date: string; now: Date } | { res: Response }> {
+    if (!deps.cronSecret) return { res: c.json({ error: 'cron_not_configured' }, 503) };
+    if (!hasCronSecret(c.req.header('Authorization'), deps.cronSecret)) return { res: c.json({ error: 'unauthorized' }, 401) };
     const now = deps.now();
     const today = manilaDate(now);
-    // Optional { date } re-runs a missed day from the last week (never the future).
-    let date = today;
     const body: unknown = await c.req.json().catch((): null => null);
     if (body && typeof body === 'object' && 'date' in body) {
       const d = (body as { date: unknown }).date;
       if (typeof d !== 'string' || !isValidIsoDate(d) || d > today || d < addDays(today, -7)) {
-        return c.json<ValidationError>({ error: 'invalid_input', issues: [{ path: 'date', message: 'Date must be within the last 7 days' }] }, 400);
+        return {
+          res: c.json<ValidationError>({ error: 'invalid_input', issues: [{ path: 'date', message: 'Date must be within the last 7 days' }] }, 400),
+        };
       }
-      date = d;
+      return { date: d, now };
     }
-    const db = await deps.getDb();
-    return c.json(await autoPostDue(db, date, now, deps.sendPush));
+    return { date: today, now };
+  }
+
+  // 00:15 Manila: add the items due today.
+  app.post('/internal/cron/fixed-postings', async (c): Promise<Response> => {
+    const r = await cronDate(c);
+    if ('res' in r) return r.res;
+    return c.json(await autoPostDue(await deps.getDb(), r.date, r.now, deps.sendPush));
+  });
+
+  // 07:00 Manila: tell the household what was added automatically, and remind
+  // the House Owner and Co-Owners about items due today that aren't.
+  app.post('/internal/cron/fixed-notices', async (c): Promise<Response> => {
+    const r = await cronDate(c);
+    if ('res' in r) return r.res;
+    return c.json(await sendFixedNotices(await deps.getDb(), r.date, r.now, deps.sendPush));
   });
 }

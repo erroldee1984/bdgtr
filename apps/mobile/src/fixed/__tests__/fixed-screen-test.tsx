@@ -179,7 +179,9 @@ describe('add, edit, remove', () => {
     await press('Edit Rent');
     expect(screen.getByLabelText('Name').props.value).toBe('Rent');
     expect(screen.getByLabelText('Amount').props.value).toBe('15000');
+    expect(screen.getByText(/Everyone in the household is told at 7 AM/)).toBeTruthy();
     await fireEvent(screen.getByLabelText('Add automatically on its day'), 'valueChange', false);
+    expect(screen.getByText(/the House Owner and Co-Owners get a reminder at 7 AM on its day/)).toBeTruthy();
     await press('Save');
     await waitFor(() => expect(mockCalls.find((c) => c.op === 'update')?.body).toMatchObject({ fid: RENT.id, autoPostEnabled: false }));
   });
