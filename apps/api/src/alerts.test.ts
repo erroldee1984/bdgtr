@@ -6,11 +6,11 @@ import {
   CreateTransactionResponseSchema,
   HouseholdResponseSchema,
 } from '@bdgtr/shared';
-import { type Db, MongoClient } from 'mongodb';
+import { type Db, MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ALERTS, ensureAlertIndexes } from './alerts.js';
+import { ALERT_CROSSINGS, ALERT_RETENTION_DAYS, ALERTS, ensureAlertIndexes } from './alerts.js';
 import { CATEGORIES, ensureCategoryIndexes } from './categories.js';
 import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
@@ -44,7 +44,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   clock = new Date('2026-11-25T02:00:00.000Z');
-  await Promise.all([USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS].map((c) => db.collection(c).deleteMany({})));
+  await Promise.all([USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, ALERT_CROSSINGS].map((c) => db.collection(c).deleteMany({})));
 });
 
 const app = createApp({
@@ -317,5 +317,57 @@ describe('GET /alerts and POST /alerts/read (negative cases)', () => {
     expect((await app.request('/alerts', { headers: { 'X-Household-Id': h } })).status).toBe(401);
     const other = HouseholdResponseSchema.parse(await (await call('other', 'POST', '/households', { body: { name: 'O', defaultMonthlyBudgetMinor: 0 } })).json()).household.id;
     expect((await alertsOf('other', other)).alerts).toEqual([]);
+  });
+});
+
+describe('alerts are kept 7 days (to save space)', () => {
+  it('MongoDB deletes them 7 days after they were made (TTL index)', async () => {
+    const ttl = (await db.collection(ALERTS).indexes()).find((i) => i.name === 'ttl_7_days');
+    expect(ttl).toMatchObject({ key: { createdAt: 1 }, expireAfterSeconds: 7 * 24 * 60 * 60 });
+    expect(ALERT_RETENTION_DAYS).toBe(7);
+  });
+
+  it('a deleted alert doesn’t fire again later that month: the total stays once, a category says "Still over"', async () => {
+    const { h, groceries } = await setup(100_000, 50_000);
+    expect((await spend('mem', h, groceries, 120_000)).alerts.map((a) => [a.categoryId ? 'cat' : 'total', a.level])).toEqual([
+      ['cat', 'over'],
+      ['total', 'over'],
+    ]);
+    await db.collection(ALERTS).deleteMany({}); // as the TTL does after 7 days
+    const { alerts } = await spend('mem', h, groceries, 1_000);
+    expect(alerts.map((a) => a.title)).toEqual(['Still over budget · Groceries']); // no second "Over the monthly budget"
+  });
+
+  it('crossings are remembered ~2 months, then deleted too', async () => {
+    const ttl = (await db.collection(ALERT_CROSSINGS).indexes()).find((i) => i.name === 'ttl');
+    expect(ttl).toMatchObject({ key: { createdAt: 1 }, expireAfterSeconds: 70 * 24 * 60 * 60 });
+  });
+
+  it('upgrade: budget alerts recorded before crossings existed are remembered at start-up (can run again)', async () => {
+    const hid = new ObjectId();
+    await db.collection(ALERTS).insertOne({ householdId: hid, yearMonth: '2026-11', scope: 'total', level: 'over', repeat: false, createdAt: clock });
+    await db.collection(ALERTS).insertOne({ householdId: hid, yearMonth: '2026-11', kind: 'daily_summary', scope: 'daily_summary:2026-11-24', level: 'near', repeat: false, createdAt: clock });
+    await ensureAlertIndexes(db);
+    await ensureAlertIndexes(db);
+    expect(await db.collection(ALERT_CROSSINGS).find({ householdId: hid }, { projection: { _id: 0, scope: 1, level: 1 } }).toArray()).toEqual([
+      { scope: 'total', level: 'over' },
+    ]);
+  });
+
+  it('GET /alerts lists the last 7 days, across months; ?month= still lists one month', async () => {
+    const { h } = await setup();
+    const hid = new ObjectId(h);
+    const at = (iso: string, title: string) =>
+      db.collection(ALERTS).insertOne({
+        householdId: hid, yearMonth: iso.slice(0, 7), kind: 'budget', scope: title, level: 'near', categoryId: null, title, body: title,
+        budgetMinor: 0, spentMinor: 0, triggeredBy: hid, transactionId: null, repeat: true, createdAt: new Date(iso),
+      });
+    await at('2026-11-17T01:00:00.000Z', 'too old'); // 8 days before the clock (25 Nov 02:00 UTC); the TTL would have taken it
+    await at('2026-11-20T01:00:00.000Z', 'five days ago');
+    await at('2026-11-25T01:00:00.000Z', 'today');
+    expect((await alertsOf('owner', h)).alerts.map((a) => a.title)).toEqual(['today', 'five days ago']);
+    clock = new Date('2026-12-01T02:00:00.000Z'); // a new month: November's last 7 days still show
+    expect((await alertsOf('owner', h)).alerts.map((a) => a.title)).toEqual(['today']);
+    expect((await alertsOf('owner', h, '2026-11')).alerts.map((a) => a.title)).toEqual(['today', 'five days ago', 'too old']);
   });
 });

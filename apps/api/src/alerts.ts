@@ -40,6 +40,25 @@ export interface AlertDoc {
 }
 
 export const ALERTS = 'alerts';
+/** Alerts are kept this long, then MongoDB deletes them (TTL), to save space. */
+export const ALERT_RETENTION_DAYS = 7;
+/**
+ * "This household already had this budget alert this month", kept apart from
+ * the alerts themselves so an alert deleted after 7 days doesn't fire again
+ * later in the month. Tiny records, deleted after ~2 months.
+ */
+export const ALERT_CROSSINGS = 'alertCrossings';
+const CROSSING_RETENTION_DAYS = 70;
+const DAY_S = 24 * 60 * 60;
+
+interface AlertCrossingDoc {
+  _id: ObjectId;
+  householdId: ObjectId;
+  yearMonth: string;
+  scope: string;
+  level: AlertLevel;
+  createdAt: Date;
+}
 // Collection names from fixed.ts, repeated to avoid a circular import (fixed.ts imports this file).
 const FIXED_COLLECTION = 'fixedTransactions';
 const FIXED_POSTINGS_COLLECTION = 'fixedPostings';
@@ -60,7 +79,38 @@ export async function ensureAlertIndexes(db: Db): Promise<void> {
       partialFilterExpression: { repeat: false },
     },
     { key: { householdId: 1, createdAt: -1 }, name: 'household_recent' },
+    { key: { createdAt: 1 }, expireAfterSeconds: ALERT_RETENTION_DAYS * DAY_S, name: 'ttl_7_days' },
   ]);
+  const crossings = db.collection<AlertCrossingDoc>(ALERT_CROSSINGS);
+  await crossings.createIndexes([
+    { key: { householdId: 1, yearMonth: 1, scope: 1, level: 1 }, unique: true, name: 'one_per_month' },
+    { key: { createdAt: 1 }, expireAfterSeconds: CROSSING_RETENTION_DAYS * DAY_S, name: 'ttl' },
+  ]);
+  // Upgrade: remember the crossings of budget alerts recorded before this existed.
+  const firsts = await alerts
+    .find({ repeat: false, $or: [{ kind: 'budget' }, { kind: { $exists: false } }] }, { projection: { householdId: 1, yearMonth: 1, scope: 1, level: 1, createdAt: 1 } })
+    .toArray();
+  if (firsts.length) {
+    await crossings
+      .insertMany(
+        firsts.map((a) => ({ _id: new ObjectId(), householdId: a.householdId, yearMonth: a.yearMonth, scope: a.scope, level: a.level, createdAt: a.createdAt })),
+        { ordered: false },
+      )
+      .catch((err: unknown) => {
+        if (!(err instanceof MongoServerError && err.code === 11000)) throw err; // already remembered
+      });
+  }
+}
+
+/** Records that this household reached `level` for `scope` this month. False if it already had. */
+async function firstCrossing(db: Db, householdId: ObjectId, yearMonth: string, scope: string, level: AlertLevel, now: Date): Promise<boolean> {
+  try {
+    await db.collection<AlertCrossingDoc>(ALERT_CROSSINGS).insertOne({ _id: new ObjectId(), householdId, yearMonth, scope, level, createdAt: now });
+    return true;
+  } catch (err) {
+    if (err instanceof MongoServerError && err.code === 11000) return false;
+    throw err;
+  }
 }
 
 export async function spentInMonth(db: Db, householdId: ObjectId, yearMonth: string, categoryId?: ObjectId): Promise<number> {
@@ -134,7 +184,10 @@ export async function recordCrossings(db: Db, household: HouseholdDoc, tx: Trans
     // A category at 90%+: every further spend in it sends its current alert again
     // (updated numbers; a repeated "over" says "Still over budget"). The household
     // total stays once a month per level.
-    if (!(await insert(make(false))) && c.categoryId) await insert(make(true));
+    // The first time this month (remembered in alertCrossings, which outlives the
+    // alert itself), or a repeat for a category already at this level.
+    if (await firstCrossing(db, household._id, tx.yearMonth, c.scope, level, now)) await insert(make(false));
+    else if (c.categoryId) await insert(make(true));
   }
   return created;
 }
@@ -190,10 +243,18 @@ async function addableReminders(db: Db, docs: AlertDoc[], today: string, role: R
 }
 
 /** A month's alerts the member may see, newest first, with who triggered each budget alert. */
-export async function listAlerts(db: Db, householdId: ObjectId, yearMonth: string, cutoff: Date, role: Role, today: string): Promise<Alert[]> {
+export async function listAlerts(
+  db: Db,
+  householdId: ObjectId,
+  which: { yearMonth: string } | { since: Date },
+  cutoff: Date,
+  role: Role,
+  today: string,
+): Promise<Alert[]> {
+  const when = 'since' in which ? { createdAt: { $gte: which.since } } : { yearMonth: which.yearMonth };
   const docs = await db
     .collection<AlertDoc>(ALERTS)
-    .find({ householdId, yearMonth, ...visibleTo(role) })
+    .find({ householdId, ...when, ...visibleTo(role) })
     .sort({ createdAt: -1, _id: -1 })
     .toArray();
   const ids = [...new Set(docs.map((d) => d.triggeredBy.toHexString()))].map((h) => new ObjectId(h));

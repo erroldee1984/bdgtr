@@ -1,4 +1,4 @@
-import { type Alert, manilaDate, yearMonthOf } from '@bdgtr/shared';
+import type { Alert } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -9,7 +9,6 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
-import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
 import { useHousehold } from '@/household/household-context';
 import { fixedProblem } from '@/fixed/fixed-screen';
@@ -21,16 +20,16 @@ import { useUnreadAlerts } from './unread-alerts';
 
 const WHEN = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
 
-/** "2026-11" ± n months. */
-export { shiftMonth } from '@/components/month-switcher';
 
 /**
- * Alerts (docs/PLAN.md §6.10): the month's budget alerts and fixed-transaction
- * notices, newest first, with who triggered each budget alert. A "due today"
- * reminder has "Add it now" while it's still its day and not yet added. Opening the screen marks them read (the tab badge
- * clears); the ones that were new stay marked "New" until you leave.
+ * Alerts (docs/PLAN.md §6.10): budget alerts, daily summaries and
+ * fixed-transaction notices from the last 7 days (older ones are deleted to
+ * save space), newest first, with who triggered each budget alert. A "due
+ * today" reminder has "Add it now" while it's still its day and not yet
+ * added. Opening the screen marks them read (the tab badge clears); the ones
+ * that were new stay marked "New" until you leave.
  */
-export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
+export function AlertsScreen() {
   const { getToken } = useAuth();
   const { active, memberships, switchTo } = useHousehold();
   const householdId = active?.householdId ?? null;
@@ -40,10 +39,8 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
     if (wanted && wanted !== householdId && memberships.some((m) => m.householdId === wanted)) switchTo(wanted);
   }, [wanted, householdId, memberships, switchTo]);
   const unread = useUnreadAlerts();
-  const thisMonth = yearMonthOf(manilaDate(now()));
-  const [month, setMonth] = useState(thisMonth);
   const [result, setResult] = useState<{ key: string; alerts: Alert[] | null; error: boolean } | null>(null);
-  const key = `${householdId}:${month}`;
+  const key = `${householdId}`;
   const toast = useToast();
   const [adding, setAdding] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
@@ -53,22 +50,22 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
   const load = useCallback(() => {
     if (!householdId) return () => {};
     let alive = true;
-    fetchAlerts(() => getToken(), householdId, month)
+    fetchAlerts(() => getToken(), householdId)
       .then(async (r) => {
         if (!alive) return;
-        setResult({ key: `${householdId}:${month}`, alerts: r.alerts, error: false });
+        setResult({ key: `${householdId}`, alerts: r.alerts, error: false });
         if (r.unreadCount > 0) {
           await markAlertsRead(() => getToken(), householdId).catch(() => {});
           unread.clear();
         }
       })
-      .catch(() => alive && setResult({ key: `${householdId}:${month}`, alerts: null, error: true }));
+      .catch(() => alive && setResult({ key: `${householdId}`, alerts: null, error: true }));
     return () => {
       alive = false;
     };
     // `unread` changes when its count does; reloading for that would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getToken, householdId, month]);
+  }, [getToken, householdId]);
 
   useFocusEffect(load);
 
@@ -98,8 +95,7 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
   }
 
   return (
-    <Screen title="Alerts" subtitle="Budget alerts, daily summaries and fixed-transaction notices for this household">
-      <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setMessage(null))} max={thisMonth} />
+    <Screen title="Alerts" subtitle="This household's budget alerts, daily summaries and fixed-transaction notices from the last 7 days">
 
       {message ? (
         <AppText tone={message.tone} role={message.tone === 'danger' ? 'alert' : undefined} aria-live="polite">
@@ -118,7 +114,7 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
         <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading alerts" />
       ) : current.alerts.length === 0 ? (
         <Card>
-          <AppText tone="secondary">No alerts this month.</AppText>
+          <AppText tone="secondary">No alerts in the last 7 days.</AppText>
         </Card>
       ) : (
         current.alerts.map((a) => {

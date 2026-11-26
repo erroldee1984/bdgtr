@@ -411,6 +411,10 @@ Month switcher. Shows the default monthly budget (editable) and this month's val
 See §3.
 
 ### 6.10 Alerts
+**Kept 7 days (changed after M5b, to save database space):**
+- Every alert is deleted by MongoDB 7 days after it's made (TTL index `ttl_7_days` on `alerts.createdAt`). That covers budget alerts, daily summaries and fixed-transaction notices.
+- The Alerts tab lists **the last 7 days** (`GET /alerts` with no month) with no month switcher. `?month=` still works for app builds from before this change.
+- "Already alerted this month" now lives in a tiny `alertCrossings` record per household, month, scope and level (unique; deleted after 70 days). So when a budget alert is deleted after a week, the monthly-budget "over" alert still doesn't fire a second time that month, and a category's further spends still say "Still over budget". Budget alerts that existed before this change were copied in at start-up.
 Monthly list of budget alerts: who triggered each one, the category, and the level. An unread badge sits on the tab. This is the durable record behind every push and toast.
 
 ### 6.11 Daily 7:00 AM summary notification

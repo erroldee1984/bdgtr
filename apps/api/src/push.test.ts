@@ -12,7 +12,7 @@ import { type Db, MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ALERTS, ensureAlertIndexes } from './alerts.js';
+import { ALERT_CROSSINGS, ALERTS, ensureAlertIndexes } from './alerts.js';
 import { CATEGORIES, ensureCategoryIndexes } from './categories.js';
 import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
@@ -67,7 +67,7 @@ let behaviour: Record<string, SendResult | 'throw'>;
 beforeEach(async () => {
   sent = [];
   behaviour = {};
-  await Promise.all([USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, PUSH_SUBSCRIPTIONS].map((c) => db.collection(c).deleteMany({})));
+  await Promise.all([USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, ALERT_CROSSINGS, PUSH_SUBSCRIPTIONS].map((c) => db.collection(c).deleteMany({})));
 });
 const fakeSend = async (d: PushSubscriptionDoc, payload: PushPayload): Promise<SendResult> => {
   const b = behaviour[d.endpoint];

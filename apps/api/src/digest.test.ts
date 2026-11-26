@@ -9,7 +9,7 @@ import { type Db, MongoClient, ObjectId } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ALERTS, ensureAlertIndexes } from './alerts.js';
+import { ALERT_CROSSINGS, ALERTS, ensureAlertIndexes } from './alerts.js';
 import { CATEGORY_BUDGETS, ensureBudgetIndexes, MONTHLY_BUDGETS } from './budgets.js';
 import { CATEGORIES, ensureCategoryIndexes } from './categories.js';
 import { createClerkVerifier } from './clerk.js';
@@ -49,7 +49,7 @@ beforeEach(async () => {
   clock = new Date('2026-11-01T02:00:00.000Z'); // households are set up early in November
   pushed.length = 0;
   await Promise.all(
-    [USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, MONTHLY_BUDGETS, CATEGORY_BUDGETS, FIXED, FIXED_POSTINGS, PUSH_SUBSCRIPTIONS].map((c) =>
+    [USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, ALERT_CROSSINGS, MONTHLY_BUDGETS, CATEGORY_BUDGETS, FIXED, FIXED_POSTINGS, PUSH_SUBSCRIPTIONS].map((c) =>
       db.collection(c).deleteMany({}),
     ),
   );
