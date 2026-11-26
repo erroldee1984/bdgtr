@@ -1,7 +1,7 @@
 /** Spend tab: Monthly Spend Breakdown (docs/PLAN.md §6.8). */
 import type { Category, Transaction } from '@bdgtr/shared';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
@@ -20,7 +20,7 @@ jest.mock('@/household/household-context', () => ({
   useHousehold: () => ({ active: { householdId: 'h1', householdName: 'Dela Cruz', role: mockRole } }),
 }));
 
-/** Swipes can't be dragged in Jest: record each row's Swipeable props and call them directly. */
+/** Records any Swipeable a row renders: rows must have none (no swipe gestures). */
 const mockSwipeables: { onSwipeableOpen: (d: string) => void; renderRightActions?: unknown }[] = [];
 jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
   const { forwardRef, useImperativeHandle } = jest.requireActual('react');
@@ -149,16 +149,6 @@ describe('pins (this device only)', () => {
     expect(screen.getByText('Unpinned.')).toBeTruthy();
   });
 
-  it('swipe right still toggles the pin, no confirmation', async () => {
-    await open();
-    const i = rowLabels().indexOf('Nov 3, Groceries, ₱500.00');
-    await act(async () => mockSwipeables.at(-4 + i)!.onSwipeableOpen('right'));
-    expect(rowLabels()[0]).toBe('Nov 3, Groceries, ₱500.00, pinned');
-    await act(async () => mockSwipeables.at(-4)!.onSwipeableOpen('right'));
-    expect(rowLabels()[0]).toBe('Nov 12, Groceries, ₱900.00');
-    expect(await AsyncStorage.getItem('pins:u:h1')).toBeNull(); // nothing pinned → key removed
-  });
-
   it('pins survive a reload; ones for spends no longer in the month are pruned, other months kept', async () => {
     await AsyncStorage.setItem('pins:u:h1', JSON.stringify({ [C.id]: '2026-11', [id(99)]: '2026-11', [id(98)]: '2026-10' }));
     await open();
@@ -210,13 +200,15 @@ describe('delete', () => {
     expect(rowLabels()).toHaveLength(4);
   });
 
-  it('no swipe to delete: rows have no right-side swipe action and swiping left does nothing', async () => {
+  it('no swipe gestures at all (pin and delete are the icons)', async () => {
     await open();
-    const swipes = mockSwipeables.slice(-4);
-    expect(swipes.every((s) => s.renderRightActions === undefined)).toBe(true);
-    await act(async () => swipes[0]!.onSwipeableOpen('left'));
-    expect(screen.queryByText('Delete this spend?')).toBeNull();
-    expect(rowLabels()[0]).toBe('Nov 12, Groceries, ₱900.00');
+    expect(rowLabels()).toHaveLength(4);
+    expect(mockSwipeables).toHaveLength(0);
+  });
+
+  it('the date never wraps onto a second line', async () => {
+    await open();
+    expect(screen.getByText('Nov 12').props.numberOfLines).toBe(1);
   });
 
   it('House Member: a delete icon only on their own rows; pin on every row', async () => {
