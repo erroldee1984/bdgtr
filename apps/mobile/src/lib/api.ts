@@ -1,5 +1,13 @@
 import { useAuth } from '@clerk/expo';
 import {
+  type Device,
+  DeviceResponseSchema,
+  DevicesResponseSchema,
+  type MembershipSettings,
+  MembershipSettingsSchema,
+  type RegisterDeviceInput,
+  type UpdateMembershipSettings,
+  VapidKeyResponseSchema,
   type AlertsResponse,
   AlertsResponseSchema,
   type CreateTransactionResponse,
@@ -214,4 +222,43 @@ export async function markAlertsRead(getToken: GetToken, householdId: string): P
 export async function fetchDashboard(getToken: GetToken, householdId: string, month?: string): Promise<Dashboard> {
   const query = month ? `?month=${encodeURIComponent(month)}` : '';
   return DashboardSchema.parse(await apiFetch(`/dashboard${query}`, getToken, inHousehold(householdId)));
+}
+
+// --- Notifications: devices and per-household settings (docs/PLAN.md §2b) ---
+
+/** The Web Push public key (no sign-in needed). Null when the server has push turned off. */
+export async function fetchVapidKey(fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  const res = await fetchImpl(`${API_URL}/push/vapid-public-key`);
+  if (res.status === 503) return null;
+  if (!res.ok) throw new ApiError(res.status, 'request_failed');
+  return VapidKeyResponseSchema.parse(await res.json()).publicKey;
+}
+
+export async function registerDevice(getToken: GetToken, input: RegisterDeviceInput): Promise<Device> {
+  return DeviceResponseSchema.parse(await apiFetch('/push-subscriptions', getToken, json('POST', input))).device;
+}
+
+/** Forget this browser (sign-out, "turn off here"). */
+export async function unregisterDevice(getToken: GetToken, endpoint: string): Promise<void> {
+  await apiFetch('/push-subscriptions/unregister', getToken, json('POST', { endpoint }));
+}
+
+export async function fetchDevices(getToken: GetToken): Promise<Device[]> {
+  return DevicesResponseSchema.parse(await apiFetch('/push-subscriptions', getToken)).devices;
+}
+
+export async function removeDevice(getToken: GetToken, id: string): Promise<void> {
+  await apiFetch(`/push-subscriptions/${encodeURIComponent(id)}`, getToken, { method: 'DELETE' });
+}
+
+export async function fetchMembershipSettings(getToken: GetToken, householdId: string): Promise<MembershipSettings> {
+  return MembershipSettingsSchema.parse(await apiFetch('/membership/me', getToken, inHousehold(householdId)));
+}
+
+export async function updateMembershipSettings(
+  getToken: GetToken,
+  householdId: string,
+  input: UpdateMembershipSettings,
+): Promise<MembershipSettings> {
+  return MembershipSettingsSchema.parse(await apiFetch('/membership/me', getToken, inHousehold(householdId, json('PATCH', input))));
 }

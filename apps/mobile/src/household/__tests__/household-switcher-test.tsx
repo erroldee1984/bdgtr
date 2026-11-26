@@ -12,7 +12,12 @@ jest.mock('@/household/household-context', () => ({
   useHousehold: () => ({ ...mockHousehold, switchTo: mockSwitchTo }),
 }));
 const mockSignOut = jest.fn();
-jest.mock('@clerk/expo', () => ({ useClerk: () => ({ signOut: mockSignOut }) }));
+const mockAuth = { getToken: async () => 't' };
+jest.mock('@clerk/expo', () => ({ useClerk: () => ({ signOut: mockSignOut }), useAuth: () => mockAuth }));
+const mockOrder: string[] = [];
+jest.mock('@/notifications/device-push', () => ({
+  forgetPushOnSignOut: async () => void mockOrder.push('forget-this-browser'),
+}));
 // The Setup check card on More has its own tests (account-status-test.tsx).
 jest.mock('@/components/setup-check', () => ({ SetupCheck: () => null }));
 
@@ -68,16 +73,25 @@ describe('More screen', () => {
       { initialUrl: '/' },
     );
 
+  it('opens Settings', async () => {
+    await renderRouter({ index: MoreScreen, settings: () => <Text>Settings screen</Text> }, { initialUrl: '/' });
+    await fireEvent.press(screen.getByLabelText('Settings'));
+    await screen.findByText('Settings screen');
+  });
+
   it('opens Household & members', async () => {
     await renderMore();
     await fireEvent.press(screen.getByLabelText('Household and members'));
     await screen.findByText('Household screen');
   });
 
-  it('Sign out signs out', async () => {
+  it('Sign out first stops this browser getting the account\'s notifications, then signs out', async () => {
+    mockOrder.length = 0;
+    mockSignOut.mockImplementation(async () => void mockOrder.push('sign-out'));
     await renderMore();
     await fireEvent.press(screen.getByText('Sign out'));
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockOrder).toEqual(['forget-this-browser', 'sign-out']);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
