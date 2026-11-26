@@ -19,6 +19,14 @@ export function focusMainContent(doc: Document | undefined = globalThis.document
   return true;
 }
 
+/** Enter or Space on the skip link (the browser's key event, or React Native's). */
+export function onSkipKey(e: { key?: string; nativeEvent?: { key?: string }; preventDefault?: () => void }): void {
+  const key = e.key ?? e.nativeEvent?.key;
+  if (key !== 'Enter' && key !== ' ') return;
+  e.preventDefault?.();
+  focusMainContent();
+}
+
 /**
  * "Skip to content" (WCAG 2.4.1), website only: the first thing Tab reaches.
  * Off-screen until it has keyboard focus, then shown at the top left.
@@ -33,6 +41,9 @@ export function SkipToContent() {
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => void focusMainContent()}
+      // Regression (M6b CI): react-native-web only fires onPress for clicks on a
+      // role="link" with no href, so Enter did nothing for keyboard users.
+      {...({ onKeyDown: onSkipKey } as Record<string, unknown>)}
       style={[styles.link, focused ? styles.shown : styles.hidden]}
       testID="skip-to-content"
     >

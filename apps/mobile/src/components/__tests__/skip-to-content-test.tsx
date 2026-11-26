@@ -54,6 +54,16 @@ describe('SkipToContent', () => {
       expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveStyle({ left: 8 });
       await fireEvent.press(link);
       expect(els[0]!.focus).toHaveBeenCalled();
+      // Regression (M6b CI): Enter (and Space) must activate it, not only a click.
+      els[0]!.focus.mockClear();
+      const preventDefault = jest.fn();
+      await fireEvent(link, 'keyDown', { key: 'Enter', preventDefault });
+      expect(els[0]!.focus).toHaveBeenCalledTimes(1);
+      expect(preventDefault).toHaveBeenCalled();
+      await fireEvent(link, 'keyDown', { key: ' ', preventDefault });
+      expect(els[0]!.focus).toHaveBeenCalledTimes(2);
+      await fireEvent(link, 'keyDown', { key: 'Tab', preventDefault: jest.fn() });
+      expect(els[0]!.focus).toHaveBeenCalledTimes(2);
       await fireEvent(link, 'blur');
       expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveStyle({ left: -10000 });
     } finally {
