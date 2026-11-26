@@ -96,6 +96,7 @@ bdgtr/
 - **react-native-gesture-handler + Reanimated** for swipe rows (Android and touch web)
 - **expo-notifications** (Android push), **expo-secure-store** (Android tokens), **@clerk/clerk-expo** for auth on both platforms
 - **Web:** a service worker (`sw.js`) handles **Web Push** and makes the site an installable **PWA** (manifest and icons)
+- **App icon** ("category lines house": blue roof, three budget bars). Android: `assets/images/` holds the 1024 px adaptive foreground and monochrome layers (background colour `#161A31` in app.json), the store icon, the splash mark and the 96 px white notification icon. These are rendered from the pack's SVG masters, because the app uses Continuous Native Generation and has no `android/res`. Web: `public/` holds favicon.ico/.svg, apple-touch-icon, the 192/512 icons in "any" and "maskable" versions, and `site.webmanifest`, all linked from `+html.tsx`. `scripts/__tests__/app-icons-test.ts` checks that every referenced icon exists at its stated size.
 
 ### API stack
 - **Hono** runs unchanged on Vercel, Node or Cloudflare Workers, so the host can change later without a rewrite
