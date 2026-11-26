@@ -14,6 +14,24 @@ jest.mock('@/household/household-context', () => ({
   useHousehold: () => ({ active: { householdId: 'h1', householdName: 'Home', role: mockRole } }),
 }));
 
+// The real Screen scrolls; this one records scroll requests so the test can see them.
+const mockScrollTo = jest.fn();
+jest.mock('@/components/screen', () => {
+  const { View, Text } = jest.requireActual('react-native');
+  return {
+    Screen: ({ title, subtitle, children, scrollRef }: { title: string; subtitle?: string; children: unknown; scrollRef?: { current: unknown } }) => {
+      if (scrollRef) scrollRef.current = { scrollTo: mockScrollTo };
+      return (
+        <View>
+          <Text>{title}</Text>
+          {subtitle ? <Text>{subtitle}</Text> : null}
+          {children}
+        </View>
+      );
+    },
+  };
+});
+
 type C = { id: string; name: string; icon: string; colour: string; defaultBudgetMinor: number; isRemoved: boolean; recentUseCount: number };
 let mockDb: C[];
 let mockFailNext: unknown = null;
@@ -50,6 +68,7 @@ jest.mock('@/lib/api', () => ({
 }));
 
 beforeEach(() => {
+  mockScrollTo.mockClear();
   mockRole = 'owner';
   mockFailNext = null;
   mockCalls.length = 0;
@@ -160,6 +179,40 @@ describe('Categories (House Owner / Co-Owner)', () => {
     await fireEvent.press(screen.getByLabelText('Remove Transport'));
     await fireEvent.press(within(row('Transport')).getByText('Remove'));
     expect(await screen.findByText('A household needs at least one category, so the last one can’t be removed.')).toBeTruthy();
+  });
+});
+
+describe('Categories: the form is brought into view', () => {
+  it('Edit on a category further down scrolls to the form at the top and focuses its Name field', async () => {
+    await open();
+    expect(mockScrollTo).not.toHaveBeenCalled(); // opening the screen doesn't jump
+    await fireEvent.press(screen.getByLabelText('Edit Transport'));
+    expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    const name = screen.getByLabelText('Name');
+    expect(name.props.value).toBe('Transport');
+    expect(name.props.autoFocus).toBe(true);
+  });
+
+  it('switching to Edit another category scrolls up again and focuses the new form', async () => {
+    await open();
+    await fireEvent.press(screen.getByLabelText('Edit Transport'));
+    await fireEvent.press(screen.getByLabelText('Edit Groceries'));
+    expect(mockScrollTo).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText('Name').props.value).toBe('Groceries');
+  });
+
+  it('Add category does the same', async () => {
+    await open();
+    await fireEvent.press(screen.getByText('Add category'));
+    expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    expect(screen.getByLabelText('Name').props.autoFocus).toBe(true);
+  });
+
+  it('closing the form (Cancel) does not scroll', async () => {
+    await open();
+    await fireEvent.press(screen.getByLabelText('Edit Transport'));
+    await fireEvent.press(screen.getByText('Cancel'));
+    expect(mockScrollTo).toHaveBeenCalledTimes(1);
   });
 });
 

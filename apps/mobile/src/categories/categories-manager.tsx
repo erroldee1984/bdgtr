@@ -9,8 +9,8 @@ import {
 } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, type ScrollViewInstance, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
@@ -57,6 +57,12 @@ export function CategoriesManager() {
   const [showRemoved, setShowRemoved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+
+  // The form opens at the top of the screen: bring it into view (its Name field takes focus).
+  useEffect(() => {
+    if (editing) scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [editing]);
 
   useEffect(() => {
     if (!householdId) return;
@@ -95,7 +101,11 @@ export function CategoriesManager() {
   const removed = (list ?? []).filter((c) => c.isRemoved);
 
   return (
-    <Screen title="Categories" subtitle={canManage ? undefined : 'Only the House Owner or a Co-Owner can change these.'}>
+    <Screen
+      title="Categories"
+      subtitle={canManage ? undefined : 'Only the House Owner or a Co-Owner can change these.'}
+      scrollRef={scrollRef}
+    >
       {loadError ? (
         <Card>
           <AppText tone="danger" role="alert">
@@ -269,7 +279,8 @@ function CategoryEditor({
   return (
     <Card>
       <AppText variant="title">{initial ? `Edit ${initial.name}` : 'New category'}</AppText>
-      <TextField label="Name" value={name} onChangeText={setName} error={errors.name} maxLength={40} />
+      {/* Focus goes here when the form opens, so it's clear what to do next (keyboard, screen readers). */}
+      <TextField label="Name" value={name} onChangeText={setName} error={errors.name} maxLength={40} autoFocus />
       <AppText variant="bodyStrong">Icon</AppText>
       <View role="radiogroup" aria-label="Icon" style={styles.grid}>
         {CATEGORY_ICONS.map((i) => (

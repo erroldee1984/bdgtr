@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import type { ReactNode, RefObject } from 'react';
+import { ScrollView, type ScrollViewInstance, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
@@ -10,19 +10,22 @@ interface ScreenProps {
   title: string;
   subtitle?: string;
   children?: ReactNode;
+  /** Lets the screen scroll itself, e.g. back to a form that just opened at the top. */
+  scrollRef?: RefObject<ScrollViewInstance | null>;
 }
 
 /**
  * Standard screen: scrolls (so 200% font size never clips content), respects
  * safe areas / camera cut-outs, and caps the content width on large screens.
  */
-export function Screen({ title, subtitle, children }: ScreenProps) {
+export function Screen({ title, subtitle, children, scrollRef }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const windowClass = useWindowClass();
   const horizontal = windowClass === 'compact' ? spacing.lg : spacing.xxl;
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.scroll}
       contentContainerStyle={[
         styles.content,
