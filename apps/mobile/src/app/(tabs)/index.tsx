@@ -7,6 +7,9 @@ import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
+import { CachedNotice } from '@/offline/cached-notice';
+import { useOutbox } from '@/offline/outbox-context';
+import { withPending } from '@/offline/pending';
 import { SpendChart } from '@/dashboard/spend-chart';
 import { greetingName, monthLabel } from '@/dashboard/format';
 import { useDashboard } from '@/dashboard/use-dashboard';
@@ -17,7 +20,10 @@ import { colors, radius, spacing } from '@/theme/tokens';
 /** Dashboard (docs/PLAN.md §6.2). */
 export default function DashboardScreen() {
   const { active, state } = useHousehold();
-  const { dashboard, error, reload } = useDashboard();
+  const { dashboard: fromServer, error, cachedAt, reload } = useDashboard();
+  const { items } = useOutbox();
+  // Spends waiting to be sent count already, so "remaining" stays honest offline.
+  const { dashboard, pendingMinor } = fromServer && active ? withPending(fromServer, items, active.householdId) : { dashboard: fromServer, pendingMinor: 0 };
   const name = greetingName(state.status === 'ready' ? state.me.user.name : null);
 
   return (
@@ -26,6 +32,7 @@ export default function DashboardScreen() {
       subtitle={[active?.householdName, dashboard ? monthLabel(dashboard.month) : null].filter(Boolean).join(' · ')}
     >
       <HouseholdSwitcher />
+      <CachedNotice cachedAt={cachedAt} />
       {!dashboard ? (
         error ? (
           <Card>
@@ -70,6 +77,11 @@ export default function DashboardScreen() {
                 <AppText variant="bodyStrong">{formatPHP(dashboard.spentMinor)}</AppText>
               </View>
             </View>
+            {pendingMinor > 0 ? (
+              <AppText variant="caption" tone="secondary">
+                {`Includes ${formatPHP(pendingMinor)} saved on this phone, not sent yet.`}
+              </AppText>
+            ) : null}
             <Button label="Add spend" variant="primary" icon="plus" onPress={() => router.push('/add')} />
           </Card>
           <Card>

@@ -706,7 +706,12 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 - **What people see:** an offline banner on every screen, "Waiting to be sent" with **Pending** badges on Spend, and a warning before signing out with unsent spends.
 - **Changed from the design above:** a spend whose category was removed while offline is **not** accepted. The server refuses removed categories, so it goes to Needs attention ("enter it again with another category"). Editing a queued spend isn't offered yet (Discard and re-enter).
 
-**Part 2 (next): offline viewing.** Dashboard, Spend, Budgets and Alerts show the last synced data with "Showing data from …", and totals include pending spends.
+**Part 2 (built): offline viewing.**
+- `useCachedLoader` keeps an encrypted copy of what Dashboard, Spend (transactions and categories), Budgets/Budget per Category and Alerts last loaded. Copies are per person and household. Only **this month and last month** are kept (`isCachedMonth`).
+- **Offline**, each of those screens shows its copy with "Showing data saved at 7:42 AM today. It updates when you're back online." (Manila time). Already offline, no retry waits, so the copy shows at once. Server errors (4xx/5xx) are never hidden behind an old copy.
+- **Dashboard totals include pending spends** (`withPending`), with "Includes ₱X saved on this phone, not sent yet." Refused ones aren't counted.
+- The offline banner follows what screens find: a saved copy means offline, fresh data means online. Coming back online also sends anything waiting.
+- **Not done (from the design above):** TanStack Query (the app's own hooks do the caching) and IndexedDB / web Background Sync (website online-only).
 
 **Goal:** with no connection, a member can still **see the last data they synced** and **enter transactions**, which **send automatically** once the connection returns. Setup tools (categories, budgets, fixed transactions, members) stay online-only, as you asked for.
 

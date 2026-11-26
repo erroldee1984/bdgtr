@@ -1,4 +1,4 @@
-import type { Alert } from '@bdgtr/shared';
+import { type Alert, AlertsResponseSchema } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -13,6 +13,8 @@ import { Screen } from '@/components/screen';
 import { useHousehold } from '@/household/household-context';
 import { fixedProblem } from '@/fixed/fixed-screen';
 import { bulkPostFixed, fetchAlerts, markAlertsRead } from '@/lib/api';
+import { CachedNotice } from '@/offline/cached-notice';
+import { useCachedLoader } from '@/offline/use-cached-loader';
 import { NeedsAttention } from '@/offline/waiting-spends';
 import { useToast } from '@/toast/toast';
 import { colors, spacing } from '@/theme/tokens';
@@ -43,6 +45,8 @@ export function AlertsScreen() {
   const [result, setResult] = useState<{ key: string; alerts: Alert[] | null; error: boolean } | null>(null);
   const key = `${householdId}`;
   const toast = useToast();
+  const loadCached = useCachedLoader();
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
   // One clientId per reminder, so a retry after a dropped connection can't add it twice.
@@ -51,7 +55,12 @@ export function AlertsScreen() {
   const load = useCallback(() => {
     if (!householdId) return () => {};
     let alive = true;
-    fetchAlerts(() => getToken(), householdId)
+    // Kept on the phone for offline viewing (docs/PLAN.md §15).
+    loadCached(householdId, 'alerts', () => fetchAlerts(() => getToken(), householdId), AlertsResponseSchema)
+      .then(({ data, cachedAt: at }) => {
+        if (alive) setCachedAt(at);
+        return data;
+      })
       .then(async (r) => {
         if (!alive) return;
         setResult({ key: `${householdId}`, alerts: r.alerts, error: false });
@@ -66,7 +75,7 @@ export function AlertsScreen() {
     };
     // `unread` changes when its count does; reloading for that would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getToken, householdId]);
+  }, [getToken, householdId, loadCached]);
 
   useFocusEffect(load);
 
@@ -99,6 +108,7 @@ export function AlertsScreen() {
     <Screen title="Alerts" subtitle="This household's budget alerts, daily summaries and fixed-transaction notices from the last 7 days">
 
       {householdId ? <NeedsAttention householdId={householdId} /> : null}
+      {current?.alerts ? <CachedNotice cachedAt={cachedAt} /> : null}
       {message ? (
         <AppText tone={message.tone} role={message.tone === 'danger' ? 'alert' : undefined} aria-live="polite">
           {message.text}

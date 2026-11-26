@@ -23,6 +23,14 @@ jest.mock('@/lib/retry', () => ({ withNetworkRetry: (fn: () => Promise<unknown>)
 const mockFetch = jest.fn();
 jest.mock('@/lib/api', () => ({ fetchDashboard: (...a: unknown[]) => mockFetch(...a) }));
 
+// Offline viewing: when the screen shows the copy saved on the phone, and spends not yet sent.
+let mockCachedAt: string | null = null;
+let mockOutboxItems: unknown[] = [];
+const mockLoad = async (_h: string, _what: string, fetcher: () => Promise<unknown>) => ({ data: await fetcher(), cachedAt: mockCachedAt });
+jest.mock('@/offline/use-cached-loader', () => ({ useCachedLoader: () => mockLoad }));
+const mockOutbox = { offline: false, noteNetwork: () => {}, syncNow: () => {}, retry: () => {}, discard: () => {}, saveSpend: async () => ({}) };
+jest.mock('@/offline/outbox-context', () => ({ useOutbox: () => ({ ...mockOutbox, items: mockOutboxItems }) }));
+
 const DASH = {
   month: '2026-11',
   totalBudgetMinor: 4_000_000,
@@ -37,6 +45,8 @@ const DASH = {
 
 beforeEach(() => {
   mockName = 'Ana Dela Cruz';
+  mockCachedAt = null;
+  mockOutboxItems = [];
   mockFetch.mockReset().mockResolvedValue(DASH);
 });
 
@@ -47,6 +57,27 @@ const open = () =>
   );
 
 describe('Dashboard', () => {
+  it('offline (Android): the saved copy, says when, and counts spends not yet sent', async () => {
+    mockCachedAt = '2026-11-26T23:42:00.000Z';
+    mockOutboxItems = [
+      { clientId: 'p1', householdId: 'h1', input: { clientId: 'p1', date: '2026-11-27', categoryId: 'b', amountMinor: 25_000 }, savedAt: '', attempts: 0, state: 'pending', problem: null },
+    ];
+    await open();
+    expect(await screen.findByTestId('cached-notice')).toBeTruthy();
+    expect(screen.getByText(/^Showing data saved (at|on) .*It updates when you're back online\.$/)).toBeTruthy();
+    expect(screen.getByLabelText('Spent ₱7,750.00')).toBeTruthy(); // 7,500 + 250 waiting
+    expect(screen.getByLabelText('Remaining ₱32,250.00')).toBeTruthy();
+    expect(screen.getByText('Includes ₱250.00 saved on this phone, not sent yet.')).toBeTruthy();
+    expect(screen.getByText('1 spend waiting to be sent.')).toBeTruthy(); // the banner
+  });
+
+  it('online with nothing waiting: no notice, no note', async () => {
+    await open();
+    await screen.findByText('Hi, Ana');
+    expect(screen.queryByTestId('cached-notice')).toBeNull();
+    expect(screen.queryByText(/saved on this phone/)).toBeNull();
+  });
+
   it('greets by first name and shows household, month, remaining, budget and spent', async () => {
     await open();
     expect(await screen.findByText('Hi, Ana')).toBeTruthy();

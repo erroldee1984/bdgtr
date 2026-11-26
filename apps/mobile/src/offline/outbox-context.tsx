@@ -30,6 +30,8 @@ interface OutboxValue {
   /** Saves a spend: straight to the server, or queued on this phone when offline. */
   saveSpend: (householdId: string, input: CreateTransactionInput) => Promise<{ queued: boolean; alerts: Alert[] }>;
   syncNow: () => void;
+  /** Screens report what their last load found: showing a saved copy means offline. */
+  noteNetwork: (online: boolean) => void;
   retry: (clientId: string) => void;
   discard: (clientId: string) => void;
 }
@@ -195,8 +197,19 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
   );
   const discard = useCallback((clientId: string) => void write(itemsRef.current.filter((i) => i.clientId !== clientId)), [write]);
   const syncNow = useCallback(() => void sync(), [sync]);
+  const noteNetwork = useCallback(
+    (online: boolean) => {
+      if (!user) return;
+      setOffline(!online);
+      if (online && itemsRef.current.some((i) => i.state === 'pending')) void sync(); // back online: send what's waiting
+    },
+    [user, sync],
+  );
 
-  const value = useMemo(() => ({ items, offline, saveSpend, syncNow, retry, discard }), [items, offline, saveSpend, syncNow, retry, discard]);
+  const value = useMemo(
+    () => ({ items, offline, saveSpend, syncNow, noteNetwork, retry, discard }),
+    [items, offline, saveSpend, syncNow, noteNetwork, retry, discard],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -210,6 +223,7 @@ export function useOutbox(): OutboxValue {
       offline: false,
       saveSpend: async (householdId, input) => ({ queued: false, alerts: (await createTransaction(() => getToken(), householdId, input)).alerts }),
       syncNow: () => {},
+      noteNetwork: () => {},
       retry: () => {},
       discard: () => {},
     }),

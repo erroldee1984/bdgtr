@@ -1,13 +1,14 @@
-import type { MonthBudgets } from '@bdgtr/shared';
+import { manilaDate, type MonthBudgets, MonthBudgetsSchema } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { useHousehold } from '@/household/household-context';
 import { fetchBudgets } from '@/lib/api';
-import { withNetworkRetry } from '@/lib/retry';
+import { isCachedMonth } from '@/offline/cached';
+import { useCachedLoader } from '@/offline/use-cached-loader';
 
-type Result = { key: string; data: MonthBudgets | null; error: unknown };
+type Result = { key: string; data: MonthBudgets | null; error: unknown; cachedAt?: string | null };
 
 /**
  * The active household's budgets for `month`. Re-read when the screen comes
@@ -20,22 +21,24 @@ export function useMonthBudgets(month: string) {
   const householdId = active?.householdId ?? null;
   const key = `${householdId}:${month}`;
   const [result, setResult] = useState<Result | null>(null);
+  const loadCached = useCachedLoader();
 
   const load = useCallback(() => {
     if (!householdId) return () => {};
     let alive = true;
     const k = `${householdId}:${month}`;
-    withNetworkRetry(() => fetchBudgets(() => getToken(), householdId, month))
-      .then((data) => alive && setResult({ key: k, data, error: null }))
+    const keep = isCachedMonth(month, manilaDate(new Date())); // offline viewing: this month and last
+    loadCached(householdId, keep ? `budgets:${month}` : null, () => fetchBudgets(() => getToken(), householdId, month), MonthBudgetsSchema)
+      .then(({ data, cachedAt }) => alive && setResult({ key: k, data, error: null, cachedAt }))
       .catch((error: unknown) => alive && setResult((prev) => ({ key: k, data: prev?.key === k ? prev.data : null, error })));
     return () => {
       alive = false;
     };
-  }, [householdId, month, getToken]);
+  }, [householdId, month, getToken, loadCached]);
 
   useFocusEffect(load);
 
   const update = useCallback((data: MonthBudgets) => setResult({ key: `${householdId}:${data.month}`, data, error: null }), [householdId]);
   const current = result?.key === key ? result : null;
-  return { budgets: current?.data ?? null, error: current?.error ?? null, reload: load, update, householdId };
+  return { budgets: current?.data ?? null, error: current?.error ?? null, cachedAt: current?.data ? (current.cachedAt ?? null) : null, reload: load, update, householdId };
 }
