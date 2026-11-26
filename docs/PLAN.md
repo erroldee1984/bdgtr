@@ -552,7 +552,7 @@ v1 ships dark mode only, matching the template.
 - `"email": "{{user.primary_email_address}}"`: required for invites (an invite is only accepted by the email it was sent to). Clerk only makes an email primary once it's verified.
 - `"name": "{{user.full_name}}"`: optional. Shows people's names in the members list; without it, the list shows emails.
 - **CORS** allows only `https://bdgtr.erroldee.com` (and localhost in dev)
-- Rate limiting, secure headers, body size limits, generic error responses
+- Rate limiting, secure headers, body size limits, generic error responses. **Rate limits (built in M6a):** per person (Clerk user), counted in MongoDB in fixed 5-minute windows (`rateLimits`, TTL cleanup), because Vercel instances share no memory: 120 changes and 1,200 reads per window, then **429** with `Retry-After`. Far above real use. On in `index.ts`/`server.ts` (`rateLimit: true`); tests opt in. Accepting invites keeps its own stricter limit.
 - The cron endpoints require `CRON_SECRET`, compared in constant time
 
 **Web hardening:** a Cloudflare Pages `_headers` file sets:
@@ -573,7 +573,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 - Vercel's outbound IPs are dynamic, so **the network allowlist must be `0.0.0.0/0`**. Mitigations: the credential exists only in Vercel, TLS is enforced, and the user's privileges are minimal. If a fixed IP becomes necessary, move to a paid host or a static-egress proxy.
 - **Backups:** M0 has no automated backups. A weekly GitHub Actions job runs `mongodump` into an encrypted artifact or a private R2 bucket (both free).
 
-**Supply chain:** lockfile, Renovate or Dependabot, and `pnpm audit` in CI that fails on high or critical findings.
+**Supply chain:** lockfile, **Dependabot** (`.github/dependabot.yml`, built in M6a: weekly on Monday, grouped minor/patch updates for npm and GitHub Actions; Expo/React Native packages are left out because they move together with the Expo SDK, via `npx expo install --fix`), and `pnpm audit` in CI that fails on high or critical findings.
 
 ---
 
@@ -611,6 +611,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
 **Writing app (Jest) tests:**
+- API tests: every test file starts its own MongoDB, which needs 500 MB free in the OS temp dir. Where `/tmp` is a small RAM disk (WSL) too many at once fail with "available disk space … less than required minimum", so `apps/api/vitest.config.ts` runs 4 files at a time.
 - Made-up tokens and keys in tests should look fake (e.g. `'x'.repeat(24)`): realistic random-looking strings trip the CI secret scan.
 - Mocked hooks must return the **same** functions and objects on every render, like the real ones (Clerk's `useAuth`, `useFetchMe`). A new function per render makes effects refetch forever and the test hangs.
 - `getByRole` only finds elements that are accessible to screen readers: a plain `View` with `role="list"` or `role="dialog"` isn't, so find those by their visible text (or wait for the loading indicator to go).

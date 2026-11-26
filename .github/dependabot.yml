@@ -1,0 +1,44 @@
+# Weekly dependency updates (docs/PLAN.md §10 "Supply chain"). Grouped so a
+# week's updates arrive as a few PRs, not dozens. CI checks every PR; merge
+# them like any other change. Expo/React Native versions move together with
+# the Expo SDK, so those are left to `npx expo install --fix` on SDK upgrades.
+version: 2
+updates:
+  - package-ecosystem: npm # pnpm workspace (pnpm-lock.yaml)
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Manila
+    open-pull-requests-limit: 5
+    groups:
+      dev-tools:
+        dependency-type: development
+        update-types: [minor, patch]
+      runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@react-native-community/*"
+      - dependency-name: "@react-native-async-storage/*"
+      - dependency-name: "jest-expo"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Manila
+    groups:
+      actions:
+        patterns: ["*"]

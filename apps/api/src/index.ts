@@ -21,6 +21,7 @@ function buildApp() {
       verifyToken: env.CLERK_JWT_KEY ? createClerkVerifier(env.CLERK_JWT_KEY) : null,
       push: pushFromEnv(env),
       cronSecret: env.CRON_SECRET ?? null,
+      rateLimit: true,
     });
   } catch (err) {
     // Misconfigured deployment: log the reason (EnvError never contains secret

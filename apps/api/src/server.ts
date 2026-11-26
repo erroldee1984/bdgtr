@@ -34,6 +34,7 @@ const app = createApp({
   verifyToken: CLERK_JWT_KEY ? createClerkVerifier(CLERK_JWT_KEY) : null,
   push: pushFromEnv(env),
   cronSecret: env.CRON_SECRET ?? null,
+  rateLimit: true,
 });
 if (!VAPID_PUBLIC_KEY) console.warn('VAPID keys not set: browser notifications are off.');
 if (!CLERK_JWT_KEY) console.warn('CLERK_JWT_KEY not set: signed-in routes will answer 503.');

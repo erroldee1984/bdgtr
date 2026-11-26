@@ -6,6 +6,7 @@ import { ensureAlertIndexes } from './alerts.js';
 import { ensureBudgetIndexes } from './budgets.js';
 import { ensureCategoryIndexes } from './categories.js';
 import { ensureFixedIndexes } from './fixed.js';
+import { ensureRateLimitIndexes } from './rate-limit.js';
 import { ensureInviteIndexes } from './invites.js';
 import { ensurePushIndexes } from './push.js';
 import { ensureTransactionIndexes } from './transactions.js';
@@ -30,6 +31,7 @@ export async function getAppDb(uri: string, dbName: string): Promise<Db> {
     ensurePushIndexes(db),
     ensureBudgetIndexes(db),
     ensureFixedIndexes(db),
+    ensureRateLimitIndexes(db),
   ]).then((): void => undefined).catch((err) => {
     indexesReady = undefined; // retry on the next request
     throw err;

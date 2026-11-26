@@ -21,6 +21,7 @@ import {
   updateHousehold,
 } from './households.js';
 import { type UserDoc, upsertUserFromAuth } from './users.js';
+import { takeRequest } from './rate-limit.js';
 import { parseJsonBody } from './validation.js';
 import { ensureDefaultCategory } from './categories.js';
 
@@ -35,6 +36,8 @@ type AppEnv = { Variables: AppVariables };
 interface Deps {
   getDb: () => Promise<Db>;
   now: () => Date;
+  /** Per-person request limits (rate-limit.ts). On in production; most tests leave it off. */
+  rateLimit?: boolean;
 }
 
 function toHousehold(h: HouseholdDoc, m: MembershipDoc): Household {
@@ -53,6 +56,11 @@ export function loadUser(deps: Deps): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const { userId, email, name } = c.get('auth');
     const db = await deps.getDb();
+    const retryAfter = deps.rateLimit ? await takeRequest(db, userId, c.req.method, deps.now()) : null;
+    if (retryAfter !== null) {
+      c.header('Retry-After', String(retryAfter));
+      return c.json({ error: 'rate_limited' }, 429);
+    }
     c.set('user', await upsertUserFromAuth(db, { clerkUserId: userId, email, name }, deps.now()));
     await next();
   };
