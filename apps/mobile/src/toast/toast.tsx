@@ -33,7 +33,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const nextId = useRef(1);
   const show = useCallback((t: ToastInput) => {
     const id = nextId.current++;
-    setItems((list) => [...list, { ...t, id }].slice(-MAX_VISIBLE));
+    setItems((list) =>
+      // The same alert can arrive twice (the save's reply and a push to this open tab): show it once.
+      list.some((x) => x.title === t.title && x.body === t.body) ? list : [...list, { ...t, id }].slice(-MAX_VISIBLE),
+    );
   }, []);
   const dismiss = useCallback((id: number) => setItems((list) => list.filter((t) => t.id !== id)), []);
   const value = useMemo(() => ({ show }), [show]);

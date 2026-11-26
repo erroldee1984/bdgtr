@@ -1,8 +1,8 @@
 import { type Alert, manilaDate, yearMonthOf } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
@@ -32,8 +32,13 @@ export function shiftMonth(yearMonth: string, by: number): string {
  */
 export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
   const { getToken } = useAuth();
-  const { active } = useHousehold();
+  const { active, memberships, switchTo } = useHousehold();
   const householdId = active?.householdId ?? null;
+  // Tapping a notification opens /alerts?household=<id>: show that household's alerts.
+  const { household: wanted } = useLocalSearchParams<{ household?: string }>();
+  useEffect(() => {
+    if (wanted && wanted !== householdId && memberships.some((m) => m.householdId === wanted)) switchTo(wanted);
+  }, [wanted, householdId, memberships, switchTo]);
   const unread = useUnreadAlerts();
   const thisMonth = yearMonthOf(manilaDate(now()));
   const [month, setMonth] = useState(thisMonth);

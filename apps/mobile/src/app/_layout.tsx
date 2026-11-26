@@ -12,6 +12,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { HouseholdProvider } from '@/household/household-context';
 import { HeaderBackButton } from '@/layout/back-button';
+import { PushBridge } from '@/notifications/push-bridge';
 import { ToastProvider } from '@/toast/toast';
 import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
 import { colors, spacing } from '@/theme/tokens';
@@ -54,6 +55,7 @@ export default function RootLayout() {
       <HouseholdProvider>
         <ThemeProvider value={navTheme}>
           <ToastProvider>
+            <PushBridge />
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
             <Stack.Screen name="(tabs)" />
@@ -68,6 +70,16 @@ export default function RootLayout() {
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.textPrimary,
                 // Always a way back, even when the page was opened straight from its URL.
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
+            <Stack.Screen
+              name="settings"
+              options={{
+                headerShown: true,
+                title: 'Settings',
+                headerStyle: { backgroundColor: colors.surface },
+                headerTintColor: colors.textPrimary,
                 headerLeft: () => <HeaderBackButton />,
               }}
             />

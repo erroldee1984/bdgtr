@@ -175,6 +175,8 @@ When a spend crosses a threshold (§6.3), the API **fans out the alert to every 
 - **Cleanup:** subscriptions that the push service reports as expired (HTTP 404/410, or Expo's `DeviceNotRegistered`) are deleted automatically.
 - **Payload:** the title and body carry the household name, category and percentage, in the same household-first wording as the daily summary, e.g. "Dela Cruz household has used 92% of its ₱8,000 Groceries budget" or "Dela Cruz household is over its ₱40,000 monthly budget by ₱1,150". **No transaction descriptions**, because notification text can show on a lock screen.
 - **Multiple households:** the alert carries `householdId`, and tapping it switches to that household.
+- **Security and privacy (built in M2b-2):** the server only delivers to the real push services (Google FCM, Mozilla, Microsoft WNS, Apple), never to an arbitrary address a client sends. Signing out forgets this browser and unsubscribes it, and on sign-in an already-subscribed browser is re-registered to whoever is signed in, so a shared computer never shows the previous person's alerts. VAPID keys: public/subject as plain Vercel variables, private key as a Vercel secret (and separate local-development keys in `apps/api/.env`). The VAPID subject is the website address, not a personal email.
+- **Foreground:** if the app is open and in front, the service worker hands the alert to the page as a toast instead of showing a system notification; the same alert from the save's reply and a push is shown once.
 
 ---
 

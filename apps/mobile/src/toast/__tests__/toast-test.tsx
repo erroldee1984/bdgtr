@@ -94,6 +94,11 @@ describe('toast', () => {
     expect(screen.getByText('four')).toBeTruthy();
   });
 
+  it('the same alert arriving twice (save reply + push to this tab) shows once', async () => {
+    await open([NEAR, NEAR, OVER]);
+    expect(screen.getAllByTestId('toast')).toHaveLength(2);
+  });
+
   it('useToast outside the provider does nothing (no crash)', async () => {
     await render(<Show toasts={[NEAR]} />);
     expect(screen.queryByTestId('toast')).toBeNull();

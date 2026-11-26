@@ -11,8 +11,16 @@ jest.mock('@clerk/expo', () => {
   const auth = { isLoaded: true, isSignedIn: true, userId: 'u', getToken: async () => 't' };
   return { useAuth: () => auth };
 });
+const mockSwitchTo = jest.fn();
 jest.mock('@/household/household-context', () => ({
-  useHousehold: () => ({ active: { householdId: 'h1', householdName: 'Dela Cruz', role: 'member' } }),
+  useHousehold: () => ({
+    active: { householdId: 'h1', householdName: 'Dela Cruz', role: 'member' },
+    memberships: [
+      { householdId: 'h1', householdName: 'Dela Cruz', role: 'member' },
+      { householdId: 'h2', householdName: 'Parents', role: 'owner' },
+    ],
+    switchTo: mockSwitchTo,
+  }),
 }));
 
 type A = { id: string; yearMonth: string; level: 'near' | 'over'; categoryId: string | null; title: string; body: string; triggeredBy: string | null; createdAt: string; unread: boolean };
@@ -42,6 +50,7 @@ const alert = (id: string, level: 'near' | 'over', yearMonth = '2026-11', create
 });
 
 beforeEach(() => {
+  mockSwitchTo.mockClear();
   mockFail = false;
   mockLastRead = '1970-01-01T00:00:00.000Z';
   mockRead.mockClear();
@@ -123,6 +132,28 @@ describe('Alerts screen', () => {
     mockFail = false;
     await fireEvent.press(screen.getByText('Try again'));
     expect(await screen.findAllByTestId('alert-row')).toHaveLength(2);
+  });
+});
+
+describe('opening from a notification (/alerts?household=…)', () => {
+  const openAt = (url: string) =>
+    renderRouter(
+      { _layout: () => (<UnreadAlertsProvider><Stack /></UnreadAlertsProvider>), alerts: () => <AlertsScreen now={NOW} /> },
+      { initialUrl: url },
+    );
+
+  it('switches to that household when you belong to it', async () => {
+    await openAt('/alerts?household=h2');
+    await screen.findAllByTestId('alert-row');
+    expect(mockSwitchTo).toHaveBeenCalledWith('h2');
+  });
+
+  it('ignores a household you are not in, and the one already shown', async () => {
+    await openAt('/alerts?household=someone-elses');
+    await screen.findAllByTestId('alert-row');
+    await openAt('/alerts?household=h1');
+    await screen.findAllByTestId('alert-row');
+    expect(mockSwitchTo).not.toHaveBeenCalled();
   });
 });
 

@@ -1,4 +1,11 @@
 import {
+  fetchDevices,
+  fetchMembershipSettings,
+  fetchVapidKey,
+  registerDevice,
+  removeDevice,
+  unregisterDevice,
+  updateMembershipSettings,
   fetchAlerts,
   markAlertsRead,
   createCategory,
@@ -280,5 +287,56 @@ describe('category, spend and dashboard calls', () => {
   it('rejects a dashboard that does not match the contract', async () => {
     serve(200, { ...DASH, spentMinor: -1 });
     await expect(fetchDashboard(tok, HID)).rejects.toThrow();
+  });
+});
+
+describe('notification calls', () => {
+  const HID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  const DEV = { id: 'd'.repeat(24), kind: 'webpush', deviceLabel: 'Chrome on Windows', createdAt: '2026-11-25T02:00:00.000Z', lastSeenAt: '2026-11-25T02:00:00.000Z' };
+  const SUB = { endpoint: 'https://fcm.googleapis.com/fcm/send/x', expirationTime: null, keys: { p256dh: 'p'.repeat(87), auth: 'a'.repeat(22) } };
+  const tok = async () => 't';
+  let fetchSpy: jest.SpyInstance;
+  const last = () => {
+    const [url, init] = fetchSpy.mock.calls.at(-1) as [string, RequestInit | undefined];
+    return { url, method: init?.method ?? 'GET', headers: (init?.headers ?? {}) as Record<string, string>, body: init?.body ? JSON.parse(init.body as string) : undefined };
+  };
+  const serve = (status: number, body?: unknown) =>
+    fetchSpy.mockImplementation(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }));
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+  afterEach(() => fetchSpy.mockRestore());
+
+  it('fetchVapidKey: the key without sign-in; null when the server has push off', async () => {
+    serve(200, { publicKey: 'B'.repeat(87) });
+    await expect(fetchVapidKey()).resolves.toBe('B'.repeat(87));
+    expect(last().headers.Authorization).toBeUndefined();
+    serve(503, { error: 'push_not_configured' });
+    await expect(fetchVapidKey()).resolves.toBeNull();
+    serve(500, {});
+    await expect(fetchVapidKey()).rejects.toMatchObject({ status: 500 });
+  });
+
+  it.each([
+    ['registerDevice', () => registerDevice(tok, { kind: 'webpush', subscription: SUB, deviceLabel: 'Chrome on Windows' }), 201, { device: DEV }, 'POST', '/push-subscriptions', { kind: 'webpush', subscription: SUB, deviceLabel: 'Chrome on Windows' }],
+    ['unregisterDevice', () => unregisterDevice(tok, SUB.endpoint), 204, undefined, 'POST', '/push-subscriptions/unregister', { endpoint: SUB.endpoint }],
+    ['fetchDevices', () => fetchDevices(tok), 200, { devices: [DEV] }, 'GET', '/push-subscriptions', undefined],
+    ['removeDevice', () => removeDevice(tok, DEV.id), 204, undefined, 'DELETE', `/push-subscriptions/${DEV.id}`, undefined],
+  ] as const)('%s → %s %s (signed in, no household)', async (_n, run, status, response, method, path, body) => {
+    serve(status, response);
+    await run();
+    expect(last()).toMatchObject({ url: `${API_URL}${path}`, method, body });
+    expect(last().headers.Authorization).toBe('Bearer t');
+    expect(last().headers['X-Household-Id']).toBeUndefined();
+  });
+
+  it('membership settings are per household', async () => {
+    serve(200, { alertsMuted: false, dailyDigestEnabled: true });
+    await fetchMembershipSettings(tok, HID);
+    expect(last()).toMatchObject({ url: `${API_URL}/membership/me`, method: 'GET' });
+    expect(last().headers['X-Household-Id']).toBe(HID);
+    serve(200, { alertsMuted: true, dailyDigestEnabled: true });
+    await expect(updateMembershipSettings(tok, HID, { alertsMuted: true })).resolves.toEqual({ alertsMuted: true, dailyDigestEnabled: true });
+    expect(last()).toMatchObject({ method: 'PATCH', body: { alertsMuted: true } });
   });
 });

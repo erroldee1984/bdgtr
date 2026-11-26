@@ -1,4 +1,4 @@
-import { useClerk } from '@clerk/expo';
+import { useAuth, useClerk } from '@clerk/expo';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
@@ -8,12 +8,14 @@ import { AppText } from '@/components/app-text';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { SetupCheck } from '@/components/setup-check';
+import { forgetPushOnSignOut } from '@/notifications/device-push';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
-const SECTIONS = ['Budgets', 'Fixed transactions', 'Settings'] as const;
+const SECTIONS = ['Budgets', 'Fixed transactions'] as const;
 
 export default function MoreScreen() {
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
 
@@ -49,6 +51,21 @@ export default function MoreScreen() {
         </View>
         <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
       </Pressable>
+      <Pressable
+        role="link"
+        accessibilityLabel="Settings"
+        onPress={() => router.push('/settings')}
+        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+      >
+        <MaterialCommunityIcons name="bell-cog-outline" size={24} color={colors.primaryLight} aria-hidden />
+        <View style={styles.flex}>
+          <AppText variant="bodyStrong">Settings</AppText>
+          <AppText variant="caption" tone="secondary">
+            Notifications, muting and your devices
+          </AppText>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
+      </Pressable>
       {SECTIONS.map((section) => (
         <Card key={section}>
           <AppText variant="bodyStrong">{section}</AppText>
@@ -65,6 +82,8 @@ export default function MoreScreen() {
           setSigningOut(true);
           setSignOutError(false);
           try {
+            // Stop this browser getting this account's alerts (shared computers).
+            await forgetPushOnSignOut(() => getToken());
             await signOut(); // RequireSignIn then redirects to /sign-in
           } catch {
             setSignOutError(true);
