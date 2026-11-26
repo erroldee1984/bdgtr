@@ -300,7 +300,8 @@ POST   /members/transfer-ownership [O]
 GET    /invites [OC]  POST /invites [OC]  DELETE /invites/:id [OC]
 
 GET    /dashboard?month=YYYY-MM [OCM]
-GET    /transactions?month=&categoryIds=&min=&max=&sort=date|amount&dir=asc|desc [OCM]
+GET    /transactions?month= [OCM]          the whole month, unfiltered (built in M4): the app filters,
+                                             sorts and pins on the device, so no filter/sort params
 POST   /transactions [OCM]                   { clientId, … } → { transaction, alerts[] }
                                              same clientId again → 200 with the original (idempotent)
 PATCH  /transactions/:id  DELETE /transactions/:id   [OC] any · [M] own only (else 403)
@@ -375,6 +376,7 @@ Month switcher. Shows the default monthly budget (editable) and this month's val
 - Category defaults aren't shown or edited here; they live under More → Categories
 
 ### 6.8 Monthly Spend Breakdown
+**As built (M4):** the Spend tab (`src/breakdown/`). The month's spends are fetched whole and arranged on the device by `arrangeBreakdown` in `shared/breakdown.ts`, which filters, sorts with stable id tie-breaks, and puts pinned rows first. Pins are stored as `{ transactionId: "YYYY-MM" }` under `pins:<clerkUserId>:<householdId>` with AsyncStorage, which uses localStorage on the web. `prunePins` drops a month's pins whose spend is gone each time that month loads. Sign-out removes every `pins:` key. Filters apply as you change them; an invalid range shows its error and is ignored. The month picker opens from the month name in `MonthSwitcher`, so Budgets and Alerts have it too. The "⋯" button shows on the web and on wide screens; phones show a one-line swipe hint instead.
 - Month selector, defaulting to the current month, with ‹ › arrows and a month picker
 - Filters: category multi-select and a min–max ₱ range (min ≤ max is validated). Combined with AND.
 - Sort: date or cost, ascending or descending. **The member's own pinned rows always come first**, with filters still applied to them.

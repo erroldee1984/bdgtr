@@ -1,21 +1,29 @@
-import { ClerkProvider } from '@clerk/expo';
-import { tokenCache } from '@clerk/expo/token-cache';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
-import { Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
-import { useFonts } from 'expo-font';
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ClerkProvider } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from "@expo-google-fonts/inter";
+import {
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from "@expo-google-fonts/poppins";
+import { useFonts } from "expo-font";
+import { DarkTheme, Stack, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { AppText } from '@/components/app-text';
-import { HouseholdProvider } from '@/household/household-context';
-import { HeaderBackButton } from '@/layout/back-button';
-import { PushBridge } from '@/notifications/push-bridge';
-import { ToastProvider } from '@/toast/toast';
-import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
-import { colors, spacing } from '@/theme/tokens';
+import { AppText } from "@/components/app-text";
+import { HouseholdProvider } from "@/household/household-context";
+import { HeaderBackButton } from "@/layout/back-button";
+import { PushBridge } from "@/notifications/push-bridge";
+import { ToastProvider } from "@/toast/toast";
+import { CLERK_PUBLISHABLE_KEY } from "@/lib/config";
+import { colors, spacing } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -51,84 +59,95 @@ export default function RootLayout() {
   if (!CLERK_PUBLISHABLE_KEY) return <SignInNotConfigured />;
 
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
-      <HouseholdProvider>
-        <ThemeProvider value={navTheme}>
-          <ToastProvider>
-            <PushBridge />
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="sign-in" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="invite/[token]" />
-            <Stack.Screen
-              name="household"
-              options={{
-                headerShown: true,
-                title: 'Household',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.textPrimary,
-                // Always a way back, even when the page was opened straight from its URL.
-                headerLeft: () => <HeaderBackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="settings"
-              options={{
-                headerShown: true,
-                title: 'Settings',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.textPrimary,
-                headerLeft: () => <HeaderBackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="categories"
-              options={{
-                headerShown: true,
-                title: 'Categories',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.textPrimary,
-                headerLeft: () => <HeaderBackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="budgets/index"
-              options={{
-                headerShown: true,
-                title: 'Budgets',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.textPrimary,
-                headerLeft: () => <HeaderBackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="budgets/categories"
-              options={{
-                headerShown: true,
-                title: 'Budget per Category',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.textPrimary,
-                headerLeft: () => <HeaderBackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="add"
-              options={{
-                presentation: 'modal',
-                headerShown: true,
-                title: 'Add spend',
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.textPrimary,
-                headerLeft: () => <HeaderBackButton />,
-              }}
-            />
-          </Stack>
-          </ToastProvider>
-        </ThemeProvider>
-      </HouseholdProvider>
-    </ClerkProvider>
+    // Swipe actions on the Spend list need the gesture-handler root.
+    <GestureHandlerRootView style={styles.root}>
+      <ClerkProvider
+        publishableKey={CLERK_PUBLISHABLE_KEY}
+        tokenCache={tokenCache}
+      >
+        <HouseholdProvider>
+          <ThemeProvider value={navTheme}>
+            <ToastProvider>
+              <PushBridge />
+              <StatusBar style="light" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.bg },
+                }}
+              >
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="sign-in" />
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="invite/[token]" />
+                <Stack.Screen
+                  name="household"
+                  options={{
+                    headerShown: true,
+                    title: "Household",
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    // Always a way back, even when the page was opened straight from its URL.
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+                <Stack.Screen
+                  name="settings"
+                  options={{
+                    headerShown: true,
+                    title: "Settings",
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+                <Stack.Screen
+                  name="categories"
+                  options={{
+                    headerShown: true,
+                    title: "Categories",
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+                <Stack.Screen
+                  name="budgets/index"
+                  options={{
+                    headerShown: true,
+                    title: "Budgets",
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+                <Stack.Screen
+                  name="budgets/categories"
+                  options={{
+                    headerShown: true,
+                    title: "Budget per Category",
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+                <Stack.Screen
+                  name="add"
+                  options={{
+                    presentation: "modal",
+                    headerShown: true,
+                    title: "Add spend",
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+              </Stack>
+            </ToastProvider>
+          </ThemeProvider>
+        </HouseholdProvider>
+      </ClerkProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -138,12 +157,20 @@ function SignInNotConfigured() {
     <View style={styles.misconfigured} role="alert">
       <AppText variant="title">Sign-in isn&apos;t configured</AppText>
       <AppText tone="secondary">
-        This build has no Clerk publishable key (EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY).
+        This build has no Clerk publishable key
+        (EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY).
       </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  misconfigured: { flex: 1, backgroundColor: colors.bg, padding: spacing.xl, justifyContent: 'center', gap: spacing.sm },
+  root: { flex: 1 },
+  misconfigured: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    padding: spacing.xl,
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
 });
