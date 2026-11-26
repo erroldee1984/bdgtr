@@ -34,6 +34,8 @@ export interface AppDeps {
    * browser push isn't set up) and how to send to any device. Absent = off.
    */
   push?: { publicKey: string | null; send: PushSender } | null;
+  /** Per-person request limits (429 past them). index.ts and server.ts turn this on. */
+  rateLimit?: boolean;
   /** Bearer secret the scheduler sends to /internal/cron/*; absent = those endpoints answer 503. */
   cronSecret?: string | null;
   /** Error reporter; defaults to console.error. Must not receive request bodies (PII). */
@@ -91,7 +93,7 @@ export function createApp(deps: AppDeps) {
     return c.json(body, dbOk ? 200 : 503);
   });
 
-  const { loadUser } = registerHouseholdRoutes(app, auth, { getDb: deps.getDb, now });
+  const { loadUser } = registerHouseholdRoutes(app, auth, { getDb: deps.getDb, now, rateLimit: deps.rateLimit ?? false });
   registerMemberRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
   registerSpendingRoutes(app, auth, loadUser, { getDb: deps.getDb, now, sendPush: deps.push?.send ?? null });
   registerBudgetRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
