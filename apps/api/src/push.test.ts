@@ -83,7 +83,7 @@ function call(who: string, method: string, path: string, { body, householdId, us
 const endpoint = (n: string) => `https://fcm.googleapis.com/fcm/send/${n}`;
 const device = (n: string, label = `Chrome ${n}`) => ({
   kind: 'webpush',
-  subscription: { endpoint: endpoint(n), expirationTime: null, keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) } },
+  subscription: { endpoint: endpoint(n), expirationTime: null as number | null, keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) } },
   deviceLabel: label,
 });
 const register = async (who: string, n: string) => {
