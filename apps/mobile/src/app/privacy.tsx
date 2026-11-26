@@ -3,7 +3,7 @@ import { Bullet, CONTACT_EMAIL, LegalPage, P, Section } from '@/components/legal
 /** Public privacy policy (linked from Google's sign-in consent screen). */
 export default function PrivacyScreen() {
   return (
-    <LegalPage title="Privacy Policy" updated="25 November 2026">
+    <LegalPage title="Privacy Policy" updated="27 November 2026">
       <Section heading="Who we are">
         <P>
           bdgtr is a personal, non-commercial household budgeting app for Android and the web
@@ -65,6 +65,12 @@ export default function PrivacyScreen() {
           by emailing {CONTACT_EMAIL}. We then delete your account and personal details. Spending you
           entered in a shared household stays part of that household&apos;s records for its other
           members, unless the household itself is deleted.
+        </P>
+        <P>
+          On your phone: the Android app keeps a copy of your households&apos; recent data (this month
+          and last month) and any spends you add while offline, so you can use it without a
+          connection. This copy is encrypted with a key held in your phone&apos;s secure storage, and it
+          is deleted when you sign out. The website never keeps a copy.
         </P>
       </Section>
 

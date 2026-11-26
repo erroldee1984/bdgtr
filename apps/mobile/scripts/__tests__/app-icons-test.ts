@@ -47,6 +47,12 @@ describe('app icons', () => {
     }
     const purposes = new Set(manifest.icons.map((i: { purpose: string }) => i.purpose));
     expect(purposes).toEqual(new Set(['any', 'maskable']));
+    // A stable app identity, and long-press shortcuts that open real pages.
+    expect(manifest).toMatchObject({ id: '/', scope: '/', start_url: '/', display: 'standalone' });
+    for (const sc of manifest.shortcuts) {
+      expect(existsSync(join(ROOT, 'src', 'app', `${sc.url.slice(1)}.tsx`)) || existsSync(join(ROOT, 'src', 'app', '(tabs)', `${sc.url.slice(1)}.tsx`))).toBe(true);
+      for (const icon of sc.icons) expect(existsSync(join(PUBLIC, icon.src))).toBe(true);
+    }
   });
 
   test('the service worker notification icon and badge exist', () => {
