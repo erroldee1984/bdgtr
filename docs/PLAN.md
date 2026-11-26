@@ -607,6 +607,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M2b dev | Simultaneous spends that only together crossed 90% sent no alert (each saw the others as "already there"). Now the level reached is judged | `apps/api/src/alerts.test.ts` ("simultaneous spends…") |
 | M2b-3 PR | The Vercel preview failed to build (TS2339: no `.ok`/`.json` on fetch's `Response`): Vercel's build doesn't see the global fetch types, though local checks did. API code now describes the fetch it uses (`FetchLike`) | `apps/api/scripts/verify-deploy-build.mjs` (`pnpm --filter @bdgtr/api verify:deploy`, in CI) fails on API source using `typeof fetch` / `RequestInit` |
 | M5a dev | On the fixed-transaction form, a field's error stayed after you corrected it, so its hint (e.g. "Every month on the 12th") stayed hidden until the next Save | `apps/mobile/src/fixed/__tests__/fixed-screen-test.tsx` ("a corrected field drops its error") |
+| M5b CI | CI on `main` failed at random: with no cached MongoDB test binary, several API test files downloaded it at once and raced over its lock file (`UnableToUnlockLockfileError`) | `apps/api/vitest.global-setup.ts` downloads it once before any file starts; verified by running the suite with an empty binary cache |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
