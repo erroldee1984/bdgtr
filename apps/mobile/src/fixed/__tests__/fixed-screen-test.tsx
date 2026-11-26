@@ -1,6 +1,6 @@
 /** More → Fixed transactions (docs/PLAN.md §6.5). */
 import type { BulkPostInput, Category, CreateFixedInput, FixedTransaction } from '@bdgtr/shared';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import { View } from 'react-native';
 
@@ -13,8 +13,6 @@ jest.mock('@clerk/expo', () => {
 });
 
 let mockRole = 'owner';
-let mockWindowClass = 'compact';
-jest.mock('@/layout/window-class', () => ({ ...jest.requireActual('@/layout/window-class'), useWindowClass: () => mockWindowClass }));
 jest.mock('@/household/household-context', () => ({
   useHousehold: () => ({ active: { householdId: 'h1', householdName: 'Dela Cruz', role: mockRole } }),
 }));
@@ -97,7 +95,6 @@ const NOW = () => new Date('2026-11-26T02:00:00.000Z'); // 26 Nov Manila
 
 beforeEach(() => {
   mockRole = 'owner';
-  mockWindowClass = 'compact';
   mockItems = [RENT, NET];
   mockPosted = { '2026-11': { [RENT.id]: '2026-11-05' } };
   mockFail = null;
@@ -317,17 +314,6 @@ describe('Select to add (bulk)', () => {
     await press('Select to add');
     await press('Cancel');
     expect(screen.queryByRole('checkbox')).toBeNull();
-  });
-});
-
-describe('wide screens', () => {
-  it('the add/edit form opens beside the list, which stays visible', async () => {
-    mockWindowClass = 'expanded';
-    await open();
-    await press('Edit Rent');
-    const row = screen.getByTestId('two-pane');
-    expect(within(row).getByLabelText('Name').props.value).toBe('Rent');
-    expect(within(row).getByText('Internet')).toBeTruthy(); // the list is still there
   });
 });
 

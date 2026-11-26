@@ -1,4 +1,12 @@
-import { type Category, CATEGORY_COLOURS, CATEGORY_ICONS, type CategoryColour, type CategoryIcon, can, formatPHP } from '@bdgtr/shared';
+import {
+  type Category,
+  CATEGORY_COLOURS,
+  CATEGORY_ICONS,
+  type CategoryColour,
+  type CategoryIcon,
+  can,
+  formatPHP,
+} from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,10 +16,16 @@ import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
-import { TwoPane } from '@/components/two-pane';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
-import { ApiError, createCategory, fetchCategories, removeCategory, restoreCategory, updateCategory } from '@/lib/api';
+import {
+  ApiError,
+  createCategory,
+  fetchCategories,
+  removeCategory,
+  restoreCategory,
+  updateCategory,
+} from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 import { budgetText, type CategoryFormErrors, validateCategoryForm } from './category-form';
@@ -102,144 +116,131 @@ export function CategoriesManager() {
       ) : !list ? (
         <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading categories" />
       ) : (
-        <TwoPane
-          sideFirstWhenStacked
-          main={
-            <>
-              {message ? (
-                <AppText tone={message.tone} aria-live="polite">
-                  {message.text}
-                </AppText>
-              ) : null}
+        <>
+          {editing ? (
+            <CategoryEditor
+              key={editing.mode === 'edit' ? editing.category.id : 'new'}
+              initial={editing.mode === 'edit' ? editing.category : null}
+              busy={busy}
+              onCancel={() => setEditing(null)}
+              onSave={async (input) => {
+                setBusy(true);
+                setMessage(null);
+                try {
+                  if (editing.mode === 'edit') await updateCategory(token, householdId, editing.category.id, input);
+                  else await createCategory(token, householdId, input);
+                  setMessage({ tone: 'success', text: editing.mode === 'edit' ? `${input.name} saved.` : `${input.name} added.` });
+                  setEditing(null);
+                  reload();
+                  return null;
+                } catch (err) {
+                  const code = err instanceof ApiError ? err.code : '';
+                  return SERVER_MESSAGES[code] ?? "Couldn't save. Check your connection and try again.";
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          ) : canManage ? (
+            <Button label="Add category" variant="primary" icon="plus" onPress={() => setEditing({ mode: 'add' })} />
+          ) : null}
 
-              <Card>
-                {activeCats.length === 0 ? (
-                  <View style={styles.empty}>
-                    <AppText tone="secondary">No categories yet.</AppText>
-                  </View>
-                ) : (
-                  <View style={styles.list}>
-                    {activeCats.map((c) => (
-                      <View key={c.id} style={styles.row} testID="category-row">
-                        <View style={styles.rowMain}>
-                          <View style={[styles.iconDot, { borderColor: c.colour }]}>
-                            <MaterialCommunityIcons name={c.icon} size={20} color={c.colour} aria-hidden />
-                          </View>
-                          <View style={styles.flex}>
-                            <AppText variant="bodyStrong">{c.name}</AppText>
-                            <AppText variant="caption" tone="secondary">
-                              {c.defaultBudgetMinor > 0 ? `Default budget ${formatPHP(c.defaultBudgetMinor)}` : 'No default budget'}
-                            </AppText>
-                          </View>
+          {message ? (
+            <AppText tone={message.tone} aria-live="polite">
+              {message.text}
+            </AppText>
+          ) : null}
+
+          <Card>
+            {activeCats.length === 0 ? (
+              <View style={styles.empty}>
+                <AppText tone="secondary">No categories yet.</AppText>
+              </View>
+            ) : (
+              <View style={styles.list}>
+                {activeCats.map((c) => (
+                  <View key={c.id} style={styles.row} testID="category-row">
+                    <View style={styles.rowMain}>
+                      <View style={[styles.iconDot, { borderColor: c.colour }]}>
+                        <MaterialCommunityIcons name={c.icon} size={20} color={c.colour} aria-hidden />
+                      </View>
+                      <View style={styles.flex}>
+                        <AppText variant="bodyStrong">{c.name}</AppText>
+                        <AppText variant="caption" tone="secondary">
+                          {c.defaultBudgetMinor > 0 ? `Default budget ${formatPHP(c.defaultBudgetMinor)}` : 'No default budget'}
+                        </AppText>
+                      </View>
+                    </View>
+                    {confirmRemove?.id === c.id ? (
+                      <View style={styles.confirm} role="alert">
+                        <AppText>{`Remove ${c.name}? Past spending keeps this category; it just won't be offered for new spending.`}</AppText>
+                        <View style={styles.actions}>
+                          <Button
+                            label="Remove"
+                            variant="danger"
+                            compact
+                            busy={busy}
+                            onPress={() => void run(() => removeCategory(token, householdId, c.id), `${c.name} removed.`)}
+                          />
+                          <Button label="Cancel" compact onPress={() => setConfirmRemove(null)} />
                         </View>
-                        {confirmRemove?.id === c.id ? (
-                          <View style={styles.confirm} role="alert">
-                            <AppText>{`Remove ${c.name}? Past spending keeps this category; it just won't be offered for new spending.`}</AppText>
-                            <View style={styles.actions}>
-                              <Button
-                                label="Remove"
-                                variant="danger"
-                                compact
-                                busy={busy}
-                                onPress={() => void run(() => removeCategory(token, householdId, c.id), `${c.name} removed.`)}
-                              />
-                              <Button label="Cancel" compact onPress={() => setConfirmRemove(null)} />
-                            </View>
-                          </View>
-                        ) : canManage ? (
-                          <View style={styles.actions}>
-                            <Button
-                              label="Edit"
-                              compact
-                              accessibilityLabel={`Edit ${c.name}`}
-                              onPress={() => setEditing({ mode: 'edit', category: c })}
-                            />
-                            {/* A household always keeps at least one category: shown, but disabled on the last one. */}
-                            <Button
-                              label="Remove"
-                              variant="danger"
-                              compact
-                              disabled={activeCats.length <= 1}
-                              accessibilityLabel={`Remove ${c.name}`}
-                              onPress={() => setConfirmRemove(c)}
-                            />
-                          </View>
+                      </View>
+                    ) : canManage ? (
+                      <View style={styles.actions}>
+                        <Button label="Edit" compact accessibilityLabel={`Edit ${c.name}`} onPress={() => setEditing({ mode: 'edit', category: c })} />
+                        {/* A household always keeps at least one category: shown, but disabled on the last one. */}
+                        <Button
+                          label="Remove"
+                          variant="danger"
+                          compact
+                          disabled={activeCats.length <= 1}
+                          accessibilityLabel={`Remove ${c.name}`}
+                          onPress={() => setConfirmRemove(c)}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            )}
+            {canManage && activeCats.length === 1 ? (
+              <AppText variant="caption" tone="secondary">
+                A household needs at least one category. Add another before removing this one.
+              </AppText>
+            ) : null}
+          </Card>
+
+          {removed.length > 0 ? (
+            <Card>
+              <Button
+                compact
+                label={showRemoved ? `Hide removed (${removed.length})` : `Show removed (${removed.length})`}
+                onPress={() => setShowRemoved((v) => !v)}
+              />
+              {showRemoved
+                ? removed.map((c) => (
+                    <View key={c.id} style={styles.row}>
+                      <View style={styles.rowMain}>
+                        <MaterialCommunityIcons name={c.icon} size={20} color={colors.textSecondary} aria-hidden />
+                        <AppText tone="secondary" style={styles.flex}>
+                          {c.name}
+                        </AppText>
+                        {canManage ? (
+                          <Button
+                            label="Restore"
+                            compact
+                            busy={busy}
+                            accessibilityLabel={`Restore ${c.name}`}
+                            onPress={() => void run(() => restoreCategory(token, householdId, c.id), `${c.name} restored.`)}
+                          />
                         ) : null}
                       </View>
-                    ))}
-                  </View>
-                )}
-                {canManage && activeCats.length === 1 ? (
-                  <AppText variant="caption" tone="secondary">
-                    A household needs at least one category. Add another before removing this one.
-                  </AppText>
-                ) : null}
-              </Card>
-
-              {removed.length > 0 ? (
-                <Card>
-                  <Button
-                    compact
-                    label={showRemoved ? `Hide removed (${removed.length})` : `Show removed (${removed.length})`}
-                    onPress={() => setShowRemoved((v) => !v)}
-                  />
-                  {showRemoved
-                    ? removed.map((c) => (
-                        <View key={c.id} style={styles.row}>
-                          <View style={styles.rowMain}>
-                            <MaterialCommunityIcons name={c.icon} size={20} color={colors.textSecondary} aria-hidden />
-                            <AppText tone="secondary" style={styles.flex}>
-                              {c.name}
-                            </AppText>
-                            {canManage ? (
-                              <Button
-                                label="Restore"
-                                compact
-                                busy={busy}
-                                accessibilityLabel={`Restore ${c.name}`}
-                                onPress={() => void run(() => restoreCategory(token, householdId, c.id), `${c.name} restored.`)}
-                              />
-                            ) : null}
-                          </View>
-                        </View>
-                      ))
-                    : null}
-                </Card>
-              ) : null}
-            </>
-          }
-          side={
-            <>
-              {editing ? (
-                <CategoryEditor
-                  key={editing.mode === 'edit' ? editing.category.id : 'new'}
-                  initial={editing.mode === 'edit' ? editing.category : null}
-                  busy={busy}
-                  onCancel={() => setEditing(null)}
-                  onSave={async (input) => {
-                    setBusy(true);
-                    setMessage(null);
-                    try {
-                      if (editing.mode === 'edit') await updateCategory(token, householdId, editing.category.id, input);
-                      else await createCategory(token, householdId, input);
-                      setMessage({ tone: 'success', text: editing.mode === 'edit' ? `${input.name} saved.` : `${input.name} added.` });
-                      setEditing(null);
-                      reload();
-                      return null;
-                    } catch (err) {
-                      const code = err instanceof ApiError ? err.code : '';
-                      return SERVER_MESSAGES[code] ?? "Couldn't save. Check your connection and try again.";
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                />
-              ) : canManage ? (
-                <Button label="Add category" variant="primary" icon="plus" onPress={() => setEditing({ mode: 'add' })} />
-              ) : null}
-            </>
-          }
-        />
+                    </View>
+                  ))
+                : null}
+            </Card>
+          ) : null}
+        </>
       )}
     </Screen>
   );
