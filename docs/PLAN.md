@@ -571,7 +571,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 **Atlas:**
 - Dedicated user with `readWrite` on `bdgtr` only, a long random password, and MFA on the Atlas account
 - Vercel's outbound IPs are dynamic, so **the network allowlist must be `0.0.0.0/0`**. Mitigations: the credential exists only in Vercel, TLS is enforced, and the user's privileges are minimal. If a fixed IP becomes necessary, move to a paid host or a static-egress proxy.
-- **Backups:** M0 has no automated backups. A weekly GitHub Actions job runs `mongodump` into an encrypted artifact or a private R2 bucket (both free).
+- **Backups (built in M6a, docs/BACKUPS.md):** M0 has no automated backups, so `.github/workflows/backup.yml` runs `mongodump` every Sunday 03:00 Manila as a **read-only** Atlas user (`BACKUP_MONGODB_URI` secret). It encrypts the dump with the owner's **age public key** (`.github/backup-age-recipient.txt`) and keeps it as a 90-day workflow artifact. The repo is public, so only the encrypted file is ever uploaded, and the private key stays on the owner's computer.
 
 **Supply chain:** lockfile, **Dependabot** (`.github/dependabot.yml`, built in M6a: weekly on Monday, grouped minor/patch updates for npm and GitHub Actions; Expo/React Native packages are left out because they move together with the Expo SDK, via `npx expo install --fix`), and `pnpm audit` in CI that fails on high or critical findings.
 
