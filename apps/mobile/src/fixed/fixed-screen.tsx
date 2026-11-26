@@ -21,7 +21,6 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Dialog } from '@/components/dialog';
 import { Screen } from '@/components/screen';
-import { TwoPane } from '@/components/two-pane';
 import { monthLabel } from '@/dashboard/format';
 import { useHousehold } from '@/household/household-context';
 import { ApiError, bulkPostFixed, createFixed, fetchCategories, fetchFixed, removeFixed, updateFixed } from '@/lib/api';
@@ -78,10 +77,7 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
     if (!householdId) return () => {};
     let alive = true;
     const k = `${householdId}:${month}`;
-    Promise.all([
-      withNetworkRetry(() => fetchFixed(token, householdId, month)),
-      withNetworkRetry(() => fetchCategories(token, householdId)),
-    ])
+    Promise.all([withNetworkRetry(() => fetchFixed(token, householdId, month)), withNetworkRetry(() => fetchCategories(token, householdId))])
       .then(([items, categories]) => {
         if (!alive) return;
         setLoaded({ key: k, items, categories });
@@ -143,10 +139,7 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
         items: which.map((i) => ({ id: i.id, clientId: Crypto.randomUUID() })),
       });
       for (const a of alerts) toast.show({ level: a.level, title: a.title, body: a.body });
-      setMessage({
-        tone: 'success',
-        text: `Added ${which.length} ${which.length === 1 ? 'transaction' : 'transactions'} on ${shortDate(date)}.`,
-      });
+      setMessage({ tone: 'success', text: `Added ${which.length} ${which.length === 1 ? 'transaction' : 'transactions'} on ${shortDate(date)}.` });
       setSelecting(false);
       setSelected([]);
       load();
@@ -191,124 +184,108 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
         <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading fixed transactions" />
       ) : (
         <>
-          <TwoPane
-            sideFirstWhenStacked
-            main={
-              <>
-                {items.length === 0 ? (
-                  <Card>
-                    <AppText tone="secondary">
-                      No fixed transactions yet.{canManage ? ' Add rent, bills or allowances so they can be added every month.' : ''}
-                    </AppText>
-                  </Card>
-                ) : (
-                  <View style={styles.list} role="list" aria-label="Fixed transactions">
-                    {items.map((item) => {
-                      const cat = categoryOf(item.categoryId);
-                      const removedCat = !!cat?.isRemoved;
-                      const on = selected.includes(item.id);
-                      const posted = item.postedOn ? `Added ${shortDate(item.postedOn)}` : `Not added in ${monthLabel(month)}`;
-                      const auto = item.autoPostEnabled
-                        ? removedCat
-                          ? 'Not added automatically: its category was removed'
-                          : 'Added automatically'
-                        : 'Added by hand';
-                      const summary = `${item.name}, ${formatPHP(item.amountMinor)}, ${cat?.name ?? 'Unknown category'}. ${scheduleText(item.dayOfMonth)}. ${auto}. ${posted}.`;
-                      return (
-                        <View key={item.id} role="listitem" style={styles.row}>
-                          {selecting ? (
-                            <Pressable
-                              role="checkbox"
-                              aria-checked={on}
-                              accessibilityLabel={summary}
-                              onPress={() => setSelected((s) => (on ? s.filter((x) => x !== item.id) : [...s, item.id]))}
-                              style={({ pressed }) => [styles.main, pressed && styles.pressed]}
-                            >
-                              <MaterialCommunityIcons
-                                name={on ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                                size={24}
-                                color={on ? colors.primaryLight : colors.textSecondary}
-                                aria-hidden
-                              />
-                              <ItemText item={item} category={cat} posted={posted} auto={auto} removedCat={removedCat} />
-                            </Pressable>
-                          ) : (
-                            <View style={styles.main} accessible accessibilityLabel={summary}>
-                              {cat ? <MaterialCommunityIcons name={cat.icon} size={24} color={cat.colour} aria-hidden /> : null}
-                              <ItemText item={item} category={cat} posted={posted} auto={auto} removedCat={removedCat} />
-                            </View>
-                          )}
-                          {canManage && !selecting ? (
-                            <Pressable
-                              role="button"
-                              accessibilityLabel={`Edit ${item.name}`}
-                              onPress={() => (setEditing(item), setMessage(null))}
-                              style={({ pressed }) => [styles.icon, pressed && styles.pressed]}
-                            >
-                              <MaterialCommunityIcons name="pencil-outline" size={22} color={colors.textSecondary} aria-hidden />
-                            </Pressable>
-                          ) : null}
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </>
-            }
-            side={
-              <>
-                {canManage && !selecting && !editing ? (
-                  <View style={styles.actions}>
-                    <Button label="Add fixed transaction" icon="plus" compact onPress={() => (setEditing('new'), setMessage(null))} />
-                    {items.length ? (
-                      <Button label="Select to add" icon="checkbox-multiple-marked-outline" compact onPress={startSelecting} />
+          {canManage && !selecting && !editing ? (
+            <View style={styles.actions}>
+              <Button label="Add fixed transaction" icon="plus" compact onPress={() => (setEditing('new'), setMessage(null))} />
+              {items.length ? <Button label="Select to add" icon="checkbox-multiple-marked-outline" compact onPress={startSelecting} /> : null}
+            </View>
+          ) : null}
+
+          {editing ? (
+            <FixedFormCard
+              key={editing === 'new' ? 'new' : editing.id}
+              title={editing === 'new' ? 'New fixed transaction' : `Edit ${editing.name}`}
+              initial={editing === 'new' ? EMPTY_FIXED_FORM : formFromItem(editing)}
+              categories={categories}
+              householdId={householdId!}
+              onCategoriesStale={load}
+              onSave={save}
+              onCancel={() => setEditing(null)}
+              {...(editing === 'new' ? {} : { onRemove: () => setRemoving(editing) })}
+            />
+          ) : null}
+
+          {selecting ? (
+            <Card>
+              <AppText variant="bodyStrong">Add as spends on</AppText>
+              <View style={styles.actions}>
+                <Button label="Today" compact variant={date === today ? 'primary' : 'secondary'} onPress={() => setDate(today)} />
+                <DatePickerButton value={date} max={addDays(today, 365)} onChange={setDate} selected={date !== today} />
+              </View>
+              <AppText tone="secondary" aria-live="polite">
+                {dateLabel(date)}
+              </AppText>
+              <AppText variant="caption" tone="secondary">
+                {selected.length ? `${selected.length} selected` : 'Tick the items to add.'}
+              </AppText>
+              <View style={styles.actions}>
+                <Button
+                  label={addLabel(selected.length)}
+                  variant="primary"
+                  compact
+                  busy={posting}
+                  disabled={selected.length === 0}
+                  onPress={() => (repeats.length ? setAskRepeat(true) : void post(chosen))}
+                />
+                <Button label="Cancel" compact disabled={posting} onPress={stopSelecting} />
+              </View>
+            </Card>
+          ) : null}
+
+          {items.length === 0 ? (
+            <Card>
+              <AppText tone="secondary">
+                No fixed transactions yet.{canManage ? ' Add rent, bills or allowances so they can be added every month.' : ''}
+              </AppText>
+            </Card>
+          ) : (
+            <View style={styles.list} role="list" aria-label="Fixed transactions">
+              {items.map((item) => {
+                const cat = categoryOf(item.categoryId);
+                const removedCat = !!cat?.isRemoved;
+                const on = selected.includes(item.id);
+                const posted = item.postedOn ? `Added ${shortDate(item.postedOn)}` : `Not added in ${monthLabel(month)}`;
+                const auto = item.autoPostEnabled ? (removedCat ? 'Not added automatically: its category was removed' : 'Added automatically') : 'Added by hand';
+                const summary = `${item.name}, ${formatPHP(item.amountMinor)}, ${cat?.name ?? 'Unknown category'}. ${scheduleText(item.dayOfMonth)}. ${auto}. ${posted}.`;
+                return (
+                  <View key={item.id} role="listitem" style={styles.row}>
+                    {selecting ? (
+                      <Pressable
+                        role="checkbox"
+                        aria-checked={on}
+                        accessibilityLabel={summary}
+                        onPress={() => setSelected((s) => (on ? s.filter((x) => x !== item.id) : [...s, item.id]))}
+                        style={({ pressed }) => [styles.main, pressed && styles.pressed]}
+                      >
+                        <MaterialCommunityIcons
+                          name={on ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                          size={24}
+                          color={on ? colors.primaryLight : colors.textSecondary}
+                          aria-hidden
+                        />
+                        <ItemText item={item} category={cat} posted={posted} auto={auto} removedCat={removedCat} />
+                      </Pressable>
+                    ) : (
+                      <View style={styles.main} accessible accessibilityLabel={summary}>
+                        {cat ? <MaterialCommunityIcons name={cat.icon} size={24} color={cat.colour} aria-hidden /> : null}
+                        <ItemText item={item} category={cat} posted={posted} auto={auto} removedCat={removedCat} />
+                      </View>
+                    )}
+                    {canManage && !selecting ? (
+                      <Pressable
+                        role="button"
+                        accessibilityLabel={`Edit ${item.name}`}
+                        onPress={() => (setEditing(item), setMessage(null))}
+                        style={({ pressed }) => [styles.icon, pressed && styles.pressed]}
+                      >
+                        <MaterialCommunityIcons name="pencil-outline" size={22} color={colors.textSecondary} aria-hidden />
+                      </Pressable>
                     ) : null}
                   </View>
-                ) : null}
-
-                {editing ? (
-                  <FixedFormCard
-                    key={editing === 'new' ? 'new' : editing.id}
-                    title={editing === 'new' ? 'New fixed transaction' : `Edit ${editing.name}`}
-                    initial={editing === 'new' ? EMPTY_FIXED_FORM : formFromItem(editing)}
-                    categories={categories}
-                    householdId={householdId!}
-                    onCategoriesStale={load}
-                    onSave={save}
-                    onCancel={() => setEditing(null)}
-                    {...(editing === 'new' ? {} : { onRemove: () => setRemoving(editing) })}
-                  />
-                ) : null}
-
-                {selecting ? (
-                  <Card>
-                    <AppText variant="bodyStrong">Add as spends on</AppText>
-                    <View style={styles.actions}>
-                      <Button label="Today" compact variant={date === today ? 'primary' : 'secondary'} onPress={() => setDate(today)} />
-                      <DatePickerButton value={date} max={addDays(today, 365)} onChange={setDate} selected={date !== today} />
-                    </View>
-                    <AppText tone="secondary" aria-live="polite">
-                      {dateLabel(date)}
-                    </AppText>
-                    <AppText variant="caption" tone="secondary">
-                      {selected.length ? `${selected.length} selected` : 'Tick the items to add.'}
-                    </AppText>
-                    <View style={styles.actions}>
-                      <Button
-                        label={addLabel(selected.length)}
-                        variant="primary"
-                        compact
-                        busy={posting}
-                        disabled={selected.length === 0}
-                        onPress={() => (repeats.length ? setAskRepeat(true) : void post(chosen))}
-                      />
-                      <Button label="Cancel" compact disabled={posting} onPress={stopSelecting} />
-                    </View>
-                  </Card>
-                ) : null}
-              </>
-            }
-          />
+                );
+              })}
+            </View>
+          )}
         </>
       )}
 
@@ -339,14 +316,7 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
           actions={
             <>
               <Button label="Cancel" compact disabled={removeBusy} onPress={() => setRemoving(null)} />
-              <Button
-                label="Remove"
-                icon="trash-can-outline"
-                variant="danger"
-                compact
-                busy={removeBusy}
-                onPress={() => void confirmRemove()}
-              />
+              <Button label="Remove" icon="trash-can-outline" variant="danger" compact busy={removeBusy} onPress={() => void confirmRemove()} />
             </>
           }
         >

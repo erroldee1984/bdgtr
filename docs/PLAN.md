@@ -497,19 +497,7 @@ v1 ships dark mode only, matching the template.
 | Desktop browser | ≥ 1024 | expanded, content capped at about 1200 px wide |
 
 - Material 3 window size classes from `useWindowDimensions()`: compact < 600, medium 600–839, expanded ≥ 840. **The side rail starts at medium (600dp)**, as Material 3 recommends. The unfolded Fold 6 is about 700dp wide (1856px at Android's ~2.6× scaling), so it never reaches 840; an earlier 840dp threshold left it on bottom tabs. Layout reacts live to folding, unfolding and browser resizing without losing state.
-- **Two-pane layouts start at medium too when the content fits** (to be decided per screen in M2–M4). The unfolded Fold 6 should get the dashboard summary beside its chart, not just a wider single column.
-- **As built (M6b):** `TwoPane` (`src/components/two-pane.tsx`) places a screen's two parts side by side, or stacks them on narrow screens. Reading and Tab order is always main, then side.
-  - **Dashboard:** summary beside the chart **from medium** (unfolded Fold 6).
-  - **Spend** (≥ 840dp): list beside the filter and sort panels, which stay open with no toggle icons.
-  - **Fixed transactions** and **Categories** (≥ 840dp): list beside the add/edit form (and the bulk-add panel).
-  - **Household** (≥ 840dp, Owner/Co-Owner): members beside invites.
-  - Forms stay one column on the unfolded Fold: at about 700dp two panes would be too cramped.
-  - Phones are unchanged; the form still comes first when stacked.
-- **Two-pane layouts on expanded widths:**
-  - Dashboard: summary beside the chart
-  - Breakdown: list beside filters and detail
-  - Maintenance screens: list beside the edit form
-  - Members: list beside invites
+- **No two-pane layouts (decided after M6b):** every screen keeps its single-column layout at every width. The content column is capped at about 1200 px, and the side rail starts at medium. Two-pane versions were built (#44) and removed again (#46), because some views broke in the narrower panes (e.g. the dashboard chart's table view), and the single column reads better.
 - Keep important controls away from the hinge. Content must reflow at 200% font size and at 320 CSS px wide on web (WCAG 1.4.4, 1.4.10).
 - **Test matrix:** Android Studio's Fold and 7.6" foldable emulators, a 6.7" phone profile, a real device where possible, Chrome and Firefox desktop at 100% and 200% zoom, and Chrome Android.
 

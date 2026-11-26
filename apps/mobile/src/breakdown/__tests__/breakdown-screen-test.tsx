@@ -15,8 +15,6 @@ jest.mock('@clerk/expo', () => {
 });
 
 let mockRole = 'owner';
-let mockWindowClass = 'medium';
-jest.mock('@/layout/window-class', () => ({ ...jest.requireActual('@/layout/window-class'), useWindowClass: () => mockWindowClass }));
 
 jest.mock('@/household/household-context', () => ({
   useHousehold: () => ({ active: { householdId: 'h1', householdName: 'Dela Cruz', role: mockRole } }),
@@ -81,7 +79,6 @@ const D = tx(4, '2026-11-01', 30_000, mockGroceries, { isYours: false });
 
 beforeEach(async () => {
   mockRole = 'owner';
-  mockWindowClass = 'medium';
   mockTxs = [A, B, C, D];
   mockDeleteError = null;
   mockLoadError = null;
@@ -292,31 +289,6 @@ describe('filter and sort icon buttons', () => {
     expect(screen.getByRole('button', { name: 'Sort, Highest first by cost' })).toBeTruthy();
     await press('Order: Highest first. Change');
     expect(rowLabels().map((l) => l.split(', ')[2])).toEqual(['₱120.00', '₱300.00', '₱500.00', '₱900.00']);
-  });
-});
-
-describe('wide screens (desktop, large tablets)', () => {
-  it('filters and sort sit beside the list, always open: no toggle icons', async () => {
-    mockWindowClass = 'expanded';
-    await open();
-    expect(screen.getByTestId('two-pane')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Sort,/ })).toBeNull();
-    expect(screen.getByTestId('filter-panel')).toBeTruthy();
-    expect(screen.getByTestId('sort-panel')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('checkbox', { name: 'Bills (removed)' }));
-    expect(rowLabels()).toEqual(['Nov 10, Bills, ₱120.00']);
-    expect(screen.getByText('Showing 1 of 4 · ₱120.00')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('radio', { name: 'Cost' }));
-    await fireEvent.changeText(screen.getByLabelText('Min'), '5000');
-    expect(screen.getByText('No spends match these filters.')).toBeTruthy(); // the side panel stays to change them
-    expect(screen.getByTestId('filter-panel')).toBeTruthy();
-  });
-
-  it('the unfolded Fold (medium) keeps the phone layout with the icons', async () => {
-    await open();
-    expect(screen.queryByTestId('two-pane')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
   });
 });
 
