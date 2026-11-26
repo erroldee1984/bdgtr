@@ -365,12 +365,13 @@ Add, edit (name, icon, colour, default budget) and remove, with confirmation exp
 - **Bulk add**: tap "Select", tick items, choose a date, then "Add N transactions". Items already posted this month are flagged, and the user can skip them or post again.
 
 ### 6.6 Budget Allocation for the Month
-Month switcher. Shows the default monthly budget (editable) and this month's value, with a "Custom" badge and "Reset to default" when overridden. Link to **Allocate per category →**.
+Month switcher. Shows the default monthly budget (editable) and this month's value, with a "Custom" badge and "Reset to default" when overridden. Link to **Budget per Category →**.
 
-### 6.7 Budget Allocation per Category (template screen 3)
-- Donut showing the % of the total allocated and the **unallocated balance** (red plus icon if over-allocated)
-- A **Defaults | This month** segmented control
-- Rows show the default value, this month's value, a "Custom" badge and reset
+### 6.7 Budget per Category (template screen 3)
+- Month switcher at the top; the labels below don't repeat the month
+- Donut showing the % of the month's total allocated and the **unallocated balance** (red plus icon if over-allocated)
+- Rows show each category's budget for the month, a "Custom" badge and "Reset to default"
+- Category defaults aren't shown or edited here; they live under More → Categories
 
 ### 6.8 Monthly Spend Breakdown
 - Month selector, defaulting to the current month, with ‹ › arrows and a month picker

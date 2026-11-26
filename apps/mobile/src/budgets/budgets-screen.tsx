@@ -48,7 +48,7 @@ export function useMonthParam(): [string, (m: string) => void] {
   return [month, setMonth];
 }
 
-/** More → Budgets (docs/PLAN.md §6.6): the month's total, the default, and a way to allocate per category. */
+/** More → Budgets (docs/PLAN.md §6.6): the month's total, the default, and a link to each category's budget. */
 export function BudgetsScreen() {
   const { getToken } = useAuth();
   const { active, refresh } = useHousehold();
@@ -181,13 +181,13 @@ export function BudgetsScreen() {
 
           <Pressable
             role="link"
-            accessibilityLabel={`Allocate per category. ${allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor)}`}
+            accessibilityLabel={`Budget per Category. ${allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor)}`}
             onPress={() => router.push({ pathname: '/budgets/categories', params: { month } })}
             style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
           >
             <MaterialCommunityIcons name="chart-donut" size={24} color={colors.primaryLight} aria-hidden />
             <View style={styles.flex}>
-              <AppText variant="bodyStrong">Allocate per category</AppText>
+              <AppText variant="bodyStrong">Budget per Category</AppText>
               <AppText variant="caption" tone={budgets.thisMonth.unallocatedMinor < 0 ? 'danger' : 'secondary'}>
                 {allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor)}
               </AppText>
