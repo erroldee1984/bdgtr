@@ -11,7 +11,7 @@ import { SetupCheck } from '@/components/setup-check';
 import { forgetPushOnSignOut } from '@/notifications/device-push';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
-const SECTIONS = ['Budgets', 'Fixed transactions'] as const;
+const SECTIONS = ['Fixed transactions'] as const;
 
 export default function MoreScreen() {
   const { signOut } = useClerk();
@@ -47,6 +47,21 @@ export default function MoreScreen() {
           <AppText variant="bodyStrong">Categories</AppText>
           <AppText variant="caption" tone="secondary">
             Names, icons, colours and default budgets
+          </AppText>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
+      </Pressable>
+      <Pressable
+        role="link"
+        accessibilityLabel="Budgets"
+        onPress={() => router.push('/budgets')}
+        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+      >
+        <MaterialCommunityIcons name="wallet-outline" size={24} color={colors.primaryLight} aria-hidden />
+        <View style={styles.flex}>
+          <AppText variant="bodyStrong">Budgets</AppText>
+          <AppText variant="caption" tone="secondary">
+            Monthly budget and how it&apos;s split across categories
           </AppText>
         </View>
         <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />

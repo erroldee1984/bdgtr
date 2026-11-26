@@ -306,11 +306,12 @@ PATCH  /transactions/:id  DELETE /transactions/:id   [OC] any · [M] own only (e
 GET    /categories [OCM]                     POST/PATCH/DELETE [OC] (DELETE = soft remove; POST /:id/restore)
 GET    /fixed-transactions [OCM]             POST/PATCH/DELETE [OC]
 POST   /fixed-transactions/bulk-post [OC]    { ids[], date }
-GET    budgets (all routes below) [OCM]      PUT/DELETE [OC]
-       /budgets/default
-       /budgets/monthly/:yearMonth                         (DELETE = reset to default)
-       /budgets/categories/default/:categoryId
-       /budgets/categories/:yearMonth/:categoryId
+GET    /budgets?month= [OCM]                 the month's total and active categories: defaults, overrides, allocation
+PUT/DELETE /budgets/monthly/:yearMonth [OC]                    { budgetMinor } · DELETE = reset to default
+PUT/DELETE /budgets/categories/:yearMonth/:categoryId [OC]     { budgetMinor } · DELETE = reset to default
+       (built in M3) Defaults are edited where they live: PATCH /household (monthly) and
+       PATCH /categories/:id (per category). Setting a month to the default's own value
+       stores no override. Every change answers with the month's budgets.
 GET    /alerts?month= [OCM]
 PATCH  /membership/me [OCM]                  { alertsMuted, dailyDigestEnabled }
 

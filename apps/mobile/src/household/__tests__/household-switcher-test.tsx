@@ -79,6 +79,13 @@ describe('More screen', () => {
     await screen.findByText('Settings screen');
   });
 
+  it('opens Budgets', async () => {
+    await renderRouter({ index: MoreScreen, 'budgets/index': () => <Text>Budgets screen</Text> }, { initialUrl: '/' });
+    expect(screen.getAllByText('Budgets')).toHaveLength(1); // the link, no longer a "coming later" card
+    await fireEvent.press(screen.getByLabelText('Budgets'));
+    await screen.findByText('Budgets screen');
+  });
+
   it('opens Household & members', async () => {
     await renderMore();
     await fireEvent.press(screen.getByLabelText('Household and members'));
