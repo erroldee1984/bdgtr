@@ -526,7 +526,8 @@ v1 ships dark mode only, matching the template.
 - **Tooling:**
   - `eslint-plugin-react-native-a11y`
   - React Native Testing Library role queries
-  - **axe-core through Playwright** on every web screen in CI
+  - **axe-core through Playwright** in CI (built in M6b, `apps/mobile/e2e/`): WCAG 2.2 AA rules on every page that renders signed out (sign-in, privacy, terms, invite, 404), plus a real-keyboard check of the skip link. Signed-in screens need a Clerk session in CI, so for now they're covered by role-based component tests and the manual passes.
+  - **Skip to content** link (web) and **reduced motion** for dialogs (built in M6b)
   - Manual TalkBack and NVDA passes each milestone
 
 ---
@@ -612,6 +613,7 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M2b-3 PR | The Vercel preview failed to build (TS2339: no `.ok`/`.json` on fetch's `Response`): Vercel's build doesn't see the global fetch types, though local checks did. API code now describes the fetch it uses (`FetchLike`) | `apps/api/scripts/verify-deploy-build.mjs` (`pnpm --filter @bdgtr/api verify:deploy`, in CI) fails on API source using `typeof fetch` / `RequestInit` |
 | M5a dev | On the fixed-transaction form, a field's error stayed after you corrected it, so its hint (e.g. "Every month on the 12th") stayed hidden until the next Save | `apps/mobile/src/fixed/__tests__/fixed-screen-test.tsx` ("a corrected field drops its error") |
 | M5b CI | CI on `main` failed at random: with no cached MongoDB test binary, several API test files downloaded it at once and raced over its lock file (`UnableToUnlockLockfileError`) | `apps/api/vitest.global-setup.ts` downloads it once before any file starts; verified by running the suite with an empty binary cache |
+| M6b CI | The website's "Skip to content" link could be reached with Tab but **Enter did nothing**: react-native-web only fires `onPress` for clicks on a `role="link"` with no `href`. Now Enter and Space activate it | `apps/mobile/src/components/__tests__/skip-to-content-test.tsx` (keyboard), `apps/mobile/e2e/a11y.spec.ts` (real browser: Tab then Enter moves focus to the content) |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 

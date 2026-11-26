@@ -55,6 +55,11 @@ jobs:
         # (earlier test steps build it, which once hid a missing build step).
         run: rm -rf packages/shared/dist && pnpm build:web
 
+      - name: Accessibility checks (axe, WCAG 2.2 AA) on the built website
+        run: |
+          pnpm --filter @bdgtr/mobile exec playwright install --with-deps chromium
+          pnpm --filter @bdgtr/mobile test:a11y
+
       - name: Dependency audit (fail on high/critical)
         run: pnpm audit --audit-level high
 

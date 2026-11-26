@@ -40,6 +40,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
+    "@playwright/test": "^1.65.1",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
     "@types/node": "^26.6.6",
@@ -59,7 +61,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "dev:web": "pnpm --filter @bdgtr/shared build && expo start --web",
-    "dev:phone": "node ../../scripts/dev-phone.mjs"
+    "dev:phone": "node ../../scripts/dev-phone.mjs",
+    "test:a11y": "playwright test"
   },
   "private": true,
   "description": "bdgtr app for Android and web (Expo / React Native)",
@@ -87,6 +90,10 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(?:\\.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?[/+].*|@expo-google-fonts[/+].*|react-navigation|@react-navigation[/+].*|@sentry[/+]react-native|native-base|react-native-svg|standard-navigation|@bdgtr[/+].*))"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/e2e/"
     ]
   }
 }
