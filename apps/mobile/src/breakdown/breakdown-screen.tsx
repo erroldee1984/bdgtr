@@ -20,6 +20,7 @@ import { Dialog } from '@/components/dialog';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
 import { useHousehold } from '@/household/household-context';
+import { CachedNotice } from '@/offline/cached-notice';
 import { WaitingSpends } from '@/offline/waiting-spends';
 import { ApiError } from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
@@ -48,7 +49,7 @@ export function listSummary(shown: number, total: number, sumMinor: number): str
 export function BreakdownScreen() {
   const { active } = useHousehold();
   const [month, setMonth] = useMonthParam();
-  const { transactions, categories, pinnedIds, error, reload, togglePin, remove } = useBreakdown(month);
+  const { transactions, categories, cachedAt, pinnedIds, error, reload, togglePin, remove } = useBreakdown(month);
   const canDeleteAny = !!active && can(active.role, 'edit_any_transaction');
 
   const [panel, setPanel] = useState<'filter' | 'sort' | null>(null);
@@ -117,6 +118,7 @@ export function BreakdownScreen() {
   return (
     <Screen title="Spend" subtitle="Monthly spend breakdown">
       <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setMessage(null))} />
+      <CachedNotice cachedAt={cachedAt} />
       {active ? <WaitingSpends householdId={active.householdId} month={month} categories={categories} /> : null}
 
       {message ? (

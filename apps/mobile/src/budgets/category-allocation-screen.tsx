@@ -9,6 +9,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
+import { CachedNotice } from '@/offline/cached-notice';
 import { useHousehold } from '@/household/household-context';
 import { resetCategoryMonthBudget, setCategoryMonthBudget } from '@/lib/api';
 import { colors, spacing } from '@/theme/tokens';
@@ -29,7 +30,7 @@ export function CategoryAllocationScreen() {
   const { active } = useHousehold();
   const canManage = !!active && can(active.role, 'manage_budget_data');
   const [month, setMonth] = useMonthParam();
-  const { budgets, error, reload, update, householdId } = useMonthBudgets(month);
+  const { budgets, error, cachedAt, reload, update, householdId } = useMonthBudgets(month);
   const [editing, setEditing] = useState<string | null>(null);
   const [resetting, setResetting] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
@@ -62,6 +63,7 @@ export function CategoryAllocationScreen() {
   return (
     <Screen title="Budget per Category" subtitle={canManage ? undefined : 'Only the House Owner or a Co-Owner can change these.'}>
       <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setEditing(null), setMessage(null))} />
+      <CachedNotice cachedAt={cachedAt} />
 
       {error && !budgets ? (
         <Card>

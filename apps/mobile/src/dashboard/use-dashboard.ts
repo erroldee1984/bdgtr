@@ -1,13 +1,13 @@
-import type { Dashboard } from '@bdgtr/shared';
+import { type Dashboard, DashboardSchema } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { useHousehold } from '@/household/household-context';
 import { fetchDashboard } from '@/lib/api';
-import { withNetworkRetry } from '@/lib/retry';
+import { useCachedLoader } from '@/offline/use-cached-loader';
 
-type Result = { forId: string; data: Dashboard | null; error: unknown };
+type Result = { forId: string; data: Dashboard | null; error: unknown; cachedAt: string | null };
 
 /**
  * This month's dashboard for the active household. Re-read whenever the
@@ -20,22 +20,25 @@ export function useDashboard() {
   const { active } = useHousehold();
   const householdId = active?.householdId ?? null;
   const [result, setResult] = useState<Result | null>(null);
+  const loadCached = useCachedLoader();
 
   const load = useCallback(() => {
     if (!householdId) return () => {};
     let alive = true;
-    withNetworkRetry(() => fetchDashboard(() => getToken(), householdId))
-      .then((data) => alive && setResult({ forId: householdId, data, error: null }))
+    // Kept on the phone for offline viewing (docs/PLAN.md §15).
+    loadCached(householdId, 'dashboard', () => fetchDashboard(() => getToken(), householdId), DashboardSchema)
+      .then(({ data, cachedAt }) => alive && setResult({ forId: householdId, data, error: null, cachedAt }))
       .catch((error: unknown) =>
-        alive && setResult((prev) => ({ forId: householdId, data: prev?.forId === householdId ? prev.data : null, error })),
+        alive &&
+        setResult((prev) => ({ forId: householdId, data: prev?.forId === householdId ? prev.data : null, error, cachedAt: prev?.cachedAt ?? null })),
       );
     return () => {
       alive = false;
     };
-  }, [householdId, getToken]);
+  }, [householdId, getToken, loadCached]);
 
   useFocusEffect(load);
 
   const current = result?.forId === householdId ? result : null;
-  return { dashboard: current?.data ?? null, error: current?.error ?? null, reload: load };
+  return { dashboard: current?.data ?? null, error: current?.error ?? null, cachedAt: current?.data ? current.cachedAt : null, reload: load };
 }

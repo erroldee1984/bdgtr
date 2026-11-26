@@ -40,7 +40,7 @@ jest.mock('@/lib/api', () => ({
   bulkPostFixed: (...a: unknown[]) => mockBulk(...a),
   fetchAlerts: async (...a: unknown[]) => {
     mockFetch(...a);
-    if (mockFail) throw new TypeError('Network request failed');
+    if (mockFail) throw new (jest.requireActual('@/lib/api-error').ApiError)(500, 'boom'); // a server error: not retried
     const withFlags = mockAlerts.map((x) => ({ ...x, unread: x.createdAt > mockLastRead }));
     // Like the server: the last 7 days (it's 25 Nov), or one month if asked.
     const month = a[2] as string | undefined;

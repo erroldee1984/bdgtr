@@ -1,15 +1,17 @@
-import { type Category, type PinMap, prunePins, type Transaction } from '@bdgtr/shared';
+import { type Category, CategorySchema, manilaDate, type PinMap, prunePins, type Transaction, TransactionSchema } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { z } from 'zod';
 
 import { useHousehold } from '@/household/household-context';
 import { deleteTransaction, fetchCategories, fetchTransactions } from '@/lib/api';
-import { withNetworkRetry } from '@/lib/retry';
+import { isCachedMonth } from '@/offline/cached';
+import { useCachedLoader } from '@/offline/use-cached-loader';
 
 import { loadPins, pinKey, savePins } from './pins';
 
-type Loaded = { key: string; txs: Transaction[]; categories: Category[]; pins: PinMap; error: null };
+type Loaded = { key: string; txs: Transaction[]; categories: Category[]; pins: PinMap; cachedAt: string | null; error: null };
 type Failed = { key: string; error: unknown };
 
 /**
@@ -26,29 +28,32 @@ export function useBreakdown(month: string) {
   const storeKey = userId && householdId ? pinKey(userId, householdId) : null;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState<Failed | null>(null);
+  const loadCached = useCachedLoader();
 
   const load = useCallback(() => {
     if (!householdId || !storeKey) return () => {};
     let alive = true;
     const k = `${householdId}:${month}`;
     const token = () => getToken();
+    // This month and last are kept on the phone for offline viewing (docs/PLAN.md §15).
+    const keep = isCachedMonth(month, manilaDate(new Date()));
     Promise.all([
-      withNetworkRetry(() => fetchTransactions(token, householdId, month)),
-      withNetworkRetry(() => fetchCategories(token, householdId)),
+      loadCached(householdId, keep ? `transactions:${month}` : null, () => fetchTransactions(token, householdId, month), z.array(TransactionSchema)),
+      loadCached(householdId, 'categories', () => fetchCategories(token, householdId), z.array(CategorySchema)),
       loadPins(storeKey),
     ])
-      .then(async ([txs, categories, stored]) => {
+      .then(async ([{ data: txs, cachedAt }, { data: categories }, stored]) => {
         const pins = prunePins(stored, month, txs.map((t) => t.id));
         if (pins !== stored) await savePins(storeKey, pins);
         if (!alive) return;
-        setLoaded({ key: k, txs, categories, pins, error: null });
+        setLoaded({ key: k, txs, categories, pins, cachedAt, error: null });
         setFailed(null);
       })
       .catch((error: unknown) => alive && setFailed({ key: k, error }));
     return () => {
       alive = false;
     };
-  }, [householdId, storeKey, month, getToken]);
+  }, [householdId, storeKey, month, getToken, loadCached]);
 
   useFocusEffect(load);
 
@@ -92,6 +97,8 @@ export function useBreakdown(month: string) {
   return {
     transactions: current?.txs ?? null,
     categories: current?.categories ?? [],
+    /** When showing the copy saved on the phone (offline): when it was saved. */
+    cachedAt: current?.cachedAt ?? null,
     pinnedIds,
     error: failed?.key === key ? failed.error : null,
     reload: load,

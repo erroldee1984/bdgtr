@@ -4,6 +4,16 @@ import { isRetryableNetworkError } from '@/lib/retry';
 
 import { OFFLINE_SUPPORTED, vaultGet, vaultSet } from './vault';
 
+/**
+ * Only this month and last month are kept on the phone (docs/PLAN.md §15),
+ * so storage stays small. Months are YYYY-MM; `today` is YYYY-MM-DD (Manila).
+ */
+export function isCachedMonth(month: string, today: string): boolean {
+  const [y, m] = today.split('-').map(Number);
+  const prev = m === 1 ? `${y! - 1}-12` : `${y}-${String(m! - 1).padStart(2, '0')}`;
+  return month === today.slice(0, 7) || month === prev;
+}
+
 /** Cache entry names: per signed-in person and household, so nothing crosses over. */
 export function cacheName(userId: string, householdId: string, what: string): string {
   return `cache:${userId}:${householdId}:${what}`;

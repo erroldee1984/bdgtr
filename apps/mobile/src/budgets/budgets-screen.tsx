@@ -10,6 +10,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
+import { CachedNotice } from '@/offline/cached-notice';
 import { monthLabel } from '@/dashboard/format';
 import { useHousehold } from '@/household/household-context';
 import { ApiError, resetMonthlyBudget, setMonthlyBudget, updateHousehold } from '@/lib/api';
@@ -54,7 +55,7 @@ export function BudgetsScreen() {
   const { active, refresh } = useHousehold();
   const canManage = !!active && can(active.role, 'manage_budget_data');
   const [month, setMonth] = useMonthParam();
-  const { budgets, error, reload, update, householdId } = useMonthBudgets(month);
+  const { budgets, error, cachedAt, reload, update, householdId } = useMonthBudgets(month);
   const [editing, setEditing] = useState<'month' | 'default' | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
   const [resetting, setResetting] = useState(false);
@@ -87,6 +88,7 @@ export function BudgetsScreen() {
       subtitle={canManage ? active?.householdName : 'Only the House Owner or a Co-Owner can change these.'}
     >
       <MonthSwitcher month={month} onChange={changeMonth} />
+      <CachedNotice cachedAt={cachedAt} />
 
       {error && !budgets ? (
         <Card>
