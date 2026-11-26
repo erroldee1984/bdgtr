@@ -12,18 +12,24 @@ import { fetchDevices, fetchMembershipSettings, removeDevice, updateMembershipSe
 import { disablePush, enablePush, type PushStatus, pushStatus } from '@/notifications/device-push';
 import { colors, spacing } from '@/theme/tokens';
 
-const STATUS_TEXT: Record<PushStatus, string> = {
-  on: 'Notifications are on for this browser. Budget alerts arrive even when bdgtr isn’t open.',
-  off: 'Get budget alerts on this browser, even when bdgtr isn’t open.',
-  blocked:
-    'This browser is blocking notifications from bdgtr. Allow them in the browser’s site settings (the icon next to the address), then come back.',
-  unsupported:
-    Platform.OS === 'web'
+/** Wording for this device: "this browser" on the website, "this phone" in the Android app. */
+function wording() {
+  const web = Platform.OS === 'web';
+  const here = web ? 'browser' : 'phone';
+  const status: Record<PushStatus, string> = {
+    on: `Notifications are on for this ${here}. Budget alerts arrive even when bdgtr isn’t open.`,
+    off: `Get budget alerts on this ${here}, even when bdgtr isn’t open.`,
+    blocked: web
+      ? 'This browser is blocking notifications from bdgtr. Allow them in the browser’s site settings (the icon next to the address), then come back.'
+      : 'Notifications for bdgtr are turned off in Android settings. Open Settings → Apps → bdgtr → Notifications, allow them, then come back.',
+    unsupported: web
       ? 'This browser can’t show notifications. Try Chrome, Edge, Firefox or Safari.'
-      : 'Phone notifications arrive in the next update. Until then, alerts show in the Alerts tab.',
-  'needs-install': 'On iPhone and iPad, add bdgtr to your Home Screen first (Share → Add to Home Screen), then open it from there.',
-  'server-off': 'Notifications aren’t set up on the server yet.',
-};
+      : 'This device can’t get notifications. Alerts still show in the Alerts tab.',
+    'needs-install': 'On iPhone and iPad, add bdgtr to your Home Screen first (Share → Add to Home Screen), then open it from there.',
+    'server-off': 'Notifications aren’t set up on the server yet.',
+  };
+  return { here, status };
+}
 
 const DATE = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' });
 
@@ -33,6 +39,7 @@ export function SettingsScreen() {
   const { active } = useHousehold();
   const householdId = active?.householdId ?? null;
   const token = useCallback(() => getToken(), [getToken]);
+  const words = wording();
 
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,7 +80,7 @@ export function SettingsScreen() {
     try {
       const next = await enablePush(token);
       setStatus(next);
-      if (next === 'on') setNote({ tone: 'success', text: 'Notifications turned on for this browser.' });
+      if (next === 'on') setNote({ tone: 'success', text: `Notifications turned on for this ${words.here}.` });
       reloadDevices();
     } catch {
       setNote({ tone: 'danger', text: "Couldn't turn on notifications. Check your connection and try again." });
@@ -85,11 +92,16 @@ export function SettingsScreen() {
   async function turnOff() {
     setBusy(true);
     setNote(null);
-    await disablePush(token);
-    setStatus(await pushStatus());
-    setNote({ tone: 'success', text: 'Notifications turned off for this browser.' });
-    reloadDevices();
-    setBusy(false);
+    try {
+      await disablePush(token);
+      setStatus(await pushStatus());
+      setNote({ tone: 'success', text: `Notifications turned off for this ${words.here}.` });
+      reloadDevices();
+    } catch {
+      setNote({ tone: 'danger', text: "Couldn't turn off notifications. Check your connection and try again." });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function toggleMute(next: boolean) {
@@ -113,11 +125,11 @@ export function SettingsScreen() {
           <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Checking notifications" />
         ) : (
           <>
-            <AppText tone="secondary">{STATUS_TEXT[status]}</AppText>
+            <AppText tone="secondary">{words.status[status]}</AppText>
             {status === 'off' ? (
               <Button label="Turn on notifications" variant="primary" icon="bell-ring-outline" busy={busy} onPress={() => void turnOn()} />
             ) : status === 'on' ? (
-              <Button label="Turn off on this browser" icon="bell-off-outline" busy={busy} onPress={() => void turnOff()} />
+              <Button label={`Turn off on this ${words.here}`} icon="bell-off-outline" busy={busy} onPress={() => void turnOff()} />
             ) : null}
           </>
         )}

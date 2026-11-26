@@ -1,4 +1,5 @@
 import {
+  deviceAddress,
   type DeviceResponse,
   type DevicesResponse,
   type MembershipSettings,
@@ -69,13 +70,13 @@ export function registerPushRoutes(
     const input = await parseJsonBody(c, RegisterDeviceInputSchema);
     const db = await deps.getDb();
     const me = c.get('user')._id;
-    const known = await db.collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS).findOne({ endpoint: input.subscription.endpoint, userId: me });
+    const known = await db.collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS).findOne({ endpoint: deviceAddress(input), userId: me });
     if (!known && (await countDevices(db, me)) >= MAX_DEVICES_PER_USER) return c.json({ error: 'device_limit' }, 409);
     const doc = await registerDevice(db, me, input, deps.now());
     return c.json<DeviceResponse>({ device: toDevice(doc) }, known ? 200 : 201);
   });
 
-  // Forget this browser (sign-out, "turn off here"). Only your own; always 204.
+  // Forget this browser or phone (sign-out, "turn off here"). Only your own; always 204.
   app.post('/push-subscriptions/unregister', auth, loadUser, async (c) => {
     const { endpoint } = await parseJsonBody(c, UnregisterDeviceInputSchema);
     const db = await deps.getDb();

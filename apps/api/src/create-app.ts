@@ -27,8 +27,11 @@ export interface AppDeps {
   authorizedParties?: string[];
   /** Injectable clock for tests. */
   now?: () => Date;
-  /** Web Push: the public key browsers subscribe with, and how to send. Null/absent = off. */
-  push?: { publicKey: string; send: PushSender } | null;
+  /**
+   * Notifications: the Web Push public key browsers subscribe with (null when
+   * browser push isn't set up) and how to send to any device. Absent = off.
+   */
+  push?: { publicKey: string | null; send: PushSender } | null;
   /** Error reporter; defaults to console.error. Must not receive request bodies (PII). */
   logError?: (err: unknown) => void;
 }

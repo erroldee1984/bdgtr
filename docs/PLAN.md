@@ -161,7 +161,8 @@ When a spend crosses a threshold (§6.3), the API **fans out the alert to every 
 
 | Where the member is | How the alert arrives |
 |---|---|
-| Android app (open, background or closed) | System notification through Expo Push → FCM. Tapping it opens the Dashboard for that household. |
+| Android app (background or closed) | System notification through Expo Push → FCM on the "Budget alerts" channel. Tapping it opens the Alerts tab for that household. |
+| Android app (open and in front) | **In-app toast** instead of a duplicate system notification, plus the Alerts list badge |
 | Browser tab open on `bdgtr.erroldee.com` | **In-app toast** (top-right "growl" on desktop, top banner on phones), announced to screen readers, plus the Alerts list badge |
 | Browser closed, or the tab in the background (Chrome, Edge, Firefox on desktop or Android) | **Web Push system notification**, the OS-level "growl", shown by the service worker even when no tab is open |
 | Safari on iPhone or iPad | Web Push only works once the site is **added to the Home Screen** (installed PWA, iOS 16.4+). Otherwise, in-app toast only. |
@@ -177,6 +178,10 @@ When a spend crosses a threshold (§6.3), the API **fans out the alert to every 
 - **Multiple households:** the alert carries `householdId`, and tapping it switches to that household.
 - **Security and privacy (built in M2b-2):** the server only delivers to the real push services (Google FCM, Mozilla, Microsoft WNS, Apple), never to an arbitrary address a client sends. Signing out forgets this browser and unsubscribes it, and on sign-in an already-subscribed browser is re-registered to whoever is signed in, so a shared computer never shows the previous person's alerts. VAPID keys: public/subject as plain Vercel variables, private key as a Vercel secret (and separate local-development keys in `apps/api/.env`). The VAPID subject is the website address, not a personal email.
 - **Foreground:** if the app is open and in front, the service worker hands the alert to the page as a toast instead of showing a system notification; the same alert from the save's reply and a push is shown once.
+- **Android (built in M2b-3):** More → Settings → "Turn on notifications" creates the "Budget alerts" channel (Android 13 only prompts once a channel exists), asks Android's permission, gets the Expo push token and registers it as an `expo` device (label e.g. "Samsung SM-A546E", never the phone's personal name). The token is remembered in secure storage; "on" means permission granted and a registered token.
+  - The server sends only to Expo's fixed address (`exp.host`); the token goes in the body and must match `ExponentPushToken[…]`. `DeviceNotRegistered` deletes the device. An Expo access token is optional (`EXPO_ACCESS_TOKEN`, a Vercel secret, only if "enhanced security for push" is turned on).
+  - Turning it off when the server can't be reached says so and stays on, since alerts would keep arriving. Signing out while offline drops the phone's push registration instead, so the previous person's alerts stop. App start and sign-in re-register a switched-on phone to whoever is signed in and pick up a rotated token.
+  - Firebase: `google-services.json` is not committed. EAS builds get it from the `GOOGLE_SERVICES_JSON` file variable (`app.config.ts` adds it when present). The FCM V1 service-account key is uploaded to EAS credentials and never stored in the repo.
 
 ---
 
@@ -574,12 +579,14 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M1a prod | Web CSP blocked Clerk Protect, then its probe hosts, and new sign-ups were rejected (PRs #8, #9); a custom `+html.tsx` once shipped pages without their JavaScript | `apps/mobile/scripts/__tests__/write-web-headers-test.ts` |
 | M1c | Opening or refreshing `/household` (also `/add`, "Create another household") straight from its URL left no way out: no history, so no header back button and Cancel did nothing. Now Back/Cancel go to the dashboard when there's no history | `apps/mobile/src/components/__tests__/back-navigation-test.tsx` (real root layout) |
 | M2b dev | Simultaneous spends that only together crossed 90% sent no alert (each saw the others as "already there"). Now the level reached is judged | `apps/api/src/alerts.test.ts` ("simultaneous spends…") |
+| M2b-3 PR | The Vercel preview failed to build (TS2339: no `.ok`/`.json` on fetch's `Response`): Vercel's build doesn't see the global fetch types, though local checks did. API code now describes the fetch it uses (`FetchLike`) | `apps/api/scripts/verify-deploy-build.mjs` (`pnpm --filter @bdgtr/api verify:deploy`, in CI) fails on API source using `typeof fetch` / `RequestInit` |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
 **Writing app (Jest) tests:**
+- Made-up tokens and keys in tests should look fake (e.g. `'x'.repeat(24)`): realistic random-looking strings trip the CI secret scan.
 - Mocked hooks must return the **same** functions and objects on every render, like the real ones (Clerk's `useAuth`, `useFetchMe`). A new function per render makes effects refetch forever and the test hangs.
-- React Native Testing Library v14: `render`, `rerender` and `fireEvent.*` are async, so always `await` them. `rerender` needs a **new** element (`app()`), not the same object.
+- React Native Testing Library v14: `render`, `rerender`, `fireEvent.*` and `act` are async, so always `await` them (an un-awaited `act` leaves the next test rendering nothing). `rerender` needs a **new** element (`app()`), not the same object.
 
 | Area | Happy path | Negative |
 |---|---|---|

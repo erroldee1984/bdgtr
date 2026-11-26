@@ -60,7 +60,15 @@
       "expo-font",
       "expo-secure-store",
       "@clerk/expo",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#5A94FF",
+          "defaultChannel": "budget-alerts"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

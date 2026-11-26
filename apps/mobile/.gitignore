@@ -41,3 +41,8 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase (Android push): config comes from the EAS GOOGLE_SERVICES_JSON file variable;
+# the FCM service-account key is uploaded to EAS and must never be committed.
+google-services.json
+*firebase-adminsdk*.json

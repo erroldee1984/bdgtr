@@ -51,6 +51,13 @@ const EnvSchema = z.object({
     .string()
     .regex(/^(mailto:|https:\/\/)\S+$/, 'VAPID_SUBJECT must be a mailto: or https:// contact')
     .optional(),
+  // Expo push access token: only needed if "enhanced security for push" is
+  // turned on for the Expo project. A secret (Vercel env var only).
+  EXPO_ACCESS_TOKEN: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined))
+    .refine((v) => v === undefined || /^[A-Za-z0-9_-]{20,200}$/.test(v), { message: 'EXPO_ACCESS_TOKEN must be an Expo access token' }),
 }).refine(
   (e) => [e.VAPID_PUBLIC_KEY, e.VAPID_PRIVATE_KEY, e.VAPID_SUBJECT].every((v) => v === undefined) ||
     [e.VAPID_PUBLIC_KEY, e.VAPID_PRIVATE_KEY, e.VAPID_SUBJECT].every((v) => v !== undefined),
