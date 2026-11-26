@@ -3,6 +3,7 @@ import {
   type DevicesResponse,
   type MembershipSettings,
   RegisterDeviceInputSchema,
+  UnregisterDeviceInputSchema,
   UpdateMembershipSettingsSchema,
   type VapidKeyResponse,
 } from '@bdgtr/shared';
@@ -72,6 +73,14 @@ export function registerPushRoutes(
     if (!known && (await countDevices(db, me)) >= MAX_DEVICES_PER_USER) return c.json({ error: 'device_limit' }, 409);
     const doc = await registerDevice(db, me, input, deps.now());
     return c.json<DeviceResponse>({ device: toDevice(doc) }, known ? 200 : 201);
+  });
+
+  // Forget this browser (sign-out, "turn off here"). Only your own; always 204.
+  app.post('/push-subscriptions/unregister', auth, loadUser, async (c) => {
+    const { endpoint } = await parseJsonBody(c, UnregisterDeviceInputSchema);
+    const db = await deps.getDb();
+    await db.collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS).deleteOne({ endpoint, userId: c.get('user')._id });
+    return c.body(null, 204);
   });
 
   app.delete('/push-subscriptions/:id', auth, loadUser, async (c) => {

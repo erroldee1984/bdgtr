@@ -150,6 +150,17 @@ describe('devices', () => {
     expect((await call('ana', 'DELETE', '/push-subscriptions/nope')).status).toBe(404);
   });
 
+  it('unregister (sign-out / turn off here) forgets your device by its address; never someone else\'s', async () => {
+    await register('ana', 'mine');
+    await register('ben', 'theirs');
+    expect((await call('ana', 'POST', '/push-subscriptions/unregister', { body: { endpoint: endpoint('theirs') } })).status).toBe(204);
+    expect((await devicesOf('ben')).length).toBe(1);
+    expect((await call('ana', 'POST', '/push-subscriptions/unregister', { body: { endpoint: endpoint('mine') } })).status).toBe(204);
+    expect(await devicesOf('ana')).toEqual([]);
+    expect((await call('ana', 'POST', '/push-subscriptions/unregister', { body: { endpoint: endpoint('mine') } })).status).toBe(204); // again: fine
+    expect((await call('ana', 'POST', '/push-subscriptions/unregister', { body: { endpoint: { $ne: null } } })).status).toBe(400);
+  });
+
   it('refuses an address that is not a real push service (the server never calls arbitrary URLs)', async () => {
     const bad = { ...device('x'), subscription: { ...device('x').subscription, endpoint: 'https://169.254.169.254/latest/meta-data' } };
     expect((await call('ana', 'POST', '/push-subscriptions', { body: bad })).status).toBe(400);

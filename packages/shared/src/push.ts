@@ -56,6 +56,10 @@ export const RegisterDeviceInputSchema = z
   .strict();
 export type RegisterDeviceInput = z.infer<typeof RegisterDeviceInputSchema>;
 
+/** Sign-out / "turn off on this browser": forget the device by its push address. */
+export const UnregisterDeviceInputSchema = z.object({ endpoint: z.string().max(1000) }).strict();
+export type UnregisterDeviceInput = z.infer<typeof UnregisterDeviceInputSchema>;
+
 export const DeviceSchema = z.object({
   id: z.string(),
   kind: z.enum(['webpush', 'expo']),
