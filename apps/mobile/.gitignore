@@ -46,3 +46,7 @@ example
 # the FCM service-account key is uploaded to EAS and must never be committed.
 google-services.json
 *firebase-adminsdk*.json
+
+# Playwright (e2e/a11y) output
+test-results/
+playwright-report/
