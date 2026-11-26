@@ -98,7 +98,7 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
   }
 
   return (
-    <Screen title="Alerts" subtitle="Budget alerts and fixed-transaction notices for this household">
+    <Screen title="Alerts" subtitle="Budget alerts, daily summaries and fixed-transaction notices for this household">
       <MonthSwitcher month={month} onChange={(m) => (setMonth(m), setMessage(null))} max={thisMonth} />
 
       {message ? (
@@ -123,7 +123,16 @@ export function AlertsScreen({ now = () => new Date() }: { now?: () => Date }) {
       ) : (
         current.alerts.map((a) => {
           const over = a.level === 'over';
-          const icon = a.kind === 'fixed_added' ? 'calendar-check' : a.kind === 'fixed_due' ? 'calendar-clock' : over ? 'alert' : 'alert-circle-outline';
+          const icon =
+            a.kind === 'daily_summary'
+              ? 'newspaper-variant-outline'
+              : a.kind === 'fixed_added'
+                ? 'calendar-check'
+                : a.kind === 'fixed_due'
+                  ? 'calendar-clock'
+                  : over
+                    ? 'alert'
+                    : 'alert-circle-outline';
           return (
             <Card key={a.id} testID="alert-row">
               <View style={styles.titleRow}>

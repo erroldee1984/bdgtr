@@ -13,3 +13,4 @@ export * from './push.ts';
 export * from './budgets.ts';
 export * from './breakdown.ts';
 export * from './fixed.ts';
+export * from './digest.ts';

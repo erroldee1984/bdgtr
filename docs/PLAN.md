@@ -102,7 +102,7 @@ bdgtr/
 - **Hono** runs unchanged on Vercel, Node or Cloudflare Workers, so the host can change later without a rewrite
 - Official **MongoDB Node driver** plus Zod. The client is cached across warm invocations.
 - Clerk JWT verification (JWKS)
-- **Scheduled jobs** are triggered by a tiny **Cloudflare Worker with Cron Triggers** (free, minute-accurate). It calls the API's internal endpoints with a `CRON_SECRET`:
+- **Scheduled jobs** (built in M5b: `apps/scheduler`, deployed with `wrangler`, setup steps in its README; the 07:00 run calls the daily summary, then the fixed-transaction notices) are triggered by a tiny **Cloudflare Worker with Cron Triggers** (free, minute-accurate). It calls the API's internal endpoints with a `CRON_SECRET`:
   - `00:15` Manila (`15 16 * * *` UTC): post today's fixed transactions
   - `07:00` Manila (`0 23 * * *` UTC, *the previous UTC day*): daily summary notification
 
@@ -326,7 +326,7 @@ GET    /push/vapid-public-key
 # Internal
 POST   /internal/cron/fixed-postings         (Authorization: Bearer CRON_SECRET) 00:15 Manila
 POST   /internal/cron/fixed-notices          (Authorization: Bearer CRON_SECRET) 07:00 Manila
-POST   /internal/cron/daily-digest           (Authorization: Bearer CRON_SECRET)
+POST   /internal/cron/daily-digest           (Authorization: Bearer CRON_SECRET) 07:00 Manila; optional { date } = the morning to run for (last 7 days)
 ```
 
 ---
@@ -414,6 +414,11 @@ See §3.
 Monthly list of budget alerts: who triggered each one, the category, and the level. An unread badge sits on the tab. This is the durable record behind every push and toast.
 
 ### 6.11 Daily 7:00 AM summary notification
+**As built (M5b):**
+- `POST /internal/cron/daily-digest`, called at 07:00 Manila by the scheduler Worker (`apps/scheduler`), sends one summary per household that has active members. The text comes from `formatDailySummary` in `shared/digest.ts`.
+- It's stored once in the Alerts tab (`kind: daily_summary`), listed under the month it arrives, and is idempotent through the alerts unique index (scope `daily_summary:<yesterday>`). That replaces a separate `digestLog`.
+- It's pushed to members with the **Daily 7 AM summary** switch on (Settings, per household, on by default). That switch is separate from muting: a muted member still gets the summary. The push uses tag `digest-<household>`, so today's replaces yesterday's.
+- Over budget sends level `over`, which is high priority.
 Every day at **7:00 AM Manila time**, each active member of each household gets one notification per household, unless they've turned the daily summary off for that household.
 
 The message is about the **whole household's** spending, not the person reading it. It always follows this pattern:

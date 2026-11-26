@@ -45,6 +45,7 @@ export function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ tone: 'danger' | 'success'; text: string } | null>(null);
   const [muted, setMuted] = useState<boolean | null>(null);
+  const [digest, setDigest] = useState<boolean | null>(null);
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [version, setVersion] = useState(0);
   const reloadDevices = useCallback(() => setVersion((v) => v + 1), []);
@@ -57,8 +58,16 @@ export function SettingsScreen() {
     if (!householdId) return;
     let alive = true;
     fetchMembershipSettings(token, householdId)
-      .then((s) => alive && setMuted(s.alertsMuted))
-      .catch(() => alive && setMuted(null));
+      .then((s) => {
+        if (!alive) return;
+        setMuted(s.alertsMuted);
+        setDigest(s.dailyDigestEnabled);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setMuted(null);
+        setDigest(null);
+      });
     return () => {
       alive = false;
     };
@@ -117,6 +126,19 @@ export function SettingsScreen() {
     }
   }
 
+  async function toggleDigest(next: boolean) {
+    if (!householdId) return;
+    const previous = digest;
+    setDigest(next);
+    try {
+      const saved = await updateMembershipSettings(token, householdId, { dailyDigestEnabled: next });
+      setDigest(saved.dailyDigestEnabled);
+    } catch {
+      setDigest(previous);
+      setNote({ tone: 'danger', text: "Couldn't change that setting. Try again." });
+    }
+  }
+
   return (
     <Screen title="Settings">
       <Card>
@@ -141,7 +163,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card>
-        <AppText variant="title">{`Budget alerts for ${active?.householdName ?? 'this household'}`}</AppText>
+        <AppText variant="title">{`Notifications from ${active?.householdName ?? 'this household'}`}</AppText>
         <View style={styles.row}>
           <AppText style={styles.flex}>Mute notifications from this household</AppText>
           <Switch
@@ -154,6 +176,19 @@ export function SettingsScreen() {
         </View>
         <AppText variant="caption" tone="secondary">
           Muting stops notifications on all your devices for this household only. Alerts still appear in the Alerts tab.
+        </AppText>
+        <View style={styles.row}>
+          <AppText style={styles.flex}>Daily 7 AM summary</AppText>
+          <Switch
+            accessibilityLabel={`Daily 7 AM summary for ${active?.householdName ?? 'this household'}`}
+            value={digest === true}
+            disabled={digest === null}
+            onValueChange={(v) => void toggleDigest(v)}
+            trackColor={{ true: colors.primary, false: colors.border }}
+          />
+        </View>
+        <AppText variant="caption" tone="secondary">
+          Yesterday&apos;s spending and what&apos;s left this month, every morning at 7. Separate from muting: it still comes when other notifications are muted.
         </AppText>
       </Card>
 

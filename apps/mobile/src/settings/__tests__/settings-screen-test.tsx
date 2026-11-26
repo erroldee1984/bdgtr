@@ -46,7 +46,12 @@ beforeEach(() => {
   mockDisable.mockReset().mockImplementation(async () => {
     mockStatus = 'off';
   });
-  mockUpdate.mockReset().mockImplementation(async (_t: unknown, _h: string, input: { alertsMuted: boolean }) => ({ alertsMuted: input.alertsMuted, dailyDigestEnabled: true }));
+  mockUpdate
+    .mockReset()
+    .mockImplementation(async (_t: unknown, _h: string, input: { alertsMuted?: boolean; dailyDigestEnabled?: boolean }) => ({
+      alertsMuted: input.alertsMuted ?? mockMuted,
+      dailyDigestEnabled: input.dailyDigestEnabled ?? true,
+    }));
   mockRemove.mockReset().mockImplementation(async (_t: unknown, id: string) => {
     mockDevices = mockDevices.filter((d) => d.id !== id);
   });
@@ -174,6 +179,27 @@ describe('Settings: mute this household', () => {
     await fireEvent(toggle, 'valueChange', true);
     expect(await screen.findByText("Couldn't change that setting. Try again.")).toBeTruthy();
     expect(screen.getByLabelText('Mute notifications from Dela Cruz').props.value).toBe(false);
+  });
+});
+
+describe('Settings: daily 7 AM summary', () => {
+  it('on by default; switching it off saves for this household only, separately from muting', async () => {
+    await open();
+    const toggle = await screen.findByLabelText('Daily 7 AM summary for Dela Cruz');
+    expect(toggle.props.value).toBe(true);
+    await fireEvent(toggle, 'valueChange', false);
+    expect(mockUpdate).toHaveBeenCalledWith(expect.any(Function), 'h1', { dailyDigestEnabled: false });
+    await waitFor(() => expect(screen.getByLabelText('Daily 7 AM summary for Dela Cruz').props.value).toBe(false));
+    expect(screen.getByLabelText('Mute notifications from Dela Cruz').props.value).toBe(false);
+  });
+
+  it('a failed save puts the switch back and says so', async () => {
+    mockUpdate.mockRejectedValue(new TypeError('Network request failed'));
+    await open();
+    const toggle = await screen.findByLabelText('Daily 7 AM summary for Dela Cruz');
+    await fireEvent(toggle, 'valueChange', false);
+    expect(await screen.findByText("Couldn't change that setting. Try again.")).toBeTruthy();
+    expect(screen.getByLabelText('Daily 7 AM summary for Dela Cruz').props.value).toBe(true);
   });
 });
 

@@ -94,7 +94,7 @@ export function formatAlert(input: {
  * Notices use level 'near', the neutral, polite style, so app builds from
  * before notices existed still read them.
  */
-export const ALERT_KINDS = ['budget', 'fixed_added', 'fixed_due'] as const;
+export const ALERT_KINDS = ['budget', 'fixed_added', 'fixed_due', 'daily_summary'] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
 /** Wording for a fixed-transaction notice: household first, never the description. */

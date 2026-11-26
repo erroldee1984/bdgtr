@@ -1,0 +1,16 @@
+# Cloudflare Worker: the bdgtr scheduler (docs/PLAN.md §1, apps/scheduler/README.md).
+name = "bdgtr-scheduler"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+# No public *.workers.dev address: it only runs on its schedule.
+workers_dev = false
+
+[vars]
+API_URL = "https://bdgtr-api.erroldee.com"
+
+# UTC. Manila is UTC+8 with no daylight saving.
+[triggers]
+crons = ["15 16 * * *", "0 23 * * *"]
+
+[observability]
+enabled = true

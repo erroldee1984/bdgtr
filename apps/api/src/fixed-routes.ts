@@ -21,6 +21,7 @@ import { type Db, ObjectId } from 'mongodb';
 
 import { readCutoff, toAlert } from './alerts.js';
 import { findCategory } from './categories.js';
+import { sendDailySummaries } from './digest.js';
 import {
   autoPostDue,
   countFixed,
@@ -190,6 +191,13 @@ export function registerFixedRoutes(app: Hono<AppEnv>, auth: MiddlewareHandler<A
     const r = await cronDate(c);
     if ('res' in r) return r.res;
     return c.json(await autoPostDue(await deps.getDb(), r.date, r.now, deps.sendPush));
+  });
+
+  // 07:00 Manila: yesterday's spending for every household (docs/PLAN.md §6.11).
+  app.post('/internal/cron/daily-digest', async (c): Promise<Response> => {
+    const r = await cronDate(c);
+    if ('res' in r) return r.res;
+    return c.json(await sendDailySummaries(await deps.getDb(), r.date, r.now, deps.sendPush));
   });
 
   // 07:00 Manila: tell the household what was added automatically, and remind
