@@ -67,6 +67,70 @@ async function fillAndSave(amount = '1,234.50', category = 'Transport') {
 }
 
 describe('Add spend', () => {
+  describe('editing a spend still waiting to be sent (/add?pending=…)', () => {
+    const waiting = {
+      clientId: '00000000-0000-4000-8000-00000000abcd',
+      householdId: 'h1',
+      input: { clientId: '00000000-0000-4000-8000-00000000abcd', date: '2026-11-24', categoryId: 'b'.repeat(24), amountMinor: 50_000, description: 'Jeep' },
+      savedAt: '',
+      attempts: 0,
+      state: 'pending',
+      problem: null,
+    };
+    const openEdit = () =>
+      renderRouter(
+        { index: () => <Text>Dashboard</Text>, add: () => <AddSpendForm now={now} />, categories: () => <Text>Categories screen</Text> },
+        { initialUrl: `/add?pending=${waiting.clientId}` },
+      );
+    const outboxWith = (editPending: jest.Mock) => ({
+      items: [waiting],
+      offline: true,
+      saveSpend: jest.fn(),
+      editPending,
+      syncNow: () => {},
+      noteNetwork: () => {},
+      retry: () => {},
+      discard: () => {},
+    });
+
+    it('opens filled in; saving keeps its clientId and changes it on the phone only', async () => {
+      const editPending = jest.fn(async () => 'saved');
+      mockOutbox = outboxWith(editPending);
+      try {
+        await openEdit();
+        const amount = await screen.findByPlaceholderText('0.00');
+        expect(amount.props.value).toBe('500');
+        expect(screen.getByLabelText('Transport')).toBeChecked();
+        expect(screen.getByDisplayValue('Jeep')).toBeTruthy();
+        await fireEvent.changeText(amount, '650');
+        await fireEvent.press(screen.getByText('Save spend'));
+        await screen.findByText('Dashboard');
+        expect(editPending).toHaveBeenCalledWith(waiting.clientId, expect.objectContaining({ clientId: waiting.clientId, amountMinor: 65_000, date: '2026-11-24' }));
+        expect(mockShow).toHaveBeenCalledWith(expect.objectContaining({ title: 'Changes saved on this phone' }));
+        expect(mockCreate).not.toHaveBeenCalled();
+      } finally {
+        mockOutbox = null;
+      }
+    });
+
+    it.each([
+      ['sending', "It's being sent right now. Try again in a moment."],
+      ['uncertain', 'This one may already have reached the server'],
+      ['gone', 'It has already been sent or removed.'],
+    ])('refused (%s): explains and stays on the form', async (outcome, text) => {
+      mockOutbox = outboxWith(jest.fn(async () => outcome));
+      try {
+        await openEdit();
+        await screen.findByPlaceholderText('0.00');
+        await fireEvent.press(screen.getByText('Save spend'));
+        expect(await screen.findByText(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeTruthy();
+        expect(screen.queryByText('Dashboard')).toBeNull();
+      } finally {
+        mockOutbox = null;
+      }
+    });
+  });
+
   it('offline (Android): saved on this phone, says so, and goes back like a normal save', async () => {
     const saveSpend = jest.fn(async () => ({ queued: true, alerts: [] }));
     mockOutbox = { items: [], offline: true, saveSpend, syncNow: () => {}, retry: () => {}, discard: () => {} };

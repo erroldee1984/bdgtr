@@ -204,6 +204,59 @@ describe('sending the queue', () => {
   });
 });
 
+describe('changing a waiting spend', () => {
+  async function queued(amount: number, failure: unknown = NET(), timeoutMs = 15_000) {
+    if (failure === 'hang') mockCreate.mockReturnValue(new Promise(() => {}));
+    else mockCreate.mockRejectedValue(failure);
+    await mount(timeoutMs);
+    const i = input(amount);
+    await act(async () => void (await api.saveSpend('h1', i)));
+    mockCreate.mockReset();
+    return i;
+  }
+
+  it('edit: same clientId (the server never had it), new values, still pending', async () => {
+    const i = await queued(100);
+    mockCreate.mockRejectedValue(NET()); // still offline when it tries again
+    let r!: Awaited<ReturnType<typeof api.editPending>>;
+    await act(async () => void (r = await api.editPending(i.clientId, { ...i, amountMinor: 150 })));
+    expect(r).toBe('saved');
+    const [stored] = await loadOutbox('user_a');
+    expect(stored).toMatchObject({ clientId: i.clientId, state: 'pending', input: { clientId: i.clientId, amountMinor: 150 } });
+  });
+
+  it('queued after a timeout (may have arrived): not editable', async () => {
+    const i = await queued(100, 'hang', 30);
+    expect((await loadOutbox('user_a'))[0]!.uncertain).toBe(true);
+    expect(await api.editPending(i.clientId, { ...i, amountMinor: 150 })).toBe('uncertain');
+    expect(screen.getByText(/may already have reached the server/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Edit / })).toBeNull();
+  });
+
+  it('while it is being sent: refused; once sent: gone', async () => {
+    const i = await queued(100);
+    let finish!: () => void;
+    mockCreate.mockReturnValue(new Promise((r) => (finish = () => r(ok()))));
+    api.syncNow(); // starts sending; the request stays open until finish()
+    await act(async () => {});
+    expect(await api.editPending(i.clientId, { ...i, amountMinor: 150 })).toBe('sending');
+    await act(async () => finish());
+    await waitFor(() => expect(state()).toBe('items: offline:false'));
+    expect(await api.editPending(i.clientId, { ...i, amountMinor: 150 })).toBe('gone');
+  });
+
+  it('Discard asks first, then drops it', async () => {
+    await queued(100);
+    const { fireEvent } = jest.requireActual('@testing-library/react-native');
+    await fireEvent.press(screen.getByRole('button', { name: /^Discard / }));
+    expect(screen.getByText('Discard this spend?')).toBeTruthy();
+    expect(state()).toBe('items:100/pending offline:true');
+    const discardButtons = screen.getAllByRole('button', { name: 'Discard' });
+    await fireEvent.press(discardButtons[discardButtons.length - 1]);
+    expect(state()).toBe('items: offline:true');
+  });
+});
+
 describe('wording', () => {
   it('banner', () => {
     expect(bannerText(false, 0)).toBeNull();

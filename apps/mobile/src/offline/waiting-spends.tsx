@@ -1,11 +1,14 @@
 import { type Category, formatPHP } from '@bdgtr/shared';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { shortDate } from '@/breakdown/breakdown-row';
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { Dialog } from '@/components/dialog';
 import { colors, radius, spacing } from '@/theme/tokens';
 
 import type { OutboxItem } from './outbox';
@@ -27,7 +30,8 @@ const line = (i: OutboxItem, categories: Category[]) =>
 
 /** Spend tab: this household's spends saved offline for `month`, not sent yet (icon + "Pending" text, not colour alone). */
 export function WaitingSpends({ householdId, month, categories }: { householdId: string; month: string; categories: Category[] }) {
-  const { items } = useOutbox();
+  const { items, discard } = useOutbox();
+  const [confirming, setConfirming] = useState<OutboxItem | null>(null);
   const mine = items.filter((i) => i.householdId === householdId && i.input.date.startsWith(month));
   if (mine.length === 0) return null;
   return (
@@ -36,11 +40,52 @@ export function WaitingSpends({ householdId, month, categories }: { householdId:
         Waiting to be sent
       </AppText>
       {mine.map((i) => (
-        <View key={i.clientId} style={styles.row} accessible accessibilityLabel={`${line(i, categories)}, ${i.state === 'pending' ? 'pending' : 'needs attention'}`}>
-          <AppText style={styles.flex}>{line(i, categories)}</AppText>
-          <PendingBadge label={i.state === 'pending' ? 'Pending' : 'Needs attention'} />
+        <View key={i.clientId} style={styles.item}>
+          <View style={styles.row} accessible accessibilityLabel={`${line(i, categories)}, ${i.state === 'pending' ? 'pending' : 'needs attention'}`}>
+            <AppText style={styles.flex}>{line(i, categories)}</AppText>
+            <PendingBadge label={i.state === 'pending' ? 'Pending' : 'Needs attention'} />
+          </View>
+          {i.uncertain ? (
+            <AppText variant="caption" tone="secondary">
+              This one may already have reached the server, so it can&apos;t be changed until it&apos;s sent.
+            </AppText>
+          ) : (
+            <View style={styles.actions}>
+              <Button
+                label="Edit"
+                icon="pencil-outline"
+                compact
+                accessibilityLabel={`Edit ${line(i, categories)}`}
+                onPress={() => router.push({ pathname: '/add', params: { pending: i.clientId } })}
+              />
+              <Button
+                label="Discard"
+                icon="trash-can-outline"
+                variant="danger"
+                compact
+                accessibilityLabel={`Discard ${line(i, categories)}`}
+                onPress={() => setConfirming(i)}
+              />
+            </View>
+          )}
         </View>
       ))}
+      {confirming ? (
+        <Dialog
+          visible
+          title="Discard this spend?"
+          onClose={() => setConfirming(null)}
+          actions={
+            <>
+              <Button label="Cancel" compact onPress={() => setConfirming(null)} />
+              <Button label="Discard" variant="danger" compact onPress={() => (discard(confirming.clientId), setConfirming(null))} />
+            </>
+          }
+        >
+          <AppText>{line(confirming, categories)}</AppText>
+          <AppText tone="secondary">It was saved on this phone only and hasn&apos;t been sent, so it won&apos;t be added.</AppText>
+        </Dialog>
+      ) : null}
       <AppText variant="caption" tone="secondary">
         Saved on this phone while offline. They&apos;re added to the totals once sent.
       </AppText>
@@ -88,6 +133,7 @@ export function NeedsAttention({ householdId }: { householdId: string }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  item: { gap: spacing.xs, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   stuck: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
