@@ -20,6 +20,10 @@ updates:
         dependency-type: production
         update-types: [minor, patch]
     ignore:
+      # Major versions (e.g. TypeScript 7, ESLint 10) can break the toolchain and
+      # must match what Expo supports: upgrade those deliberately, not by bot.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "expo"
       - dependency-name: "expo-*"
       - dependency-name: "@expo/*"
