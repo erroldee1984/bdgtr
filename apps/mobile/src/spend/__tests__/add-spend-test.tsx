@@ -22,7 +22,9 @@ const mockShow = jest.fn();
 jest.mock('@/toast/toast', () => ({ useToast: () => ({ show: mockShow }) }));
 const mockCategories = jest.fn();
 const mockCreate = jest.fn();
+const mockCreateCategory = jest.fn();
 jest.mock('@/lib/api', () => ({
+  createCategory: (...a: unknown[]) => mockCreateCategory(...a),
   ApiError: jest.requireActual('@/lib/api-error').ApiError,
   fetchCategories: (...a: unknown[]) => mockCategories(...a),
   createTransaction: (...a: unknown[]) => mockCreate(...a),
@@ -39,6 +41,11 @@ beforeEach(() => {
   mockCategories.mockReset().mockResolvedValue([cat('a', 'Groceries', 1), cat('b', 'Transport', 5), cat('c', 'Old', 9, true), cat('d', 'Bills', 1)]);
   mockCreate.mockReset().mockResolvedValue({ transaction: {}, alerts: [] });
   mockShow.mockClear();
+  mockCreateCategory.mockReset().mockImplementation(async (_t: unknown, _h: string, input: { name: string }) => ({
+    ...cat('e', input.name, 0),
+    icon: 'help-circle-outline',
+    colour: '#94A3B8',
+  }));
   jest.mocked(DateTimePickerAndroid.open).mockReset();
 });
 
@@ -181,3 +188,94 @@ describe('Add spend', () => {
     expect(mockShow).not.toHaveBeenCalled();
   });
 });
+
+describe('Add spend: quick add a category', () => {
+  async function quickAdd(name: string) {
+    await fireEvent.press(await screen.findByLabelText('New category'));
+    await fireEvent.changeText(screen.getByLabelText('New category name'), name);
+    await fireEvent.press(screen.getByText('Add'));
+  }
+
+  it('House Owner / Co-Owner: asks only for a name, adds it with the "?" icon, selects it and saves the spend in it', async () => {
+    mockRole = 'co_owner';
+    await open();
+    await quickAdd('  Pet food ');
+    expect(mockCreateCategory).toHaveBeenCalledWith(expect.any(Function), 'h1', {
+      name: 'Pet food',
+      icon: 'help-circle-outline',
+      colour: '#94A3B8',
+      defaultBudgetMinor: 0,
+    });
+    expect(await screen.findByText('Pet food added and selected.')).toBeTruthy();
+    expect(screen.getByLabelText('Pet food')).toBeChecked();
+    await fireAmountAndSave();
+    expect(mockCreate.mock.calls[0][2].categoryId).toBe('e'.repeat(24));
+  });
+
+  it('a name that already exists (any case or spacing) selects that category instead of making a duplicate', async () => {
+    mockRole = 'owner';
+    await open();
+    await quickAdd('  GROCERIES ');
+    expect(mockCreateCategory).not.toHaveBeenCalled();
+    expect(await screen.findByText("Groceries already exists, so it's selected.")).toBeTruthy();
+    expect(screen.getByLabelText('Groceries')).toBeChecked();
+  });
+
+  it('a removed category\'s name can be reused (it is not offered, so a new one is made)', async () => {
+    mockRole = 'owner';
+    await open();
+    await quickAdd('Old');
+    expect(mockCreateCategory).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['blank', '   ', 'Name is required'],
+    ['too long', 'x'.repeat(41), 'Name must be 40 characters or fewer'],
+  ])('a %s name is explained and nothing is sent', async (_label, name, message) => {
+    mockRole = 'owner';
+    await open();
+    await fireEvent.press(await screen.findByLabelText('New category'));
+    // maxLength stops typing past 40 on a device; the check still guards pasted text.
+    await fireEvent(screen.getByLabelText('New category name'), 'changeText', name);
+    await fireEvent.press(screen.getByText('Add'));
+    expect(screen.getByText(message)).toBeTruthy();
+    expect(mockCreateCategory).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new ApiError(409, 'category_exists'), 'A category with this name already exists. Pick it from the list.', 2],
+    [new ApiError(409, 'category_limit'), 'This household has too many categories. Remove or reuse one in Categories.', 1],
+    [new TypeError('Network request failed'), "Couldn't add the category. Check your connection and try again.", 1],
+  ])('server says %s → explains it (a name clash reloads the list)', async (err, message, loads) => {
+    mockRole = 'owner';
+    mockCreateCategory.mockRejectedValueOnce(err);
+    await open();
+    await quickAdd('Pet food');
+    expect(await screen.findByText(message)).toBeTruthy();
+    await waitFor(() => expect(mockCategories).toHaveBeenCalledTimes(loads));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('Cancel closes it without adding anything', async () => {
+    mockRole = 'owner';
+    await open();
+    await fireEvent.press(await screen.findByLabelText('New category'));
+    await fireEvent.press(screen.getByText('Cancel'));
+    expect(screen.queryByLabelText('New category name')).toBeNull();
+    expect(screen.getByLabelText('New category')).toBeTruthy();
+    expect(mockCreateCategory).not.toHaveBeenCalled();
+  });
+
+  it('House Member: no "New category" (only Owners and Co-Owners manage categories)', async () => {
+    mockRole = 'member';
+    await open();
+    await screen.findByLabelText('Category');
+    expect(screen.queryByLabelText('New category')).toBeNull();
+  });
+});
+
+async function fireAmountAndSave() {
+  await fireEvent.changeText(screen.getByPlaceholderText('0.00'), '250');
+  await fireEvent.press(screen.getByText('Save spend'));
+  await screen.findByText('Dashboard');
+}

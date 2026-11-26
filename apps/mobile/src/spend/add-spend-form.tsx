@@ -16,6 +16,7 @@ import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 import { useToast } from '@/toast/toast';
 
 import { DatePickerButton } from './date-picker-button';
+import { QuickAddCategory } from './quick-add-category';
 import { dateLabel, quickDates, type SpendFormErrors, validateSpendForm } from './spend-form';
 
 const SERVER_MESSAGES: Record<string, string> = {
@@ -35,6 +36,8 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const { active } = useHousehold();
   const toast = useToast();
   const householdId = active?.householdId ?? '';
+  const canManage = !!active && can(active.role, 'manage_budget_data');
+  const [quickNote, setQuickNote] = useState<string | null>(null);
   const { today, yesterday } = useMemo(() => quickDates(now()), [now]);
 
   const clientId = useRef(Crypto.randomUUID()).current;
@@ -167,7 +170,24 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
               </Pressable>
             );
           })}
+          {canManage ? (
+            <QuickAddCategory
+              householdId={householdId}
+              categories={categories}
+              onConflict={reload}
+              onPicked={(c, isNew) => {
+                if (isNew) setCategories((list) => [c, ...(list ?? [])]);
+                setCategoryId(c.id);
+                setQuickNote(isNew ? `${c.name} added and selected.` : `${c.name} already exists, so it's selected.`);
+              }}
+            />
+          ) : null}
         </View>
+        {quickNote ? (
+          <AppText tone="secondary" aria-live="polite">
+            {quickNote}
+          </AppText>
+        ) : null}
         {errors.category ? (
           <AppText tone="danger" role="alert">
             {errors.category}

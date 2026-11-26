@@ -41,6 +41,7 @@ export const CATEGORY_ICONS = [
   'credit-card',
   'hand-heart',
   'dots-horizontal',
+  'help-circle-outline',
 ] as const;
 export type CategoryIcon = (typeof CATEGORY_ICONS)[number];
 
@@ -68,6 +69,16 @@ export const DEFAULT_CATEGORY: { name: string; icon: CategoryIcon; colour: Categ
   name: 'Groceries',
   icon: 'cart',
   colour: '#4ADE80',
+};
+
+/**
+ * "Quick add" from the Add spend screen asks only for a name; the rest starts
+ * as a "?" icon, a neutral colour and no budget, to be set later in Categories.
+ */
+export const QUICK_CATEGORY_DEFAULTS: { icon: CategoryIcon; colour: CategoryColour; defaultBudgetMinor: number } = {
+  icon: 'help-circle-outline',
+  colour: '#94A3B8',
+  defaultBudgetMinor: 0,
 };
 
 const categoryName = z

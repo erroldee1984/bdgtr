@@ -8,6 +8,7 @@ import {
   categoryNameKey,
   CreateCategoryInputSchema,
   DEFAULT_CATEGORY,
+  QUICK_CATEGORY_DEFAULTS,
   UpdateCategoryInputSchema,
 } from './categories.ts';
 import { MAX_AMOUNT_MINOR } from './money.ts';
@@ -58,6 +59,11 @@ describe('default category', () => {
   it('is Groceries, and a valid category', () => {
     expect(DEFAULT_CATEGORY.name).toBe('Groceries');
     expect(CreateCategoryInputSchema.safeParse({ ...DEFAULT_CATEGORY, defaultBudgetMinor: 0 }).success).toBe(true);
+  });
+
+  it('quick-add defaults ("?" icon, neutral colour, no budget) make a valid category with any name', () => {
+    expect(QUICK_CATEGORY_DEFAULTS).toEqual({ icon: 'help-circle-outline', colour: '#94A3B8', defaultBudgetMinor: 0 });
+    expect(CreateCategoryInputSchema.safeParse({ name: 'Pet food', ...QUICK_CATEGORY_DEFAULTS }).success).toBe(true);
   });
 
   it('palette and icon lists have no duplicates', () => {

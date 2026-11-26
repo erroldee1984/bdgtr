@@ -338,7 +338,7 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 
 ### 6.3 Transaction Entry (modal on phones, side panel on wide screens)
 - Date: **Today / Yesterday / Pick date** (native picker on Android, `<input type="date">` on web)
-- Category: grid of chips, most-used first
+- Category: grid of chips, most-used first. **House Owners and Co-Owners also get "+ New category"**: it asks only for a name and adds the category with a "?" icon, a neutral colour and no budget (edit them later in Categories), then selects it. A name that already exists just selects that category.
 - Amount: numeric keypad opens with autofocus, ₱ prefix, centavos allowed
 - Description: optional, collapsed by default
 - After saving, the API works out threshold crossings, saves `alerts` and **fans them out to every active household member's registered devices** (Android push plus browser Web Push), skipping members who muted this household. The person who entered the spend also sees an in-app toast straight away. Delivery rules are in §2b.
