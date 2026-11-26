@@ -7,6 +7,7 @@ export default defineConfig({
     // start with < 500 MB free where it keeps its files (the OS temp dir). On machines
     // where /tmp is a small RAM disk (e.g. WSL), 16 at once ran out; 4 at a time fits.
     maxWorkers: 4,
+    globalSetup: ['./vitest.global-setup.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
