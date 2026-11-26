@@ -197,6 +197,8 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
               title={editing === 'new' ? 'New fixed transaction' : `Edit ${editing.name}`}
               initial={editing === 'new' ? EMPTY_FIXED_FORM : formFromItem(editing)}
               categories={categories}
+              householdId={householdId!}
+              onCategoriesStale={load}
               onSave={save}
               onCancel={() => setEditing(null)}
               {...(editing === 'new' ? {} : { onRemove: () => setRemoving(editing) })}

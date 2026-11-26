@@ -16,8 +16,9 @@ const SERVER_MESSAGES: Record<string, string> = {
 };
 
 /**
- * "+ New category" on Add spend (House Owner / Co-Owner): asks only for a
- * name; the icon ("?"), colour and budget can be set later in Categories.
+ * "+ New category" on Add spend and the fixed-transaction form (House Owner /
+ * Co-Owner): asks only for a name; the icon ("?"), colour and budget can be
+ * set later in Categories.
  * A name that already exists just selects that category (no duplicate).
  */
 export function QuickAddCategory({

@@ -370,6 +370,7 @@ Add, edit (name, icon, colour, default budget) and remove, with confirmation exp
 - **Alerts:** spends added these ways raise budget alerts like any spend. Auto-posted ones are recorded as entered by the person who created the item.
 - **Bulk add:** "Select to add", tick items, pick a date (its month drives the "already added" flags), then "Add N transactions". If any were already added that month, a dialog offers **Skip them** (only when some aren't repeats), **Add again** or **Cancel**.
 - Removing an item is a soft remove, and spends already added from it stay.
+- The add/edit form has the same **"+ New category"** quick add as Add spend: it asks only for a name, and an existing name just selects that category.
 - House Members see the list read-only.
 - CRUD list: name, category, amount, day of month, auto-post toggle
 - **Auto-post**: the daily cron posts every enabled item whose day matches today in Manila time. Days 29–31 clamp to the last day of the month. The unique index on `fixedPostings` prevents duplicates.
