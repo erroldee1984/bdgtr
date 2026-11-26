@@ -4,7 +4,8 @@ import { router, Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
 
-import { AlertsScreen, shiftMonth } from '@/alerts/alerts-screen';
+import { AlertsScreen } from '@/alerts/alerts-screen';
+import { shiftMonth } from '@/components/month-switcher';
 import { UnreadAlertsProvider, useUnreadAlerts } from '@/alerts/unread-alerts';
 
 jest.mock('@clerk/expo', () => {
@@ -40,9 +41,11 @@ jest.mock('@/lib/api', () => ({
   fetchAlerts: async (...a: unknown[]) => {
     mockFetch(...a);
     if (mockFail) throw new TypeError('Network request failed');
-    const month = (a[2] as string | undefined) ?? '2026-11';
     const withFlags = mockAlerts.map((x) => ({ ...x, unread: x.createdAt > mockLastRead }));
-    return { alerts: withFlags.filter((x) => x.yearMonth === month), unreadCount: withFlags.filter((x) => x.unread).length };
+    // Like the server: the last 7 days (it's 25 Nov), or one month if asked.
+    const month = a[2] as string | undefined;
+    const shown = month ? withFlags.filter((x) => x.yearMonth === month) : withFlags.filter((x) => x.createdAt >= '2026-11-18');
+    return { alerts: shown, unreadCount: withFlags.filter((x) => x.unread).length };
   },
   markAlertsRead: async () => {
     mockRead();
@@ -50,7 +53,6 @@ jest.mock('@/lib/api', () => ({
   },
 }));
 
-const NOW = () => new Date('2026-11-25T02:00:00.000Z');
 const alert = (id: string, level: 'near' | 'over', yearMonth = '2026-11', createdAt = '2026-11-24T05:00:00.000Z'): A => ({
   id, yearMonth, level, categoryId: 'c', title: level === 'over' ? 'Over budget · Groceries' : 'Nearly at budget · Groceries',
   body: `body ${id}`, triggeredBy: 'Mia Santos', createdAt, unread: true,
@@ -81,7 +83,7 @@ const open = () =>
         </UnreadAlertsProvider>
       ),
       index: () => <Text>Home</Text>,
-      alerts: () => <AlertsScreen now={NOW} />,
+      alerts: () => <AlertsScreen />,
     },
     { initialUrl: '/' },
   );
@@ -183,22 +185,21 @@ describe('Alerts screen', () => {
     });
   });
 
-  it('previous month via the arrow; next is disabled at the current month', async () => {
+  it('shows the last 7 days (older alerts are deleted), with no month switcher', async () => {
     await open();
     await act(async () => router.push('/alerts'));
     await screen.findAllByTestId('alert-row');
-    expect(screen.getByLabelText('Next month')).toBeDisabled();
-    await fireEvent.press(screen.getByLabelText('Previous month'));
-    expect(await screen.findByText('October 2026')).toBeTruthy();
-    expect(await screen.findByText('body old')).toBeTruthy();
-    expect(screen.queryByText('body a2')).toBeNull();
+    expect(mockFetch).toHaveBeenLastCalledWith(expect.any(Function), 'h1'); // no month: the server's last 7 days
+    expect(screen.queryByText('body old')).toBeNull();
+    expect(screen.queryByLabelText('Previous month')).toBeNull();
+    expect(screen.getByText(/from the last 7 days/)).toBeTruthy();
   });
 
-  it('a month with none says so', async () => {
+  it('none in the last 7 days says so', async () => {
     mockAlerts = [];
     await open();
     await act(async () => router.push('/alerts'));
-    expect(await screen.findByText('No alerts this month.')).toBeTruthy();
+    expect(await screen.findByText('No alerts in the last 7 days.')).toBeTruthy();
   });
 
   it('a load failure offers Try again, which recovers', async () => {
@@ -215,7 +216,7 @@ describe('Alerts screen', () => {
 describe('opening from a notification (/alerts?household=…)', () => {
   const openAt = (url: string) =>
     renderRouter(
-      { _layout: () => (<UnreadAlertsProvider><Stack /></UnreadAlertsProvider>), alerts: () => <AlertsScreen now={NOW} /> },
+      { _layout: () => (<UnreadAlertsProvider><Stack /></UnreadAlertsProvider>), alerts: () => <AlertsScreen /> },
       { initialUrl: url },
     );
 
@@ -234,7 +235,7 @@ describe('opening from a notification (/alerts?household=…)', () => {
   });
 });
 
-describe('shiftMonth', () => {
+describe('shiftMonth (month switcher)', () => {
   it.each([
     ['2026-11', -1, '2026-10'],
     ['2026-01', -1, '2025-12'],

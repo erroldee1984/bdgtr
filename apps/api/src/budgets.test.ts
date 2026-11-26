@@ -11,7 +11,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ALERTS, ensureAlertIndexes } from './alerts.js';
+import { ALERT_CROSSINGS, ALERTS, ensureAlertIndexes } from './alerts.js';
 import { CATEGORY_BUDGETS, ensureBudgetIndexes, MONTHLY_BUDGETS } from './budgets.js';
 import { CATEGORIES, ensureCategoryIndexes } from './categories.js';
 import { createClerkVerifier } from './clerk.js';
@@ -45,7 +45,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await Promise.all(
-    [USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, MONTHLY_BUDGETS, CATEGORY_BUDGETS].map((c) => db.collection(c).deleteMany({})),
+    [USERS, HOUSEHOLDS, MEMBERSHIPS, INVITES, CATEGORIES, TRANSACTIONS, ALERTS, ALERT_CROSSINGS, MONTHLY_BUDGETS, CATEGORY_BUDGETS].map((c) => db.collection(c).deleteMany({})),
   );
 });
 

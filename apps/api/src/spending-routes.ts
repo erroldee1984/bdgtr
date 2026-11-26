@@ -36,7 +36,7 @@ import {
   updateCategory,
 } from './categories.js';
 import { effectiveBudgets } from './budgets.js';
-import { countUnread, listAlerts, markAlertsRead, readCutoff, recordCrossings, toAlert } from './alerts.js';
+import { ALERT_RETENTION_DAYS, countUnread, listAlerts, markAlertsRead, readCutoff, recordCrossings, toAlert } from './alerts.js';
 import { type AppVariables, requireHousehold } from './household-routes.js';
 import { fanOutAlerts, type PushSender } from './push.js';
 import {
@@ -234,14 +234,17 @@ export function registerSpendingRoutes(
 
   // --- Alerts (docs/PLAN.md §6.10) ---
 
+  // Alerts from the last 7 days (they're deleted after that). ?month= lists one
+  // month instead, for app builds from before alerts expired.
   app.get('/alerts', ...inHousehold('view'), async (c) => {
-    const month = monthParam(c, deps.now());
-    if (!month) return c.json({ error: 'invalid_month' }, 400);
+    const month = c.req.query('month') === undefined ? null : monthParam(c, deps.now());
+    if (c.req.query('month') !== undefined && !month) return c.json({ error: 'invalid_month' }, 400);
+    const which = month ? { yearMonth: month } : { since: new Date(deps.now().getTime() - ALERT_RETENTION_DAYS * 24 * 60 * 60 * 1000) };
     const db = await deps.getDb();
     const householdId = c.get('household')._id;
     const cutoff = readCutoff(c.get('membership'));
     const role = c.get('membership').role;
-    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, month, cutoff, role, manilaDate(deps.now())), countUnread(db, householdId, cutoff, role)]);
+    const [alerts, unreadCount] = await Promise.all([listAlerts(db, householdId, which, cutoff, role, manilaDate(deps.now())), countUnread(db, householdId, cutoff, role)]);
     return c.json<AlertsResponse>({ alerts, unreadCount });
   });
 
