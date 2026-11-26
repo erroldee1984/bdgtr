@@ -63,7 +63,7 @@ export async function ensureAlertIndexes(db: Db): Promise<void> {
   ]);
 }
 
-async function spentInMonth(db: Db, householdId: ObjectId, yearMonth: string, categoryId?: ObjectId): Promise<number> {
+export async function spentInMonth(db: Db, householdId: ObjectId, yearMonth: string, categoryId?: ObjectId): Promise<number> {
   const match: Record<string, unknown> = { householdId, yearMonth };
   if (categoryId) match.categoryId = categoryId;
   const [row] = await db

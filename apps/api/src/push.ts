@@ -193,7 +193,8 @@ export function alertPayload(household: HouseholdDoc, alert: AlertDoc): PushPayl
     level: alert.level,
     householdId: id,
     url: `/alerts?household=${id}`,
-    tag: `alert-${id}-${alert.scope}`,
+    // Today's summary replaces yesterday's instead of stacking.
+    tag: alert.kind === 'daily_summary' ? `digest-${id}` : `alert-${id}-${alert.scope}`,
   };
 }
 
@@ -213,17 +214,27 @@ export async function fanOutAlerts(
   try {
     const members = await db
       .collection<MembershipDoc>(MEMBERSHIPS)
-      .find({ householdId: household._id, status: 'active', alertsMuted: { $ne: true } }, { projection: { userId: 1, role: 1 } })
+      .find({ householdId: household._id, status: 'active' }, { projection: { userId: 1, role: 1, alertsMuted: 1, dailyDigestEnabled: 1 } })
       .toArray();
     const devices = await db
       .collection<PushSubscriptionDoc>(PUSH_SUBSCRIPTIONS)
       .find({ userId: { $in: members.map((m) => m.userId) } })
       .toArray();
-    // Managers-only alerts ("due today" reminders) skip House Members' devices.
-    const managers = new Set(members.filter((m) => m.role !== 'member').map((m) => m.userId.toHexString()));
+    const byUser = new Map(members.map((m) => [m.userId.toHexString(), m]));
+    /**
+     * The daily summary follows its own per-household switch (separate from the
+     * alert mute, docs/PLAN.md §6.11). Everything else skips muted members, and
+     * managers-only alerts ("due today" reminders) skip House Members.
+     */
+    const wants = (a: AlertDoc, m: MembershipDoc | undefined): boolean => {
+      if (!m) return false;
+      if (a.kind === 'daily_summary') return m.dailyDigestEnabled !== false;
+      if (m.alertsMuted === true) return false;
+      return a.audience !== 'managers' || m.role !== 'member';
+    };
     const jobs = alerts.flatMap((a) =>
       devices
-        .filter((d) => a.audience !== 'managers' || managers.has(d.userId.toHexString()))
+        .filter((d) => wants(a, byUser.get(d.userId.toHexString())))
         .map(async (d) => ({ d, result: await send(d, alertPayload(household, a)) })),
     );
     const results = (await Promise.allSettled(jobs)).flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
