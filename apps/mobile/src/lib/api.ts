@@ -21,6 +21,14 @@ import {
   type CreateTransactionInput,
   type Transaction,
   TransactionsResponseSchema,
+  type BulkPostInput,
+  type BulkPostResponse,
+  BulkPostResponseSchema,
+  type CreateFixedInput,
+  type FixedTransaction,
+  FixedTransactionResponseSchema,
+  FixedTransactionsResponseSchema,
+  type UpdateFixedInput,
   type Dashboard,
   DashboardSchema,
   type UpdateCategoryInput,
@@ -222,6 +230,36 @@ export async function fetchTransactions(getToken: GetToken, householdId: string,
 /** Deletes a spend. House Members get 403 for one they didn't enter. */
 export async function deleteTransaction(getToken: GetToken, householdId: string, id: string): Promise<void> {
   await apiFetch(`/transactions/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, { method: 'DELETE' }));
+}
+
+// --- Fixed transactions (docs/PLAN.md §6.5) ---
+
+/** Active fixed items, each with the date it was first added in `month` (or null). */
+export async function fetchFixed(getToken: GetToken, householdId: string, month: string): Promise<FixedTransaction[]> {
+  return FixedTransactionsResponseSchema.parse(
+    await apiFetch(`/fixed-transactions?month=${encodeURIComponent(month)}`, getToken, inHousehold(householdId)),
+  ).items;
+}
+
+export async function createFixed(getToken: GetToken, householdId: string, input: CreateFixedInput): Promise<FixedTransaction> {
+  return FixedTransactionResponseSchema.parse(await apiFetch('/fixed-transactions', getToken, inHousehold(householdId, json('POST', input)))).item;
+}
+
+export async function updateFixed(getToken: GetToken, householdId: string, id: string, input: UpdateFixedInput): Promise<FixedTransaction> {
+  return FixedTransactionResponseSchema.parse(
+    await apiFetch(`/fixed-transactions/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, json('PATCH', input))),
+  ).item;
+}
+
+export async function removeFixed(getToken: GetToken, householdId: string, id: string): Promise<void> {
+  await apiFetch(`/fixed-transactions/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, { method: 'DELETE' }));
+}
+
+/** Adds the chosen items as spends on one date (each item's clientId makes a retry safe). */
+export async function bulkPostFixed(getToken: GetToken, householdId: string, input: BulkPostInput): Promise<BulkPostResponse> {
+  return BulkPostResponseSchema.parse(
+    await apiFetch('/fixed-transactions/bulk-post', getToken, inHousehold(householdId, json('POST', input))),
+  );
 }
 
 /** A month's alerts (default: this month) plus the unread count across all months. */

@@ -306,8 +306,9 @@ POST   /transactions [OCM]                   { clientId, … } → { transaction
                                              same clientId again → 200 with the original (idempotent)
 PATCH  /transactions/:id  DELETE /transactions/:id   [OC] any · [M] own only (else 403)
 GET    /categories [OCM]                     POST/PATCH/DELETE [OC] (DELETE = soft remove; POST /:id/restore)
-GET    /fixed-transactions [OCM]             POST/PATCH/DELETE [OC]
-POST   /fixed-transactions/bulk-post [OC]    { ids[], date }
+GET    /fixed-transactions?month= [OCM]      active items + postedOn (first add that month) · POST/PATCH/DELETE [OC]
+POST   /fixed-transactions/bulk-post [OC]    { date, items: [{ id, clientId }] } (built in M5a): each item's own
+                                             clientId makes a retry safe; the app asks before re-adding
 GET    /budgets?month= [OCM]                 the month's total and active categories: defaults, overrides, allocation
 PUT/DELETE /budgets/monthly/:yearMonth [OC]                    { budgetMinor } · DELETE = reset to default
 PUT/DELETE /budgets/categories/:yearMonth/:categoryId [OC]     { budgetMinor } · DELETE = reset to default
@@ -362,6 +363,14 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore. **A household always has at least one active category:** new households start with **Groceries**, any household found with none gets Groceries added automatically, and the last active category can't be removed (the API refuses with 409 `last_category`; the app shows Remove disabled on it and says why).
 
 ### 6.5 Monthly Fixed Transactions
+**As built (M5a):** More → Fixed transactions (`src/fixed/`, route `/fixed`).
+- Each item shows its name, amount, category and day ("Every month on the 5th"; days 29–31 add "or the last day of shorter months"), whether it's added automatically or by hand, and when it was added this month.
+- **Auto-post** is `POST /internal/cron/fixed-postings` (Bearer `CRON_SECRET`, constant-time check; 503 when the secret isn't set). It adds the items due on today's **Manila** date in every household, and an optional `{ date }` re-runs one of the last 7 days.
+- **No double-posting:** each auto-post uses a fixed clientId for that item and month (a UUID made from a hash of the two), so a re-run, or a crash between adding the spend and noting it in `fixedPostings`, never adds it twice. Items already added that month (by bulk add) are skipped, and so are items whose category was removed; the app marks those in red.
+- **Alerts:** spends added these ways raise budget alerts like any spend. Auto-posted ones are recorded as entered by the person who created the item.
+- **Bulk add:** "Select to add", tick items, pick a date (its month drives the "already added" flags), then "Add N transactions". If any were already added that month, a dialog offers **Skip them** (only when some aren't repeats), **Add again** or **Cancel**.
+- Removing an item is a soft remove, and spends already added from it stay.
+- House Members see the list read-only.
 - CRUD list: name, category, amount, day of month, auto-post toggle
 - **Auto-post**: the daily cron posts every enabled item whose day matches today in Manila time. Days 29–31 clamp to the last day of the month. The unique index on `fixedPostings` prevents duplicates.
 - **Bulk add**: tap "Select", tick items, choose a date, then "Add N transactions". Items already posted this month are flagged, and the user can skip them or post again.
@@ -585,12 +594,15 @@ Clerk handles web sessions with short-lived tokens. We store nothing sensitive i
 | M1c | Opening or refreshing `/household` (also `/add`, "Create another household") straight from its URL left no way out: no history, so no header back button and Cancel did nothing. Now Back/Cancel go to the dashboard when there's no history | `apps/mobile/src/components/__tests__/back-navigation-test.tsx` (real root layout) |
 | M2b dev | Simultaneous spends that only together crossed 90% sent no alert (each saw the others as "already there"). Now the level reached is judged | `apps/api/src/alerts.test.ts` ("simultaneous spends…") |
 | M2b-3 PR | The Vercel preview failed to build (TS2339: no `.ok`/`.json` on fetch's `Response`): Vercel's build doesn't see the global fetch types, though local checks did. API code now describes the fetch it uses (`FetchLike`) | `apps/api/scripts/verify-deploy-build.mjs` (`pnpm --filter @bdgtr/api verify:deploy`, in CI) fails on API source using `typeof fetch` / `RequestInit` |
+| M5a dev | On the fixed-transaction form, a field's error stayed after you corrected it, so its hint (e.g. "Every month on the 12th") stayed hidden until the next Save | `apps/mobile/src/fixed/__tests__/fixed-screen-test.tsx` ("a corrected field drops its error") |
 
 **Coverage is enforced:** `pnpm test` (and so `pnpm check` and CI) fails if coverage drops below: shared 90%; API 85% (branches 80%); app 85% statements/lines, 80% branches, 75% functions, counted over **every** app file, not only the ones a test touches.
 
 **Writing app (Jest) tests:**
 - Made-up tokens and keys in tests should look fake (e.g. `'x'.repeat(24)`): realistic random-looking strings trip the CI secret scan.
 - Mocked hooks must return the **same** functions and objects on every render, like the real ones (Clerk's `useAuth`, `useFetchMe`). A new function per render makes effects refetch forever and the test hangs.
+- `getByRole` only finds elements that are accessible to screen readers: a plain `View` with `role="list"` or `role="dialog"` isn't, so find those by their visible text (or wait for the loading indicator to go).
+- If `tsc` complains that a new route like `"/fixed"` isn't a valid `Href`, the dev server's generated `.expo/types/router.d.ts` is stale: delete it (it's ignored by git; CI never has it).
 - React Native Testing Library v14: `render`, `rerender`, `fireEvent.*` and `act` are async, so always `await` them (an un-awaited `act` leaves the next test rendering nothing). `rerender` needs a **new** element (`app()`), not the same object.
 
 | Area | Happy path | Negative |

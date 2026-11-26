@@ -112,6 +112,16 @@ export default function RootLayout() {
                   }}
                 />
                 <Stack.Screen
+                  name="fixed"
+                  options={{
+                    headerShown: true,
+                    title: 'Fixed transactions',
+                    headerStyle: { backgroundColor: colors.surface },
+                    headerTintColor: colors.textPrimary,
+                    headerLeft: () => <HeaderBackButton />,
+                  }}
+                />
+                <Stack.Screen
                   name="budgets/categories"
                   options={{
                     headerShown: true,

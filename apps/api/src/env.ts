@@ -58,6 +58,12 @@ const EnvSchema = z.object({
     .optional()
     .transform((v) => (v && v.trim() ? v.trim() : undefined))
     .refine((v) => v === undefined || /^[A-Za-z0-9_-]{20,200}$/.test(v), { message: 'EXPO_ACCESS_TOKEN must be an Expo access token' }),
+  // Shared with the Cloudflare Worker that runs the scheduled jobs. A secret.
+  CRON_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined))
+    .refine((v) => v === undefined || /^[A-Za-z0-9_-]{32,256}$/.test(v), { message: 'CRON_SECRET must be at least 32 letters, digits, - or _' }),
 }).refine(
   (e) => [e.VAPID_PUBLIC_KEY, e.VAPID_PRIVATE_KEY, e.VAPID_SUBJECT].every((v) => v === undefined) ||
     [e.VAPID_PUBLIC_KEY, e.VAPID_PRIVATE_KEY, e.VAPID_SUBJECT].every((v) => v !== undefined),
