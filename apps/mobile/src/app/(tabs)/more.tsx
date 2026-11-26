@@ -8,7 +8,11 @@ import { AppText } from '@/components/app-text';
 import { Screen } from '@/components/screen';
 import { SetupCheck } from '@/components/setup-check';
 import { clearAllPins } from '@/breakdown/pins';
+import { Button } from '@/components/button';
+import { Dialog } from '@/components/dialog';
 import { forgetPushOnSignOut } from '@/notifications/device-push';
+import { useOutbox } from '@/offline/outbox-context';
+import { vaultClear } from '@/offline/vault';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 export default function MoreScreen() {
@@ -16,6 +20,25 @@ export default function MoreScreen() {
   const { getToken } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
+  const [confirmUnsent, setConfirmUnsent] = useState(false);
+  const unsent = useOutbox().items.length;
+
+  async function doSignOut() {
+    setConfirmUnsent(false);
+    setSigningOut(true);
+    setSignOutError(false);
+    try {
+      // Stop this browser getting this account's alerts (shared computers).
+      await forgetPushOnSignOut(() => getToken());
+      await clearAllPins(); // pins stay on a device only while signed in (PLAN §6.8)
+      await vaultClear(); // offline copies and unsent spends (PLAN §15)
+      await signOut(); // RequireSignIn then redirects to /sign-in
+    } catch {
+      setSignOutError(true);
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <Screen title="More">
@@ -98,20 +121,7 @@ export default function MoreScreen() {
         role="button"
         accessibilityState={{ busy: signingOut, disabled: signingOut }}
         disabled={signingOut}
-        onPress={async () => {
-          setSigningOut(true);
-          setSignOutError(false);
-          try {
-            // Stop this browser getting this account's alerts (shared computers).
-            await forgetPushOnSignOut(() => getToken());
-            await clearAllPins(); // pins stay on a device only while signed in (PLAN §6.8)
-            await signOut(); // RequireSignIn then redirects to /sign-in
-          } catch {
-            setSignOutError(true);
-          } finally {
-            setSigningOut(false);
-          }
-        }}
+        onPress={() => (unsent > 0 ? setConfirmUnsent(true) : void doSignOut())}
         style={({ pressed }) => [styles.signOut, (pressed || signingOut) && styles.pressed]}
       >
         <MaterialCommunityIcons name="logout" size={22} color={colors.danger} aria-hidden />
@@ -125,6 +135,23 @@ export default function MoreScreen() {
         </AppText>
       ) : null}
       <SetupCheck />
+      {confirmUnsent ? (
+        <Dialog
+          visible
+          title={`${unsent} ${unsent === 1 ? 'spend hasn’t' : 'spends haven’t'} been sent`}
+          onClose={() => setConfirmUnsent(false)}
+          actions={
+            <>
+              <Button label="Cancel" compact onPress={() => setConfirmUnsent(false)} />
+              <Button label="Sign out anyway" variant="danger" compact onPress={() => void doSignOut()} />
+            </>
+          }
+        >
+          <AppText tone="secondary">
+            They were saved on this phone while offline. If you sign out now they&apos;ll be lost. Go online and let them send first.
+          </AppText>
+        </Dialog>
+      ) : null}
     </Screen>
   );
 }

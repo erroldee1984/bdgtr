@@ -19,6 +19,10 @@ const mockOrder: string[] = [];
 jest.mock('@/notifications/device-push', () => ({
   forgetPushOnSignOut: async () => void mockOrder.push('forget-this-browser'),
 }));
+let mockUnsent: unknown[] = [];
+jest.mock('@/offline/outbox-context', () => ({ useOutbox: () => ({ items: mockUnsent }) }));
+const mockVaultClear = jest.fn(async () => {});
+jest.mock('@/offline/vault', () => ({ vaultClear: () => mockVaultClear() }));
 // The Setup check card on More has its own tests (account-status-test.tsx).
 jest.mock('@/components/setup-check', () => ({ SetupCheck: () => null }));
 
@@ -120,6 +124,29 @@ describe('More screen', () => {
     await fireEvent.press(screen.getByText('Sign out'));
     await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
     expect(await AsyncStorage.getAllKeys()).toEqual(['other']);
+  });
+
+  it('Sign out also wipes this phone’s offline copies', async () => {
+    mockUnsent = [];
+    mockVaultClear.mockClear();
+    await renderMore();
+    await fireEvent.press(screen.getByText('Sign out'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+    expect(mockVaultClear).toHaveBeenCalled();
+  });
+
+  it('spends not yet sent: warns first; Cancel keeps you signed in, "Sign out anyway" goes ahead', async () => {
+    mockUnsent = [{}, {}];
+    await renderMore();
+    await fireEvent.press(screen.getByText('Sign out'));
+    expect(screen.getByText('2 spends haven’t been sent')).toBeTruthy();
+    expect(mockSignOut).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    expect(mockSignOut).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByText('Sign out'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Sign out anyway' }));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+    mockUnsent = [];
   });
 
   it('a failed sign-out says so (instead of failing silently) and can be retried', async () => {

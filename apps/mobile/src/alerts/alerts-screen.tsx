@@ -13,6 +13,7 @@ import { Screen } from '@/components/screen';
 import { useHousehold } from '@/household/household-context';
 import { fixedProblem } from '@/fixed/fixed-screen';
 import { bulkPostFixed, fetchAlerts, markAlertsRead } from '@/lib/api';
+import { NeedsAttention } from '@/offline/waiting-spends';
 import { useToast } from '@/toast/toast';
 import { colors, spacing } from '@/theme/tokens';
 
@@ -97,6 +98,7 @@ export function AlertsScreen() {
   return (
     <Screen title="Alerts" subtitle="This household's budget alerts, daily summaries and fixed-transaction notices from the last 7 days">
 
+      {householdId ? <NeedsAttention householdId={householdId} /> : null}
       {message ? (
         <AppText tone={message.tone} role={message.tone === 'danger' ? 'alert' : undefined} aria-live="polite">
           {message.text}

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
 import { usesNavRail, useWindowClass } from '@/layout/window-class';
+import { OfflineBanner } from '@/offline/offline-banner';
 import { colors, MAX_CONTENT_WIDTH, spacing } from '@/theme/tokens';
 
 interface ScreenProps {
@@ -44,7 +45,10 @@ export function Screen({ title, subtitle, children, scrollRef }: ScreenProps) {
             {subtitle}
           </AppText>
         ) : null}
-        <View style={styles.body}>{children}</View>
+        <View style={styles.body}>
+          <OfflineBanner />
+          {children}
+        </View>
       </View>
     </ScrollView>
   );
