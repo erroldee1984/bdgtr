@@ -4,6 +4,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { colors, radius, spacing } from '@/theme/tokens';
 
+import { useReducedMotion } from './use-reduced-motion';
+
 /**
  * A small modal dialog: title, content, and a row of buttons. Back (Android),
  * Escape (web) and a tap outside all close it. Exposed as role="dialog" with
@@ -22,8 +24,9 @@ export function Dialog({
   children?: ReactNode;
   actions?: ReactNode;
 }) {
+  const reducedMotion = useReducedMotion();
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
       <View style={styles.centre}>
         <View style={styles.sheet} role="dialog" aria-modal aria-label={title}>

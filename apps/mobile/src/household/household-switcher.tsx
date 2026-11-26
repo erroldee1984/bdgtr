@@ -6,6 +6,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
+import { useReducedMotion } from '@/components/use-reduced-motion';
 
 import { useHousehold } from './household-context';
 
@@ -16,6 +17,7 @@ import { useHousehold } from './household-context';
 export function HouseholdSwitcher() {
   const { active, memberships, switchTo } = useHousehold();
   const [open, setOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
   if (!active) return null;
 
   return (
@@ -33,7 +35,7 @@ export function HouseholdSwitcher() {
         <MaterialCommunityIcons name="chevron-down" size={20} color={colors.textSecondary} aria-hidden />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Close" />
         <View style={styles.sheet} role="dialog" aria-modal aria-label="Your households">
           <AppText variant="title">Your households</AppText>
