@@ -12,6 +12,7 @@ import { listMembershipsForUser } from './households.js';
 import { registerMemberRoutes } from './member-routes.js';
 import type { PushSender } from './push.js';
 import { registerPushRoutes } from './push-routes.js';
+import { registerBudgetRoutes } from './budget-routes.js';
 import { registerSpendingRoutes } from './spending-routes.js';
 
 export interface AppDeps {
@@ -90,6 +91,7 @@ export function createApp(deps: AppDeps) {
   const { loadUser } = registerHouseholdRoutes(app, auth, { getDb: deps.getDb, now });
   registerMemberRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
   registerSpendingRoutes(app, auth, loadUser, { getDb: deps.getDb, now, sendPush: deps.push?.send ?? null });
+  registerBudgetRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
   registerPushRoutes(app, auth, loadUser, { getDb: deps.getDb, now, vapidPublicKey: deps.push?.publicKey ?? null });
 
   // Signed-in user and their households. Creates the user record on first sign-in.

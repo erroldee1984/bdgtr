@@ -35,6 +35,7 @@ import {
   toCategory,
   updateCategory,
 } from './categories.js';
+import { effectiveBudgets } from './budgets.js';
 import { countUnread, listAlerts, markAlertsRead, readCutoff, recordCrossings, toAlert } from './alerts.js';
 import { type AppVariables, requireHousehold } from './household-routes.js';
 import { fanOutAlerts, type PushSender } from './push.js';
@@ -258,21 +259,22 @@ export function registerSpendingRoutes(
     const db = await deps.getDb();
     const household = c.get('household');
     await ensureDefaultCategory(db, household._id, c.get('user')._id, deps.now());
-    const [categories, spent] = await Promise.all([
+    const [categories, spent, budgets] = await Promise.all([
       db.collection<CategoryDoc>(CATEGORIES).find({ householdId: household._id }).toArray(),
       spentByCategory(db, household._id, month),
+      effectiveBudgets(db, household, month),
     ]);
-    // Monthly overrides arrive in M3; until then the defaults apply to every month.
+    // The month's budgets: its overrides where set, else the defaults (§4).
     return c.json<Dashboard>(
       buildDashboard({
         month,
-        totalBudgetMinor: household.defaultMonthlyBudgetMinor,
+        totalBudgetMinor: budgets.totalMinor,
         categories: categories.map((d) => ({
           id: d._id.toHexString(),
           name: d.name,
           icon: d.icon,
           colour: d.colour,
-          budgetMinor: d.defaultBudgetMinor,
+          budgetMinor: budgets.categoryMinor(d),
           isRemoved: d.isRemoved,
         })),
         spentByCategory: spent,
