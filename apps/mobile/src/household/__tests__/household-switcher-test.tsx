@@ -87,6 +87,13 @@ describe('More screen', () => {
     await screen.findByText('Budgets screen');
   });
 
+  it('opens Fixed transactions (no longer a "coming later" card)', async () => {
+    await renderRouter({ index: MoreScreen, fixed: () => <Text>Fixed screen</Text> }, { initialUrl: '/' });
+    expect(screen.queryByText('Coming in a later milestone')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Fixed transactions'));
+    await screen.findByText('Fixed screen');
+  });
+
   it('opens Household & members', async () => {
     await renderMore();
     await fireEvent.press(screen.getByLabelText('Household and members'));

@@ -14,6 +14,8 @@ export interface TransactionDoc {
   amountMinor: number;
   description: string | null;
   source: 'manual' | 'fixed-auto' | 'fixed-bulk';
+  /** The fixed transaction this was posted from (auto-post or bulk add). */
+  fixedTransactionId?: ObjectId | null;
   createdBy: ObjectId;
   /** When the server received it. */
   syncedAt: Date;
@@ -55,6 +57,7 @@ export async function createTransaction(
   input: CreateTransactionInput,
   by: ObjectId,
   now: Date,
+  from: { source: TransactionDoc['source']; fixedTransactionId: ObjectId | null } = { source: 'manual', fixedTransactionId: null },
 ): Promise<{ doc: TransactionDoc; created: boolean }> {
   const coll = db.collection<TransactionDoc>(TRANSACTIONS);
   const doc: TransactionDoc = {
@@ -66,7 +69,8 @@ export async function createTransaction(
     categoryId: new ObjectId(input.categoryId),
     amountMinor: input.amountMinor,
     description: input.description ?? null,
-    source: 'manual',
+    source: from.source,
+    fixedTransactionId: from.fixedTransactionId,
     createdBy: by,
     syncedAt: now,
     createdAt: now,

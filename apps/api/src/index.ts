@@ -20,6 +20,7 @@ function buildApp() {
       getDb: () => getAppDb(env.MONGODB_URI, env.MONGODB_DB),
       verifyToken: env.CLERK_JWT_KEY ? createClerkVerifier(env.CLERK_JWT_KEY) : null,
       push: pushFromEnv(env),
+      cronSecret: env.CRON_SECRET ?? null,
     });
   } catch (err) {
     // Misconfigured deployment: log the reason (EnvError never contains secret

@@ -5,14 +5,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
-import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { SetupCheck } from '@/components/setup-check';
 import { clearAllPins } from '@/breakdown/pins';
 import { forgetPushOnSignOut } from '@/notifications/device-push';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
-
-const SECTIONS = ['Fixed transactions'] as const;
 
 export default function MoreScreen() {
   const { signOut } = useClerk();
@@ -69,6 +66,21 @@ export default function MoreScreen() {
       </Pressable>
       <Pressable
         role="link"
+        accessibilityLabel="Fixed transactions"
+        onPress={() => router.push('/fixed')}
+        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+      >
+        <MaterialCommunityIcons name="calendar-sync-outline" size={24} color={colors.primaryLight} aria-hidden />
+        <View style={styles.flex}>
+          <AppText variant="bodyStrong">Fixed transactions</AppText>
+          <AppText variant="caption" tone="secondary">
+            Rent, bills and other monthly spends, added automatically
+          </AppText>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
+      </Pressable>
+      <Pressable
+        role="link"
         accessibilityLabel="Settings"
         onPress={() => router.push('/settings')}
         style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
@@ -82,14 +94,6 @@ export default function MoreScreen() {
         </View>
         <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
       </Pressable>
-      {SECTIONS.map((section) => (
-        <Card key={section}>
-          <AppText variant="bodyStrong">{section}</AppText>
-          <AppText variant="caption" tone="secondary">
-            Coming in a later milestone
-          </AppText>
-        </Card>
-      ))}
       <Pressable
         role="button"
         accessibilityState={{ busy: signingOut, disabled: signingOut }}

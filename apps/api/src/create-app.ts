@@ -14,6 +14,7 @@ import type { PushSender } from './push.js';
 import { registerPushRoutes } from './push-routes.js';
 import { registerBudgetRoutes } from './budget-routes.js';
 import { registerSpendingRoutes } from './spending-routes.js';
+import { registerFixedRoutes } from './fixed-routes.js';
 
 export interface AppDeps {
   /** Browser origins allowed by CORS. Native Android requests send no Origin and are unaffected. */
@@ -33,6 +34,8 @@ export interface AppDeps {
    * browser push isn't set up) and how to send to any device. Absent = off.
    */
   push?: { publicKey: string | null; send: PushSender } | null;
+  /** Bearer secret the scheduler sends to /internal/cron/*; absent = those endpoints answer 503. */
+  cronSecret?: string | null;
   /** Error reporter; defaults to console.error. Must not receive request bodies (PII). */
   logError?: (err: unknown) => void;
 }
@@ -92,6 +95,7 @@ export function createApp(deps: AppDeps) {
   registerMemberRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
   registerSpendingRoutes(app, auth, loadUser, { getDb: deps.getDb, now, sendPush: deps.push?.send ?? null });
   registerBudgetRoutes(app, auth, loadUser, { getDb: deps.getDb, now });
+  registerFixedRoutes(app, auth, loadUser, { getDb: deps.getDb, now, sendPush: deps.push?.send ?? null, cronSecret: deps.cronSecret ?? null });
   registerPushRoutes(app, auth, loadUser, { getDb: deps.getDb, now, vapidPublicKey: deps.push?.publicKey ?? null });
 
   // Signed-in user and their households. Creates the user record on first sign-in.
