@@ -1,4 +1,5 @@
 import { ClerkProvider } from '@clerk/expo';
+import { resourceCache } from '@clerk/expo/resource-cache';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
@@ -7,7 +8,7 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppText } from '@/components/app-text';
@@ -21,6 +22,14 @@ import { CLERK_PUBLISHABLE_KEY } from '@/lib/config';
 import { colors, spacing } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/**
+ * Android app: Clerk keeps the signed-in session on the phone, so a fresh
+ * start without a connection still restores it and offline mode can open
+ * (docs/PLAN.md §15). Clerk marks this experimental. The website stays
+ * online-only, so it isn't used there.
+ */
+const CLERK_RESOURCE_CACHE = Platform.OS === 'web' ? undefined : resourceCache;
 
 const navTheme = {
   ...DarkTheme,
@@ -56,7 +65,7 @@ export default function RootLayout() {
   return (
     // Swipe actions on the Spend list need the gesture-handler root.
     <GestureHandlerRootView style={styles.root}>
-      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache} __experimental_resourceCache={CLERK_RESOURCE_CACHE}>
         <HouseholdProvider>
           <ThemeProvider value={navTheme}>
             <ToastProvider>

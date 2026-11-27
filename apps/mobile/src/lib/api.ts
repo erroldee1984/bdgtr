@@ -74,11 +74,14 @@ export async function apiFetch(
   fetchImpl: typeof fetch = fetch,
 ): Promise<unknown> {
   const token = await getToken();
-  if (!token) throw new ApiError(401, 'not_signed_in');
+  // No token can mean signed out, or (Android app) offline with an expired cached
+  // token. Send it anyway: offline, the request fails as a network error, so the
+  // saved copies and the outbox take over; online, the server's 401 means signed out.
   const res = await fetchImpl(`${API_URL}${path}`, {
     ...init,
-    headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` },
+    headers: { ...(init.headers as Record<string, string>), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
+  if (!token && res.status === 401) throw new ApiError(401, 'not_signed_in');
   if (res.status === 204) return null;
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
