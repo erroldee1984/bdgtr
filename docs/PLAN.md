@@ -171,6 +171,16 @@ Step-by-step Cloudflare instructions will come in M0. §13 has the outline.
 - **Each release:** bump `version` in `app.json`; build locally with the production profile (see the local-build recipe: `eas build --local`, `GOOGLE_SERVICES_JSON` path, `ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a`; versionCode auto-increments on EAS); verify the certificate and `google_app_id` with `apksigner`/`aapt2`; `gh release create vX.Y.Z bdgtr.apk` with its SHA-256 and the certificate fingerprint in the notes; then download `releases/latest/download/bdgtr.apk` and compare the SHA-256.
 - **PWA check (M6c):** Chrome's installability check reports no errors (live site and build). The manifest gained `id`, `scope` and long-press shortcuts (Add spend, Spend).
 
+### 2c. Updates without a new APK (over-the-air, from 1.0.2)
+
+The Android app gets changes the way the website does: merge to `main`, and phones pick them up. **EAS Update** (free plan: 1,000 people a month who download an update).
+- **How it reaches phones:** `.github/workflows/app-update.yml` runs after CI passes on `main` and publishes to the `production` channel (`eas update`, with the same `EXPO_PUBLIC_*` values as the production APK; a test keeps them in step). Phones check when bdgtr opens, download in the background (never blocking startup, so offline start is unaffected), and run the update the **next time** it opens. More shows "bdgtr 1.0.2, updated <date>" and, once an update is waiting, **Restart now**.
+- **Only JavaScript and images travel this way.** Native changes (a new native module, permissions, `app.json` plugins, an Expo SDK upgrade) still need a new APK. `runtimeVersion` follows the app `version`, so updates only reach phones on the same version.
+- **Guard:** `scripts/native-fingerprint.mjs` hashes everything native (`@expo/fingerprint`) and compares it with `native-fingerprint.json`, recorded for the released APK. If anything native changed, the workflow **doesn't publish** and its summary says a new APK is needed.
+- **Native release steps:** bump `version` in `app.json` → build and release the APK (§2a) → `node scripts/native-fingerprint.mjs record` and commit `native-fingerprint.json`. Updates resume for the new version.
+- **Needs:** the `EXPO_TOKEN` repository secret (an Expo access token; never in the repo).
+- **Rolling back:** `eas update:republish` an earlier update to the `production` channel, or revert the commit on `main` (the next CI run publishes the reverted code).
+
 ### 2b. Notifications to all household members
 
 When a spend crosses a threshold (§6.3), the API **fans out the alert to every active member of that household**. That includes the person who entered the spend, minus anyone who has muted alerts.
