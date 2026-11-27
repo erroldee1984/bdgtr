@@ -92,6 +92,7 @@ export function CategoryAllocationScreen() {
           <Card>
             {budgets.categories.map((c) => {
               const custom = c.overrideMinor !== null;
+              const automatic = c.kind === 'unbudgeted';
               return (
                 <View key={c.id} style={styles.row} testID="allocation-row">
                   <View style={styles.rowHead}>
@@ -111,7 +112,12 @@ export function CategoryAllocationScreen() {
                   ) : (
                     <>
                       <AppText variant="title">{formatPHP(c.budgetMinor)}</AppText>
-                      {canManage ? (
+                      {automatic ? (
+                        <AppText variant="caption" tone="secondary">
+                          Automatic: what the monthly budget doesn&apos;t give the other categories.
+                        </AppText>
+                      ) : null}
+                      {canManage && !automatic ? (
                         <View style={styles.actions}>
                           <Button
                             label="Edit"

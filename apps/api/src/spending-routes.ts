@@ -29,6 +29,7 @@ import {
   createCategory,
   ensureDefaultCategory,
   findCategory,
+  isUnbudgeted,
   listCategories,
   removeCategory,
   restoreCategory,
@@ -116,6 +117,12 @@ export function registerSpendingRoutes(
     const input = await parseJsonBody(c, UpdateCategoryInputSchema);
     if (!id) return c.json({ error: 'not_found' }, 404);
     const db = await deps.getDb();
+    // The built-in Unbudgeted category keeps its name, and its budget is automatic
+    // (icon and colour can change).
+    const target = await findCategory(db, c.get('household')._id, id);
+    if (target && isUnbudgeted(target) && (input.name !== undefined || input.defaultBudgetMinor !== undefined)) {
+      return c.json({ error: 'protected_category' }, 409);
+    }
     const { doc, error } = await updateCategory(db, c.get('household')._id, id, input, deps.now());
     if (error === 'category_exists') return c.json({ error }, 409);
     if (!doc) return c.json({ error: 'not_found' }, 404);
@@ -130,6 +137,7 @@ export function registerSpendingRoutes(
     const result = await removeCategory(db, c.get('household')._id, id, deps.now());
     if (result === 'not_found') return c.json({ error: 'not_found' }, 404);
     if (result === 'last_category') return c.json({ error: 'last_category' }, 409);
+    if (result === 'protected_category') return c.json({ error: 'protected_category' }, 409);
     return c.body(null, 204);
   });
 

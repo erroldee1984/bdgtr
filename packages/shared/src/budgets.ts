@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { CATEGORY_COLOURS, CATEGORY_ICONS } from './categories.ts';
+import { CATEGORY_COLOURS, CATEGORY_ICONS, CATEGORY_KINDS } from './categories.ts';
 import { YEAR_MONTH_PATTERN } from './dashboard.ts';
 import { MAX_AMOUNT_MINOR } from './money.ts';
 
@@ -45,6 +45,14 @@ export interface Allocation {
 }
 
 /** How much of the total the categories take (the donut, §6.7). */
+/**
+ * The Unbudgeted category's budget: what the month's total doesn't give the
+ * other categories, never below ₱0 (over-allocated → ₱0).
+ */
+export function unbudgetedMinor(totalMinor: number, otherBudgetsMinor: number[]): number {
+  return Math.max(0, totalMinor - otherBudgetsMinor.reduce((s, v) => s + v, 0));
+}
+
 export function allocation(totalMinor: number, categoryBudgetsMinor: number[]): Allocation {
   const allocatedMinor = categoryBudgetsMinor.reduce((sum, v) => sum + v, 0);
   return {
@@ -71,6 +79,8 @@ export const MonthBudgetCategorySchema = z.object({
   overrideMinor: minor.nullable(),
   /** What applies this month. */
   budgetMinor: minor,
+  /** 'unbudgeted': automatic budget (the rest of the month's total), not set by hand. */
+  kind: z.enum(CATEGORY_KINDS).optional(),
 });
 export type MonthBudgetCategory = z.infer<typeof MonthBudgetCategorySchema>;
 
@@ -92,19 +102,39 @@ export function buildMonthBudgets(input: {
   month: string;
   defaultMonthlyBudgetMinor: number;
   monthlyOverrideMinor: number | null;
-  categories: { id: string; name: string; icon: MonthBudgetCategory['icon']; colour: MonthBudgetCategory['colour']; defaultBudgetMinor: number; overrideMinor: number | null }[];
+  categories: {
+    id: string;
+    name: string;
+    icon: MonthBudgetCategory['icon'];
+    colour: MonthBudgetCategory['colour'];
+    defaultBudgetMinor: number;
+    overrideMinor: number | null;
+    kind?: MonthBudgetCategory['kind'];
+  }[];
 }): MonthBudgets {
-  const categories = input.categories
-    .map((c) => ({ ...c, budgetMinor: effectiveBudget(c.defaultBudgetMinor, c.overrideMinor) }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'en-PH'));
   const totalBudgetMinor = effectiveBudget(input.defaultMonthlyBudgetMinor, input.monthlyOverrideMinor);
+  const normal = input.categories
+    .filter((c) => c.kind !== 'unbudgeted')
+    .map((c) => ({ ...c, kind: 'normal' as const, budgetMinor: effectiveBudget(c.defaultBudgetMinor, c.overrideMinor) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'en-PH'));
+  // Unbudgeted gets the rest of the month's total (and of the default), listed last.
+  const unbudgeted = input.categories
+    .filter((c) => c.kind === 'unbudgeted')
+    .map((c) => ({
+      ...c,
+      kind: 'unbudgeted' as const,
+      overrideMinor: null as number | null,
+      defaultBudgetMinor: unbudgetedMinor(input.defaultMonthlyBudgetMinor, normal.map((n) => n.defaultBudgetMinor)),
+      budgetMinor: unbudgetedMinor(totalBudgetMinor, normal.map((n) => n.budgetMinor)),
+    }));
   return {
     month: input.month,
     defaultMonthlyBudgetMinor: input.defaultMonthlyBudgetMinor,
     monthlyOverrideMinor: input.monthlyOverrideMinor,
     totalBudgetMinor,
-    categories,
-    defaults: allocation(input.defaultMonthlyBudgetMinor, categories.map((c) => c.defaultBudgetMinor)),
-    thisMonth: allocation(totalBudgetMinor, categories.map((c) => c.budgetMinor)),
+    categories: [...normal, ...unbudgeted],
+    // "Allocated" = given to categories by hand; the unallocated rest is Unbudgeted's budget.
+    defaults: allocation(input.defaultMonthlyBudgetMinor, normal.map((c) => c.defaultBudgetMinor)),
+    thisMonth: allocation(totalBudgetMinor, normal.map((c) => c.budgetMinor)),
   };
 }

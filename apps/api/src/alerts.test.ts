@@ -75,9 +75,11 @@ async function setup(totalBudgetMinor = 1_000_000, groceriesBudgetMinor = 100_00
   const res = await call('owner', 'POST', '/households', { body: { name: 'Dela Cruz', defaultMonthlyBudgetMinor: totalBudgetMinor } });
   const h = HouseholdResponseSchema.parse(await res.json()).household.id;
   await join(h, 'mem', 'member');
-  const groceries = CategoriesResponseSchema.parse(await (await call('owner', 'GET', '/categories', { householdId: h })).json()).categories[0]!;
-  await call('owner', 'PATCH', `/categories/${groceries.id}`, { householdId: h, body: { defaultBudgetMinor: groceriesBudgetMinor } });
-  return { h, groceries: groceries.id };
+  // New households start with only the built-in Unbudgeted category: add Groceries for the tests.
+  const groceries = CategoryResponseSchema.parse(
+    await (await call('owner', 'POST', '/categories', { householdId: h, body: { name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: groceriesBudgetMinor } })).json(),
+  ).category.id;
+  return { h, groceries };
 }
 
 async function spend(who: string, h: string, categoryId: string, amountMinor: number, extra: Record<string, unknown> = {}) {

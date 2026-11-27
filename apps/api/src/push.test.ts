@@ -1,5 +1,6 @@
 import {
   CategoriesResponseSchema,
+  CategoryResponseSchema,
   CreatedInviteResponseSchema,
   CreateTransactionResponseSchema,
   DeviceResponseSchema,
@@ -122,8 +123,10 @@ async function setup() {
   ).household.id;
   const inv = CreatedInviteResponseSchema.parse(await (await call('owner', 'POST', '/invites', { householdId: h, body: { email: 'mem@example.com', role: 'member' } })).json());
   await call('mem', 'POST', '/invites/accept', { body: { token: inv.token } });
-  const groceries = CategoriesResponseSchema.parse(await (await call('owner', 'GET', '/categories', { householdId: h })).json()).categories[0]!.id;
-  await call('owner', 'PATCH', `/categories/${groceries}`, { householdId: h, body: { defaultBudgetMinor: 100_000 } });
+  // New households start with only the built-in Unbudgeted category: add Groceries for the tests.
+  const groceries = CategoryResponseSchema.parse(
+    await (await call('owner', 'POST', '/categories', { householdId: h, body: { name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: 100_000 } })).json(),
+  ).category.id;
   return { h, groceries };
 }
 const spend = async (who: string, h: string, categoryId: string, amountMinor: number, using = app) => {

@@ -6,7 +6,7 @@ import {
   type CreateCategoryInput,
   manilaDate,
   addDays,
-  DEFAULT_CATEGORY,
+  UNBUDGETED_CATEGORY,
   type UpdateCategoryInput,
 } from '@bdgtr/shared';
 import { type Db, MongoServerError, ObjectId } from 'mongodb';
@@ -25,6 +25,8 @@ export interface CategoryDoc {
   defaultBudgetMinor: number;
   isRemoved: boolean;
   removedAt: Date | null;
+  /** 'unbudgeted' marks the one built-in Unbudgeted category; absent = a normal one. */
+  kind?: 'unbudgeted';
   createdBy: ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +43,13 @@ export async function ensureCategoryIndexes(db: Db): Promise<void> {
       partialFilterExpression: { isRemoved: false },
     },
     { key: { householdId: 1 }, name: 'household' },
+    // Exactly one active Unbudgeted category per household, even if two requests add it at once.
+    {
+      key: { householdId: 1 },
+      unique: true,
+      name: 'one_unbudgeted',
+      partialFilterExpression: { kind: 'unbudgeted', isRemoved: false },
+    },
   ]);
 }
 
@@ -55,6 +64,7 @@ export function toCategory(doc: CategoryDoc, recentUseCount = 0): Category {
     defaultBudgetMinor: doc.defaultBudgetMinor,
     isRemoved: doc.isRemoved,
     recentUseCount,
+    kind: doc.kind === 'unbudgeted' ? 'unbudgeted' : 'normal',
   };
 }
 
@@ -122,18 +132,31 @@ export async function countActiveCategories(db: Db, householdId: ObjectId): Prom
 }
 
 /**
- * A household always has at least one active category: if it has none (a new
- * household, or one from before categories existed), add the default
- * (Groceries). Safe to call concurrently: the unique active-name index lets
- * only one copy in.
+ * Every household has its built-in "Unbudgeted" category (owner's decision;
+ * it replaced the old default "Groceries"). New households start with it;
+ * older ones get it the next time they're opened. An existing active
+ * category already called "Unbudgeted" becomes the built-in one rather than
+ * a duplicate. Safe to call concurrently: unique indexes let only one in.
+ * (It also means a household always has at least one category.)
  */
 export async function ensureDefaultCategory(db: Db, householdId: ObjectId, by: ObjectId, now: Date): Promise<void> {
-  if ((await countActiveCategories(db, householdId)) > 0) return;
+  const coll = db.collection<CategoryDoc>(CATEGORIES);
+  if (await coll.findOne({ householdId, kind: 'unbudgeted', isRemoved: false }, { projection: { _id: 1 } })) return;
   try {
-    await db.collection<CategoryDoc>(CATEGORIES).insertOne(newDoc(householdId, { ...DEFAULT_CATEGORY, defaultBudgetMinor: 0 }, by, now));
+    const named = await coll.updateOne(
+      { householdId, nameKey: categoryNameKey(UNBUDGETED_CATEGORY.name), isRemoved: false },
+      { $set: { kind: 'unbudgeted', updatedAt: now } },
+    );
+    if (named.matchedCount === 1) return;
+    await coll.insertOne({ ...newDoc(householdId, { ...UNBUDGETED_CATEGORY, defaultBudgetMinor: 0 }, by, now), kind: 'unbudgeted' });
   } catch (err) {
     if (!isDuplicateKey(err)) throw err; // someone else just added it
   }
+}
+
+/** The built-in Unbudgeted category can't be removed or renamed, and its budget is automatic. */
+export function isUnbudgeted(doc: Pick<CategoryDoc, 'kind'>): boolean {
+  return doc.kind === 'unbudgeted';
 }
 
 export type UpdateResult = { doc: CategoryDoc | null; error: 'not_found' | 'category_exists' | null };
@@ -173,10 +196,11 @@ export async function removeCategory(
   householdId: ObjectId,
   id: ObjectId,
   now: Date,
-): Promise<'ok' | 'not_found' | 'last_category'> {
+): Promise<'ok' | 'not_found' | 'last_category' | 'protected_category'> {
   const coll = db.collection<CategoryDoc>(CATEGORIES);
   const target = await coll.findOne({ _id: id, householdId, isRemoved: false });
   if (!target) return 'not_found';
+  if (isUnbudgeted(target)) return 'protected_category';
   if ((await countActiveCategories(db, householdId)) <= 1) return 'last_category';
   const res = await coll.updateOne(
     { _id: id, householdId, isRemoved: false },

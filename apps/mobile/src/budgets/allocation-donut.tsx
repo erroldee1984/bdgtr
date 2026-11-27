@@ -19,12 +19,17 @@ export interface DonutCategory {
   name: string;
   colour: string;
   budgetMinor: number;
+  /** 'unbudgeted': the built-in category holding the unallocated rest. */
+  kind?: 'normal' | 'unbudgeted';
 }
 
 /** The donut's words (also what a screen reader hears). */
-export function describeAllocation(a: Allocation, totalMinor: number): string {
+export function describeAllocation(a: Allocation, totalMinor: number, hasUnbudgeted = false): string {
   if (totalMinor <= 0) return `${formatPHP(a.allocatedMinor)} allocated, no total budget set`;
-  const rest = a.unallocatedMinor < 0 ? `over-allocated by ${formatPHP(-a.unallocatedMinor)}` : `${formatPHP(a.unallocatedMinor)} unallocated`;
+  const rest =
+    a.unallocatedMinor < 0
+      ? `over-allocated by ${formatPHP(-a.unallocatedMinor)}`
+      : `${formatPHP(a.unallocatedMinor)} ${hasUnbudgeted ? 'in Unbudgeted' : 'unallocated'}`;
   return `${a.percentAllocated}% of ${formatPHP(totalMinor)} allocated, ${rest}`;
 }
 
@@ -65,9 +70,11 @@ export function AllocationDonut({ allocation, totalMinor, categories }: { alloca
   const over = allocation.unallocatedMinor < 0;
   const parts = slices(categories, totalMinor);
   const legend = categories.filter((c) => c.budgetMinor > 0);
+  // The unallocated rest is the Unbudgeted category's budget (its own slice).
+  const hasUnbudgeted = categories.some((c) => c.kind === 'unbudgeted');
   return (
     <View style={styles.wrap} testID="allocation-donut">
-      <View style={styles.ring} role="img" aria-label={describeAllocation(allocation, totalMinor)}>
+      <View style={styles.ring} role="img" aria-label={describeAllocation(allocation, totalMinor, hasUnbudgeted)}>
         <Svg width={SIZE} height={SIZE} aria-hidden>
           <Circle cx={SIZE / 2} cy={SIZE / 2} r={R} stroke={colors.border} strokeWidth={STROKE} fill="none" />
           {parts.map((p) => {
@@ -100,7 +107,9 @@ export function AllocationDonut({ allocation, totalMinor, categories }: { alloca
       <View style={styles.balance} aria-hidden>
         {over ? <MaterialCommunityIcons name="plus-circle" size={20} color={colors.danger} /> : null}
         <AppText tone={over ? 'danger' : 'secondary'}>
-          {over ? `Over-allocated by ${formatPHP(-allocation.unallocatedMinor)}` : `${formatPHP(allocation.unallocatedMinor)} unallocated`}
+          {over
+            ? `Over-allocated by ${formatPHP(-allocation.unallocatedMinor)}`
+            : `${formatPHP(allocation.unallocatedMinor)} ${hasUnbudgeted ? 'in Unbudgeted' : 'unallocated'}`}
         </AppText>
       </View>
       {legend.length ? (

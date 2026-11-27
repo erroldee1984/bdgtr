@@ -7,7 +7,7 @@ import {
   categoriesForEntry,
   categoryNameKey,
   CreateCategoryInputSchema,
-  DEFAULT_CATEGORY,
+  UNBUDGETED_CATEGORY,
   QUICK_CATEGORY_DEFAULTS,
   UpdateCategoryInputSchema,
 } from './categories.ts';
@@ -56,9 +56,9 @@ describe('UpdateCategoryInputSchema', () => {
 });
 
 describe('default category', () => {
-  it('is Groceries, and a valid category', () => {
-    expect(DEFAULT_CATEGORY.name).toBe('Groceries');
-    expect(CreateCategoryInputSchema.safeParse({ ...DEFAULT_CATEGORY, defaultBudgetMinor: 0 }).success).toBe(true);
+  it('is Unbudgeted (owner’s decision, replacing Groceries), and a valid category', () => {
+    expect(UNBUDGETED_CATEGORY).toEqual({ name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8' });
+    expect(CreateCategoryInputSchema.safeParse({ ...UNBUDGETED_CATEGORY, defaultBudgetMinor: 0 }).success).toBe(true);
   });
 
   it('quick-add defaults ("?" icon, neutral colour, no budget) make a valid category with any name', () => {

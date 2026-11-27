@@ -1,12 +1,4 @@
-import {
-  type Category,
-  CATEGORY_COLOURS,
-  CATEGORY_ICONS,
-  type CategoryColour,
-  type CategoryIcon,
-  can,
-  formatPHP,
-} from '@bdgtr/shared';
+import { type Category, CATEGORY_COLOURS, CATEGORY_ICONS, type CategoryColour, type CategoryIcon, can, formatPHP } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,14 +10,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
-import {
-  ApiError,
-  createCategory,
-  fetchCategories,
-  removeCategory,
-  restoreCategory,
-  updateCategory,
-} from '@/lib/api';
+import { ApiError, createCategory, fetchCategories, removeCategory, restoreCategory, updateCategory } from '@/lib/api';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
 import { budgetText, type CategoryFormErrors, validateCategoryForm } from './category-form';
@@ -167,7 +152,11 @@ export function CategoriesManager() {
                       <View style={styles.flex}>
                         <AppText variant="bodyStrong">{c.name}</AppText>
                         <AppText variant="caption" tone="secondary">
-                          {c.defaultBudgetMinor > 0 ? `Default budget ${formatPHP(c.defaultBudgetMinor)}` : 'No default budget'}
+                          {c.kind === 'unbudgeted'
+                            ? 'Built in: gets whatever the monthly budget doesn’t give the other categories. Can’t be removed.'
+                            : c.defaultBudgetMinor > 0
+                              ? `Default budget ${formatPHP(c.defaultBudgetMinor)}`
+                              : 'No default budget'}
                         </AppText>
                       </View>
                     </View>
@@ -185,9 +174,14 @@ export function CategoriesManager() {
                           <Button label="Cancel" compact onPress={() => setConfirmRemove(null)} />
                         </View>
                       </View>
-                    ) : canManage ? (
+                    ) : canManage && c.kind !== 'unbudgeted' ? (
                       <View style={styles.actions}>
-                        <Button label="Edit" compact accessibilityLabel={`Edit ${c.name}`} onPress={() => setEditing({ mode: 'edit', category: c })} />
+                        <Button
+                          label="Edit"
+                          compact
+                          accessibilityLabel={`Edit ${c.name}`}
+                          onPress={() => setEditing({ mode: 'edit', category: c })}
+                        />
                         {/* A household always keeps at least one category: shown, but disabled on the last one. */}
                         <Button
                           label="Remove"
@@ -203,11 +197,7 @@ export function CategoriesManager() {
                 ))}
               </View>
             )}
-            {canManage && activeCats.length === 1 ? (
-              <AppText variant="caption" tone="secondary">
-                A household needs at least one category. Add another before removing this one.
-              </AppText>
-            ) : null}
+            {/* Unbudgeted is always there, so a household never runs out of categories. */}
           </Card>
 
           {removed.length > 0 ? (

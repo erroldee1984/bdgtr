@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { allocation, buildMonthBudgets, effectiveBudget, isBudgetMonth, MonthBudgetsSchema, SetBudgetInputSchema } from './budgets.ts';
+import { allocation, buildMonthBudgets, unbudgetedMinor, effectiveBudget, isBudgetMonth, MonthBudgetsSchema, SetBudgetInputSchema } from './budgets.ts';
 import { MAX_AMOUNT_MINOR } from './money.ts';
 
 describe('effectiveBudget', () => {
@@ -75,4 +75,39 @@ describe('SetBudgetInputSchema', () => {
 describe('isBudgetMonth', () => {
   it.each(['2000-01', '2026-11', '2099-12'])('accepts %s', (m) => expect(isBudgetMonth(m)).toBe(true));
   it.each(['1999-12', '2100-01', '2026-13', '2026-00', '2026-1', 'default', ''])('refuses %s', (m) => expect(isBudgetMonth(m)).toBe(false));
+});
+
+describe('Unbudgeted (the built-in category)', () => {
+  const cats = [
+    { id: 'u', name: 'Unbudgeted', icon: 'dots-horizontal' as const, colour: '#94A3B8' as const, defaultBudgetMinor: 999, overrideMinor: 5 as number | null, kind: 'unbudgeted' as const },
+    { id: 'g', name: 'Groceries', icon: 'cart' as const, colour: '#4ADE80' as const, defaultBudgetMinor: 1_000_000, overrideMinor: null },
+    { id: 'b', name: 'Bills', icon: 'flash' as const, colour: '#5A94FF' as const, defaultBudgetMinor: 500_000, overrideMinor: 700_000 },
+  ];
+
+  it('unbudgetedMinor: the rest of the total, never below ₱0', () => {
+    expect(unbudgetedMinor(4_000_000, [1_000_000, 500_000])).toBe(2_500_000);
+    expect(unbudgetedMinor(1_000_000, [1_000_000, 500_000])).toBe(0);
+    expect(unbudgetedMinor(0, [])).toBe(0);
+  });
+
+  it('its budget is whatever the month doesn’t give the others (stored values ignored); listed last', () => {
+    const b = buildMonthBudgets({ month: '2026-11', defaultMonthlyBudgetMinor: 4_000_000, monthlyOverrideMinor: null, categories: cats });
+    expect(b.categories.map((c) => [c.name, c.budgetMinor, c.kind])).toEqual([
+      ['Bills', 700_000, 'normal'],
+      ['Groceries', 1_000_000, 'normal'],
+      ['Unbudgeted', 2_300_000, 'unbudgeted'],
+    ]);
+    expect(b.categories.at(-1)).toMatchObject({ overrideMinor: null, defaultBudgetMinor: 2_500_000 }); // the defaults' rest
+  });
+
+  it('"allocated" counts only the others; unallocated = Unbudgeted’s budget', () => {
+    const b = buildMonthBudgets({ month: '2026-11', defaultMonthlyBudgetMinor: 4_000_000, monthlyOverrideMinor: null, categories: cats });
+    expect(b.thisMonth).toEqual({ allocatedMinor: 1_700_000, unallocatedMinor: 2_300_000, percentAllocated: 42 });
+  });
+
+  it('over-allocated: Unbudgeted is ₱0 and the over amount still shows', () => {
+    const b = buildMonthBudgets({ month: '2026-11', defaultMonthlyBudgetMinor: 1_000_000, monthlyOverrideMinor: null, categories: cats });
+    expect(b.categories.at(-1)!.budgetMinor).toBe(0);
+    expect(b.thisMonth.unallocatedMinor).toBe(-700_000);
+  });
 });

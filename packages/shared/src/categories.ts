@@ -65,11 +65,20 @@ export type CategoryColour = (typeof CATEGORY_COLOURS)[number];
  * start with this one, and it's added automatically to any household that has
  * none (e.g. one created before categories existed).
  */
-export const DEFAULT_CATEGORY: { name: string; icon: CategoryIcon; colour: CategoryColour } = {
-  name: 'Groceries',
-  icon: 'cart',
-  colour: '#4ADE80',
+/**
+ * Every household has exactly one "Unbudgeted" category (owner's decision,
+ * replacing the old default "Groceries"). It can't be removed or renamed, and
+ * its budget isn't set by hand: it's whatever the monthly budget doesn't give
+ * the other categories (see unbudgetedMinor in budgets.ts).
+ */
+export const UNBUDGETED_CATEGORY: { name: string; icon: CategoryIcon; colour: CategoryColour } = {
+  name: 'Unbudgeted',
+  icon: 'dots-horizontal',
+  colour: '#94A3B8',
 };
+
+export const CATEGORY_KINDS = ['normal', 'unbudgeted'] as const;
+export type CategoryKind = (typeof CATEGORY_KINDS)[number];
 
 /**
  * "Quick add" from the Add spend screen asks only for a name; the rest starts
@@ -122,6 +131,8 @@ export const CategorySchema = z.object({
   isRemoved: z.boolean(),
   /** Transactions in the last 90 days; the entry screen lists most-used first. */
   recentUseCount: z.number().int().min(0),
+  /** 'unbudgeted' for the built-in Unbudgeted category; absent (older servers) = normal. */
+  kind: z.enum(CATEGORY_KINDS).optional(),
 });
 export type Category = z.infer<typeof CategorySchema>;
 
