@@ -98,7 +98,11 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     if (!householdId) return;
     let alive = true;
     // Kept on the phone too, so a spend can be added offline (docs/PLAN.md §15).
-    fetchWithCache(userId ? cacheName(userId, householdId, 'categories') : null, () => fetchCategories(() => getToken(), householdId), z.array(CategorySchema))
+    fetchWithCache(
+      userId ? cacheName(userId, householdId, 'categories') : null,
+      () => fetchCategories(() => getToken(), householdId),
+      z.array(CategorySchema),
+    )
       .then(({ data: c }) => {
         if (!alive) return;
         setCategories(categoriesForEntry(c));
@@ -110,7 +114,11 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       alive = false;
     };
   }, [getToken, userId, householdId, version]);
-  const reload = () => setVersion((v) => v + 1);
+  // Show the spinner again, so "Try again" visibly does something.
+  const reload = () => {
+    setLoadError(false);
+    setVersion((v) => v + 1);
+  };
 
   const maxDate = useMemo(() => {
     const [y, m, d] = today.split('-').map(Number);
@@ -129,7 +137,12 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       setSaving(true);
       try {
         const { date: d, categoryId: cat, amountMinor, description: desc } = result.input;
-        const { alerts } = await updateTransaction(() => getToken(), householdId, edit, { date: d, categoryId: cat, amountMinor, description: desc ?? null });
+        const { alerts } = await updateTransaction(() => getToken(), householdId, edit, {
+          date: d,
+          categoryId: cat,
+          amountMinor,
+          description: desc ?? null,
+        });
         toast.show({ level: 'near', title: 'Spend updated', body: `${formatPHP(amountMinor)} on ${dateLabel(d)}` });
         for (const a of alerts) toast.show({ level: a.level, title: a.title, body: a.body });
         goBackOrHome();
@@ -184,7 +197,9 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     return (
       <View style={styles.center}>
         <AppText tone="danger" role="alert">
-          {saved === 'missing' ? 'That spend was deleted, or moved to another month.' : "Couldn't load that spend. Check your connection and try again."}
+          {saved === 'missing'
+            ? 'That spend was deleted, or moved to another month.'
+            : "Couldn't load that spend. Check your connection and try again."}
         </AppText>
         <Button label="Back" compact onPress={goBackOrHome} />
       </View>
@@ -202,7 +217,9 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     return (
       <View style={styles.center}>
         <AppText tone="danger" role="alert">
-          Couldn&apos;t load the categories.
+          {outbox.offline
+            ? 'You’re offline, and the categories aren’t saved on this phone yet. Open the app once while online and you can add spends offline after that.'
+            : 'Couldn’t load the categories.'}
         </AppText>
         <Button label="Try again" compact onPress={reload} />
       </View>

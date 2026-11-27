@@ -57,6 +57,7 @@ import { useCallback } from 'react';
 import { ApiError } from './api-error';
 import { API_URL } from './config';
 import { withNetworkRetry } from './retry';
+import { isDeviceOffline, OfflineError, tokenWithin } from '@/offline/network';
 
 export { ApiError };
 
@@ -73,7 +74,10 @@ export async function apiFetch(
   init: RequestInit = {},
   fetchImpl: typeof fetch = fetch,
 ): Promise<unknown> {
-  const token = await getToken();
+  // Known offline (Android app): fail at once so the saved copy shows straight away.
+  if (isDeviceOffline()) throw new OfflineError();
+  // Clerk can retry for minutes offline; don't wait that long for a token.
+  const token = await tokenWithin(getToken);
   // No token can mean signed out, or (Android app) offline with an expired cached
   // token. Send it anyway: offline, the request fails as a network error, so the
   // saved copies and the outbox take over; online, the server's 401 means signed out.

@@ -1,7 +1,7 @@
 import { useAuth, useClerk } from '@clerk/expo';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
@@ -21,7 +21,8 @@ export default function MoreScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const [confirmUnsent, setConfirmUnsent] = useState(false);
-  const unsent = useOutbox().items.length;
+  const { items, offline } = useOutbox();
+  const unsent = items.length;
 
   async function doSignOut() {
     setConfirmUnsent(false);
@@ -42,91 +43,56 @@ export default function MoreScreen() {
 
   return (
     <Screen title="More">
-      <Pressable
-        role="link"
-        accessibilityLabel="Household and members"
-        onPress={() => router.push('/household')}
-        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons name="home-group" size={24} color={colors.primaryLight} aria-hidden />
-        <View style={styles.flex}>
-          <AppText variant="bodyStrong">Household & members</AppText>
-          <AppText variant="caption" tone="secondary">
-            Name, budget, members and invites
-          </AppText>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
-      </Pressable>
-      <Pressable
-        role="link"
-        accessibilityLabel="Categories"
-        onPress={() => router.push('/categories')}
-        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons name="shape-outline" size={24} color={colors.primaryLight} aria-hidden />
-        <View style={styles.flex}>
-          <AppText variant="bodyStrong">Categories</AppText>
-          <AppText variant="caption" tone="secondary">
-            Names, icons, colours and default budgets
-          </AppText>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
-      </Pressable>
-      <Pressable
-        role="link"
-        accessibilityLabel="Budgets"
-        onPress={() => router.push('/budgets')}
-        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons name="wallet-outline" size={24} color={colors.primaryLight} aria-hidden />
-        <View style={styles.flex}>
-          <AppText variant="bodyStrong">Budgets</AppText>
-          <AppText variant="caption" tone="secondary">
-            Monthly budget and how it&apos;s split across categories
-          </AppText>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
-      </Pressable>
-      <Pressable
-        role="link"
-        accessibilityLabel="Fixed transactions"
-        onPress={() => router.push('/fixed')}
-        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons name="calendar-sync-outline" size={24} color={colors.primaryLight} aria-hidden />
-        <View style={styles.flex}>
-          <AppText variant="bodyStrong">Fixed transactions</AppText>
-          <AppText variant="caption" tone="secondary">
-            Rent, bills and other monthly spends, added automatically
-          </AppText>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
-      </Pressable>
-      <Pressable
-        role="link"
-        accessibilityLabel="Settings"
-        onPress={() => router.push('/settings')}
-        style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-      >
-        <MaterialCommunityIcons name="bell-cog-outline" size={24} color={colors.primaryLight} aria-hidden />
-        <View style={styles.flex}>
-          <AppText variant="bodyStrong">Settings</AppText>
-          <AppText variant="caption" tone="secondary">
-            Notifications, muting and your devices
-          </AppText>
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
-      </Pressable>
+      <LinkCard
+        icon="home-group"
+        title="Household & members"
+        label="Household and members"
+        detail="Name, budget, members and invites"
+        href="/household"
+        disabled={offline}
+      />
+      <LinkCard
+        icon="shape-outline"
+        title="Categories"
+        label="Categories"
+        detail="Names, icons, colours and default budgets"
+        href="/categories"
+        disabled={offline}
+      />
+      <LinkCard
+        icon="wallet-outline"
+        title="Budgets"
+        label="Budgets"
+        detail="Monthly budget and how it’s split across categories"
+        href="/budgets"
+      />
+      <LinkCard
+        icon="calendar-sync-outline"
+        title="Fixed transactions"
+        label="Fixed transactions"
+        detail="Rent, bills and other monthly spends, added automatically"
+        href="/fixed"
+        disabled={offline}
+      />
+      <LinkCard
+        icon="bell-cog-outline"
+        title="Settings"
+        label="Settings"
+        detail="Notifications, muting and your devices"
+        href="/settings"
+        disabled={offline}
+      />
       <Pressable
         role="button"
-        accessibilityState={{ busy: signingOut, disabled: signingOut }}
-        disabled={signingOut}
+        accessibilityState={{ busy: signingOut, disabled: signingOut || offline }}
+        accessibilityHint={offline ? 'Needs a connection' : undefined}
+        disabled={signingOut || offline}
         onPress={() => (unsent > 0 ? setConfirmUnsent(true) : void doSignOut())}
         style={({ pressed }) => [styles.signOut, (pressed || signingOut) && styles.pressed]}
       >
         <MaterialCommunityIcons name="logout" size={22} color={colors.danger} aria-hidden />
         <AppText variant="bodyStrong" tone="danger">
-          {signingOut ? 'Signing out…' : 'Sign out'}
+          {signingOut ? 'Signing out…' : offline ? 'Sign out (needs a connection)' : 'Sign out'}
         </AppText>
       </Pressable>
       {signOutError ? (
@@ -153,6 +119,53 @@ export default function MoreScreen() {
         </Dialog>
       ) : null}
     </Screen>
+  );
+}
+
+/**
+ * A row linking to another screen. Online-only screens are disabled while the
+ * phone is offline (docs/PLAN.md §15) and say why in words, not only by fading.
+ */
+function LinkCard({
+  icon,
+  title,
+  label,
+  detail,
+  href,
+  disabled = false,
+}: {
+  icon: ComponentProps<typeof MaterialCommunityIcons>['name'];
+  title: string;
+  label: string;
+  detail: string;
+  href: '/household' | '/categories' | '/budgets' | '/fixed' | '/settings';
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      role="link"
+      accessibilityLabel={label}
+      accessibilityHint={disabled ? 'Needs a connection' : undefined}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={() => router.push(href)}
+      style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+    >
+      <MaterialCommunityIcons name={icon} size={24} color={disabled ? colors.textSecondary : colors.primaryLight} aria-hidden />
+      <View style={styles.flex}>
+        <AppText variant="bodyStrong" tone={disabled ? 'secondary' : undefined}>
+          {title}
+        </AppText>
+        <AppText variant="caption" tone="secondary">
+          {disabled ? 'Needs a connection' : detail}
+        </AppText>
+      </View>
+      {disabled ? (
+        <MaterialCommunityIcons name="wifi-off" size={22} color={colors.textSecondary} aria-hidden />
+      ) : (
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />
+      )}
+    </Pressable>
   );
 }
 
