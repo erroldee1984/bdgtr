@@ -71,6 +71,7 @@ jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: mockSignedIn, userId: 'user_a', getToken: mockGetToken }),
   useClerk: () => ({ signOut: mockSignOut }),
 }));
+jest.mock('@/household/household-context', () => ({ useHousehold: () => ({ state: { status: 'loading' } }) }));
 jest.mock('@/toast/toast', () => ({ useToast: () => ({ show: () => {} }) }));
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -80,8 +81,6 @@ jest.mock('expo-router', () => ({
     return <Text>{`redirect:${href}`}</Text>;
   },
 }));
-jest.mock('@/components/setup-check', () => ({ SetupCheck: () => null }));
-
 
 const METRICS = { frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 

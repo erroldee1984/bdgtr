@@ -17,7 +17,6 @@ import { HouseholdProvider } from '@/household/household-context';
 // One stable object, like Clerk's real useAuth (a new getToken each render would refetch forever).
 const mockAuth = { isLoaded: true, isSignedIn: true, userId: 'user_ana', getToken: async () => 'tok' };
 jest.mock('@clerk/expo', () => ({ useAuth: () => mockAuth }));
-jest.mock('@/lib/api-health', () => ({ checkApiHealthWithRetry: async () => 'connected' }));
 jest.mock('@/lib/storage', () => ({
   getItem: async () => null,
   setItem: async () => {},

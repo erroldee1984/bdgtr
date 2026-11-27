@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { describeAccountError } from '../../components/account-status';
 import { ApiError } from '../api-error';
 import { isRetryableNetworkError, withNetworkRetry } from '../retry';
 
@@ -53,16 +52,5 @@ describe('withNetworkRetry', () => {
   it('does not retry a response that fails schema validation', async () => {
     const zodError = z.object({ a: z.string() }).safeParse({}).error;
     expect(isRetryableNetworkError(zodError)).toBe(false);
-  });
-});
-
-describe('describeAccountError', () => {
-  it.each([
-    [new ApiError(401, 'unauthorized'), 'The server did not accept your sign-in.', '401 unauthorized'],
-    [new ApiError(503, 'auth_not_configured'), 'The server is not set up for sign-in yet.', '503 auth_not_configured'],
-    [new ApiError(500, 'internal_error'), "Couldn't load your account.", '500 internal_error'],
-    [new TypeError('Network request failed'), "Couldn't reach the server to load your account.", 'network'],
-  ])('%s → friendly message and short reason', (err, message, detail) => {
-    expect(describeAccountError(err)).toEqual({ message, detail });
   });
 });
