@@ -11,7 +11,7 @@ import {
   isTooFarAhead,
   manilaDate,
   MAX_CATEGORIES,
-  type TransactionResponse,
+  type UpdateTransactionResponse,
   type TransactionsResponse,
   UpdateCategoryInputSchema,
   UpdateTransactionInputSchema,
@@ -219,9 +219,18 @@ export function registerSpendingRoutes(
       const problem = await categoryProblem(c, db, input.categoryId);
       if (problem) return problem;
     }
-    const updated = await updateTransaction(db, c.get('household')._id, tx!._id, input, deps.now());
+    const now = deps.now();
+    const updated = await updateTransaction(db, c.get('household')._id, tx!._id, input, now);
     if (!updated) return c.json({ error: 'not_found' }, 404);
-    return c.json<TransactionResponse>({ transaction: toTransaction(updated, c.get('user')._id) });
+    // A bigger amount, another category or another month can cross a budget line
+    // like a new spend does: same alerts, to everyone (docs/PLAN.md §6.3).
+    const alerts = await recordCrossings(db, c.get('household'), updated, now);
+    await fanOutAlerts(db, c.get('household'), alerts, deps.sendPush);
+    const cutoff = readCutoff(c.get('membership'));
+    return c.json<UpdateTransactionResponse>({
+      transaction: toTransaction(updated, c.get('user')._id),
+      alerts: alerts.map((a) => toAlert(a, cutoff, null)),
+    });
   });
 
   app.delete('/transactions/:id', ...inHousehold('enter_transaction'), async (c) => {

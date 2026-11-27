@@ -416,6 +416,8 @@ Month switcher. Shows the default monthly budget (editable) and this month's val
   - Since pinning is applied on the device, the month's filtered list is fetched **whole, without pagination**. A household month is a few hundred rows at most. Pinned-first ordering is a pure function in `shared`.
 - Each row shows **Date · Category · Cost**, then a **Pin** icon button and a **Delete** icon button at the right end. These were changed after M4 at the user's request: no "⋯" menu, no long-press or right-click menu, and **no swipe gestures**. The date stays on one line.
 - Tap a row to open a dialog with its description, or "No description"
+- **Editing saved spends (added after M6):** the description dialog has **Edit** for spends the person may change. House Members can edit their own; the House Owner and Co-Owners any (D1). It opens Add spend filled in (`/add?edit=<id>&month=`), and saving sends `PATCH /transactions/:id`. If the spend's category was removed since, it stays offered while editing.
+  - An edit checks the budget thresholds again, like a new spend: the reply includes any new alerts, which are shown as toasts and pushed to members.
 - **Pin icon** toggles the pin, with no confirmation. **Delete icon** asks for confirmation first. There are **no swipe gestures** on rows; both swipes were removed at the user's request.
 - **House Members** see the Delete icon only on rows they entered. Other rows keep an empty slot so the columns line up. Pinning works for everyone.
 - Every icon button has a full spoken label, e.g. "Delete Nov 3, Groceries, ₱500.00", and a 48dp target.

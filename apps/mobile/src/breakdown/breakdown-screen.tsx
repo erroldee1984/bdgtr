@@ -9,6 +9,7 @@ import {
   type Transaction,
 } from '@bdgtr/shared';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
@@ -237,7 +238,23 @@ export function BreakdownScreen() {
           visible
           title={`${nameOf(details)} · ${formatPHP(details.amountMinor)}`}
           onClose={() => setDetails(null)}
-          actions={<Button label="Close" compact onPress={() => setDetails(null)} />}
+          actions={
+            <>
+              {canDelete(details) ? (
+                <Button
+                  label="Edit"
+                  icon="pencil-outline"
+                  compact
+                  onPress={() => {
+                    const id = details.id;
+                    setDetails(null);
+                    router.push({ pathname: '/add', params: { edit: id, month } });
+                  }}
+                />
+              ) : null}
+              <Button label="Close" compact onPress={() => setDetails(null)} />
+            </>
+          }
         >
           <AppText tone="secondary">{shortDate(details.date)}</AppText>
           <AppText tone={details.description ? 'primary' : 'secondary'}>{details.description || 'No description'}</AppText>

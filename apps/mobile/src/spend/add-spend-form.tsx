@@ -1,4 +1,4 @@
-import { CategorySchema, type Category, categoriesForEntry, can } from '@bdgtr/shared';
+import { CategorySchema, type Category, categoriesForEntry, can, formatPHP, type Transaction } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
@@ -13,7 +13,7 @@ import { Button } from '@/components/button';
 import { TextField } from '@/components/text-field';
 import { useHousehold } from '@/household/household-context';
 import { goBackOrHome } from '@/layout/back-button';
-import { ApiError, fetchCategories } from '@/lib/api';
+import { ApiError, fetchCategories, fetchTransactions, updateTransaction } from '@/lib/api';
 import { cacheName, fetchWithCache } from '@/offline/cached';
 import { useOutbox } from '@/offline/outbox-context';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
@@ -52,10 +52,15 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const { today, yesterday } = useMemo(() => quickDates(now()), [now]);
 
   // /add?pending=<clientId>: edit a spend that's still waiting to be sent (Android, offline).
-  const { pending } = useLocalSearchParams<{ pending?: string }>();
+  // /add?edit=<id>&month=YYYY-MM: edit a saved spend (online).
+  const { pending, edit, month: editMonth } = useLocalSearchParams<{ pending?: string; edit?: string; month?: string }>();
   const editing = pending ? outbox.items.find((i) => i.clientId === pending) : undefined;
+  const [saved, setSaved] = useState<Transaction | 'missing' | 'error' | null>(null);
+  const savedTx = saved && typeof saved === 'object' ? saved : null;
+  const prefill = editing?.input ?? savedTx;
   const clientId = useRef(pending ?? Crypto.randomUUID()).current;
   const [categories, setCategories] = useState<Category[] | null>(null);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [version, setVersion] = useState(0);
   const [date, setDate] = useState(today);
@@ -67,15 +72,27 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const [saving, setSaving] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
 
-  // Fill the form from the waiting spend once the outbox has it (adjusting
-  // state while rendering, as React recommends, rather than in an effect).
-  if (editing && !prefilled) {
+  // Fill the form from the spend being edited once it's here (adjusting state
+  // while rendering, as React recommends, rather than in an effect).
+  if (prefill && !prefilled) {
     setPrefilled(true);
-    setDate(editing.input.date);
-    setCategoryId(editing.input.categoryId);
-    setAmount(amountText(editing.input.amountMinor));
-    if (editing.input.description) setDescription(editing.input.description);
+    setDate(prefill.date);
+    setCategoryId(prefill.categoryId);
+    setAmount(amountText(prefill.amountMinor));
+    if (prefill.description) setDescription(prefill.description);
   }
+
+  // A saved spend: fetch its month and find it.
+  useEffect(() => {
+    if (!edit || !householdId || !editMonth) return;
+    let alive = true;
+    fetchTransactions(() => getToken(), householdId, editMonth)
+      .then((txs) => alive && setSaved(txs.find((t) => t.id === edit) ?? 'missing'))
+      .catch(() => alive && setSaved('error'));
+    return () => {
+      alive = false;
+    };
+  }, [edit, editMonth, householdId, getToken]);
 
   useEffect(() => {
     if (!householdId) return;
@@ -85,6 +102,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       .then(({ data: c }) => {
         if (!alive) return;
         setCategories(categoriesForEntry(c));
+        setAllCategories(c);
         setLoadError(false);
       })
       .catch(() => alive && setLoadError(true));
@@ -107,6 +125,31 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       return;
     }
     setErrors({});
+    if (edit && savedTx) {
+      setSaving(true);
+      try {
+        const { date: d, categoryId: cat, amountMinor, description: desc } = result.input;
+        const { alerts } = await updateTransaction(() => getToken(), householdId, edit, { date: d, categoryId: cat, amountMinor, description: desc ?? null });
+        toast.show({ level: 'near', title: 'Spend updated', body: `${formatPHP(amountMinor)} on ${dateLabel(d)}` });
+        for (const a of alerts) toast.show({ level: a.level, title: a.title, body: a.body });
+        goBackOrHome();
+      } catch (err) {
+        const code = err instanceof ApiError ? err.code : '';
+        if (code === 'category_removed' || code === 'category_not_found') {
+          setCategoryId(null);
+          reload();
+        }
+        setServerError(
+          err instanceof ApiError && err.status === 403
+            ? 'You can only edit spends you entered.'
+            : err instanceof ApiError && err.status === 404
+              ? 'That spend was deleted.'
+              : (SERVER_MESSAGES[code] ?? "Couldn't save the change. Check your connection and try again."),
+        );
+        setSaving(false);
+      }
+      return;
+    }
     if (pending) {
       const outcome = await outbox.editPending(pending, result.input);
       if (outcome === 'saved') {
@@ -135,6 +178,24 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       setServerError(SERVER_MESSAGES[code] ?? "Couldn't save. Check your connection and try again; it won't be saved twice.");
       setSaving(false);
     }
+  }
+
+  if (edit && saved !== null && typeof saved !== 'object') {
+    return (
+      <View style={styles.center}>
+        <AppText tone="danger" role="alert">
+          {saved === 'missing' ? 'That spend was deleted, or moved to another month.' : "Couldn't load that spend. Check your connection and try again."}
+        </AppText>
+        <Button label="Back" compact onPress={goBackOrHome} />
+      </View>
+    );
+  }
+  if (edit && saved === null) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading the spend" />
+      </View>
+    );
   }
 
   if (loadError) {
@@ -177,6 +238,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {pending ? <Stack.Screen options={{ title: 'Edit waiting spend' }} /> : null}
+      {edit ? <Stack.Screen options={{ title: 'Edit spend' }} /> : null}
       <View style={styles.section}>
         <TextField
           label="Amount"
@@ -193,7 +255,8 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
       <View style={styles.section}>
         <AppText variant="bodyStrong">Category</AppText>
         <View role="radiogroup" aria-label="Category" style={styles.chips}>
-          {categories.map((c) => {
+          {/* When editing, the spend's own category stays offered even if it was removed since. */}
+          {[...categories, ...allCategories.filter((c) => c.isRemoved && c.id === prefill?.categoryId)].map((c) => {
             const on = categoryId === c.id;
             return (
               <Pressable

@@ -4,6 +4,7 @@ import {
   CategoryResponseSchema,
   CreatedInviteResponseSchema,
   CreateTransactionResponseSchema,
+  UpdateTransactionResponseSchema,
   HouseholdResponseSchema,
 } from '@bdgtr/shared';
 import { type Db, MongoClient, ObjectId } from 'mongodb';
@@ -317,6 +318,27 @@ describe('GET /alerts and POST /alerts/read (negative cases)', () => {
     expect((await app.request('/alerts', { headers: { 'X-Household-Id': h } })).status).toBe(401);
     const other = HouseholdResponseSchema.parse(await (await call('other', 'POST', '/households', { body: { name: 'O', defaultMonthlyBudgetMinor: 0 } })).json()).household.id;
     expect((await alertsOf('other', other)).alerts).toEqual([]);
+  });
+});
+
+describe('editing a spend', () => {
+  it('raising the amount past 90% sends the alert, like a new spend; it is returned and stored', async () => {
+    const { h, groceries } = await setup();
+    const { transaction } = await spend('mem', h, groceries, 50_000);
+    tick();
+    const res = await call('mem', 'PATCH', `/transactions/${transaction.id}`, { householdId: h, body: { amountMinor: 95_000 } });
+    expect(res.status).toBe(200);
+    const body = UpdateTransactionResponseSchema.parse(await res.json());
+    expect(body.transaction.amountMinor).toBe(95_000);
+    expect(body.alerts.map((a) => [a.level, a.categoryId])).toEqual([['near', groceries]]);
+    expect((await alertsOf('owner', h)).alerts).toHaveLength(1);
+  });
+
+  it('a change that crosses nothing returns no alerts', async () => {
+    const { h, groceries } = await setup();
+    const { transaction } = await spend('mem', h, groceries, 10_000);
+    const res = await call('mem', 'PATCH', `/transactions/${transaction.id}`, { householdId: h, body: { description: 'Market' } });
+    expect(UpdateTransactionResponseSchema.parse(await res.json()).alerts).toEqual([]);
   });
 });
 

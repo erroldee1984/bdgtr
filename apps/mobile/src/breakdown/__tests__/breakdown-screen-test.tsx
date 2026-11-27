@@ -2,9 +2,10 @@
 import type { Category, Transaction } from '@bdgtr/shared';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { BreakdownScreen, deleteProblem, listSummary } from '@/breakdown/breakdown-screen';
 import { ApiError } from '@/lib/api-error';
@@ -90,8 +91,12 @@ beforeEach(async () => {
 function Other() {
   return <View />;
 }
+function AddRoute() {
+  const p = useLocalSearchParams<{ edit?: string; month?: string }>();
+  return <Text>{`Edit screen ${p.edit} ${p.month}`}</Text>;
+}
 async function open(month = '2026-11') {
-  await renderRouter({ spend: BreakdownScreen, index: Other }, { initialUrl: `/spend?month=${month}` });
+  await renderRouter({ spend: BreakdownScreen, index: Other, add: AddRoute }, { initialUrl: `/spend?month=${month}` });
   await screen.findByText(/spends? ·|Showing|No spends/);
 }
 const rowLabels = () => screen.getAllByRole('button', { name: /^Nov \d+, / }).map((r) => r.props.accessibilityLabel as string);
@@ -118,6 +123,23 @@ describe('the list', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await fireEvent.press(row(/^Nov 12,/));
     expect(screen.getByText('No description')).toBeTruthy();
+  });
+
+  it('the description dialog has Edit, which opens the spend in the edit screen', async () => {
+    await open();
+    await fireEvent.press(row(/^Nov 3,/));
+    await fireEvent.press(screen.getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByText(`Edit screen ${A.id} 2026-11`)).toBeTruthy();
+  });
+
+  it('House Member: Edit only on spends they entered', async () => {
+    mockRole = 'member';
+    await open();
+    await fireEvent.press(row(/^Nov 10,/)); // someone else's
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+    await fireEvent.press(row(/^Nov 12,/)); // theirs
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
   });
 
   it('an empty month says so', async () => {
