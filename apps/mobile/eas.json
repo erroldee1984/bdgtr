@@ -31,7 +31,7 @@
       "extends": "base",
       "autoIncrement": true,
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://bdgtr-api.erroldee.com",
