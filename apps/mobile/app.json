@@ -2,7 +2,7 @@
   "expo": {
     "name": "bdgtr",
     "slug": "bdgtr",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Household budgeting and expense tracker",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -10,7 +10,7 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#12152B",
     "android": {
-      "package": "com.erroldee.bdgtr",
+      "package": "com.erroldee.bdgtr.app",
       "adaptiveIcon": {
         "backgroundColor": "#161A31",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

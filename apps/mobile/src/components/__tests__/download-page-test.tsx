@@ -23,5 +23,6 @@ describe('Download page', () => {
     expect(screen.getByLabelText('Download bdgtr.apk, the Android app').props.href).toBe(APK_URL);
     expect(screen.getByText(/About 21 MB/)).toBeTruthy();
     expect(screen.queryByText(/The first release is being prepared/)).toBeNull();
+    expect(screen.getByText(/installs as a separate app next to the old one/)).toBeTruthy();
   });
 });

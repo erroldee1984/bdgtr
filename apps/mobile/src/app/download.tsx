@@ -57,6 +57,14 @@ export default function DownloadScreen() {
         </P>
       </Section>
 
+      <Section heading="Had bdgtr before 1.0.1?">
+        <P>
+          Version 1.0.1 is registered with Google under a new name, so it installs as a separate app next to the old one. Open the old app
+          once while online so any spends saved offline are sent, then install 1.0.1, sign in, and uninstall the old one. Your spends and
+          budgets are kept on the server.
+        </P>
+      </Section>
+
       <Section heading="Updating">
         <P>
           Download the latest file from this page and install it over the old one. Your sign-in and settings stay. Spends you saved while
