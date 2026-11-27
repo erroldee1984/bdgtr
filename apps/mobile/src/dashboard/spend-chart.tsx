@@ -1,5 +1,5 @@
 import { barShares, type DashboardCategory, formatPHP } from '@bdgtr/shared';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 

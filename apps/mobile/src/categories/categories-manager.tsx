@@ -1,6 +1,6 @@
 import { type Category, CATEGORY_COLOURS, CATEGORY_ICONS, type CategoryColour, type CategoryIcon, can, formatPHP } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, type ScrollViewInstance, StyleSheet, View } from 'react-native';
 

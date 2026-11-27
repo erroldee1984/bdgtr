@@ -1,6 +1,6 @@
 import { useAuth, useClerk } from '@clerk/expo';
 import { router } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { type ComponentProps, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 

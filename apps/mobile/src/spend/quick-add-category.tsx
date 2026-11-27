@@ -1,6 +1,6 @@
 import { type Category, categoryNameKey, CreateCategoryInputSchema, QUICK_CATEGORY_DEFAULTS } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
