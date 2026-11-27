@@ -61,13 +61,23 @@ describe('apiFetch', () => {
     expect(init.headers).toEqual({ 'X-Household-Id': 'h1', Authorization: 'Bearer t' });
   });
 
-  it('does not call the API at all when signed out', async () => {
-    const fetchImpl = respond(200, {});
+  it('signed out (no token): sent without an Authorization header; the 401 means not signed in', async () => {
+    const fetchImpl = respond(401, { error: 'unauthorized' });
     await expect(apiFetch('/me', async () => null, {}, fetchImpl)).rejects.toMatchObject({
       status: 401,
       code: 'not_signed_in',
     });
-    expect(fetchImpl).not.toHaveBeenCalled();
+    const headers = (fetchImpl.mock.calls[0] as unknown as [string, { headers: Record<string, string> }])[1].headers;
+    expect(headers.Authorization).toBeUndefined(); // never "Bearer null"
+  });
+
+  // Offline (Android): Clerk may have no fresh token. That must look like "offline"
+  // (a network error, so cached copies and the outbox take over), not "signed out".
+  it('no token and no connection: the network error comes through, not "not signed in"', async () => {
+    const fetchImpl = jest.fn(async () => {
+      throw new TypeError('Network request failed');
+    });
+    await expect(apiFetch('/me', async () => null, {}, fetchImpl as unknown as typeof fetch)).rejects.toThrow('Network request failed');
   });
 
   it.each([
@@ -163,10 +173,11 @@ describe('household calls', () => {
     await expect(fetchHousehold(tok, H.id)).rejects.toThrow();
   });
 
-  it('never calls the API when signed out', async () => {
-    serve(200, { household: H });
-    await expect(fetchHousehold(async () => null, H.id)).rejects.toMatchObject({ status: 401 });
-    expect(fetchSpy).not.toHaveBeenCalled();
+  it('signed out: the request carries no token, and the server’s 401 means not signed in', async () => {
+    serve(401, { error: 'unauthorized' });
+    await expect(fetchHousehold(async () => null, H.id)).rejects.toMatchObject({ status: 401, code: 'not_signed_in' });
+    const headers = (fetchSpy.mock.calls[0] as unknown as [string, { headers: Record<string, string> }])[1].headers;
+    expect(headers.Authorization).toBeUndefined();
   });
 });
 

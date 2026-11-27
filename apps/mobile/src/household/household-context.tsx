@@ -1,10 +1,11 @@
-import type { Household, MeResponse } from '@bdgtr/shared';
+import { type Household, type MeResponse, MeResponseSchema } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { fetchMe } from '@/lib/api';
 import { withNetworkRetry } from '@/lib/retry';
 import { getItem, setItem } from '@/lib/storage';
+import { fetchWithCache } from '@/offline/cached';
 
 import { activeHouseholdKey, chooseActiveHousehold } from './choose-active';
 
@@ -55,7 +56,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const fetchState = useCallback(
     async (forUser: string, preferId?: string): Promise<State> => {
       try {
-        const me = await withNetworkRetry(() => fetchMe(() => getToken()));
+        // The Android app keeps the last list, so an offline start still knows your
+        // households (docs/PLAN.md §15). One quick retry only: offline it shouldn't wait.
+        const { data: me } = await fetchWithCache(
+          `cache:${forUser}:me`,
+          () => withNetworkRetry(() => fetchMe(() => getToken()), { delaysMs: [1000] }),
+          MeResponseSchema,
+        );
         const stored = preferId ?? (await getItem(activeHouseholdKey(forUser)));
         const activeId = chooseActiveHousehold(me.memberships, stored);
         if (activeId) await setItem(activeHouseholdKey(forUser), activeId);
