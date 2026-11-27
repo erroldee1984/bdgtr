@@ -8,9 +8,9 @@ import MoreScreen from '@/app/(tabs)/more';
 import { HouseholdSwitcher } from '@/household/household-switcher';
 
 const mockSwitchTo = jest.fn();
-let mockHousehold: { active: unknown; memberships: unknown[] };
+let mockHousehold: { active: unknown; memberships: unknown[]; state?: unknown };
 jest.mock('@/household/household-context', () => ({
-  useHousehold: () => ({ ...mockHousehold, switchTo: mockSwitchTo }),
+  useHousehold: () => ({ state: { status: 'loading' }, ...mockHousehold, switchTo: mockSwitchTo }),
 }));
 const mockSignOut = jest.fn();
 const mockAuth = { getToken: async () => 't' };
@@ -23,8 +23,6 @@ let mockUnsent: unknown[] = [];
 jest.mock('@/offline/outbox-context', () => ({ useOutbox: () => ({ items: mockUnsent }) }));
 const mockVaultClear = jest.fn(async () => {});
 jest.mock('@/offline/vault', () => ({ vaultClear: () => mockVaultClear() }));
-// The Setup check card on More has its own tests (account-status-test.tsx).
-jest.mock('@/components/setup-check', () => ({ SetupCheck: () => null }));
 
 const HOME = { householdId: 'h1', householdName: 'Home', role: 'owner' };
 const PARENTS = { householdId: 'h2', householdName: 'Parents', role: 'member' };
@@ -36,10 +34,7 @@ beforeEach(() => {
 });
 
 const renderSwitcher = () =>
-  renderRouter(
-    { index: () => <HouseholdSwitcher />, onboarding: () => <Text>Create household screen</Text> },
-    { initialUrl: '/' },
-  );
+  renderRouter({ index: () => <HouseholdSwitcher />, onboarding: () => <Text>Create household screen</Text> }, { initialUrl: '/' });
 
 describe('HouseholdSwitcher', () => {
   it('shows the active household and lists every household with its role, the active one checked', async () => {
@@ -72,11 +67,20 @@ describe('HouseholdSwitcher', () => {
 });
 
 describe('More screen', () => {
-  const renderMore = () =>
-    renderRouter(
-      { index: MoreScreen, household: () => <Text>Household screen</Text> },
-      { initialUrl: '/' },
-    );
+  const renderMore = () => renderRouter({ index: MoreScreen, household: () => <Text>Household screen</Text> }, { initialUrl: '/' });
+
+  it('says which account is signed in, just above Sign out (was in the old Setup check)', async () => {
+    mockHousehold = { ...mockHousehold, state: { status: 'ready', me: { user: { id: 'u', email: 'ana@example.com' }, memberships: [] } } };
+    await renderMore();
+    expect(screen.getByText('Signed in as ana@example.com')).toBeTruthy();
+    expect(screen.queryByText('Setup check')).toBeNull();
+  });
+
+  it('an account with no email shows no "Signed in as" line', async () => {
+    mockHousehold = { ...mockHousehold, state: { status: 'ready', me: { user: { id: 'u', email: null }, memberships: [] } } };
+    await renderMore();
+    expect(screen.queryByText(/Signed in as/)).toBeNull();
+  });
 
   it('opens Settings', async () => {
     await renderRouter({ index: MoreScreen, settings: () => <Text>Settings screen</Text> }, { initialUrl: '/' });
@@ -104,7 +108,7 @@ describe('More screen', () => {
     await screen.findByText('Household screen');
   });
 
-  it('Sign out first stops this browser getting the account\'s notifications, then signs out', async () => {
+  it("Sign out first stops this browser getting the account's notifications, then signs out", async () => {
     mockOrder.length = 0;
     mockSignOut.mockImplementation(async () => void mockOrder.push('sign-out'));
     await renderMore();
@@ -153,9 +157,7 @@ describe('More screen', () => {
     mockSignOut.mockRejectedValueOnce(new TypeError('Network request failed'));
     await renderMore();
     await fireEvent.press(screen.getByText('Sign out'));
-    await waitFor(() =>
-      expect(screen.getByText("Couldn't sign out. Check your connection and try again.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText("Couldn't sign out. Check your connection and try again.")).toBeTruthy());
     await fireEvent.press(screen.getByText('Sign out'));
     expect(mockSignOut).toHaveBeenCalledTimes(2);
   });

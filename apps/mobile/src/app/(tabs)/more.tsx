@@ -6,10 +6,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Screen } from '@/components/screen';
-import { SetupCheck } from '@/components/setup-check';
 import { clearAllPins } from '@/breakdown/pins';
 import { Button } from '@/components/button';
 import { Dialog } from '@/components/dialog';
+import { useHousehold } from '@/household/household-context';
 import { forgetPushOnSignOut } from '@/notifications/device-push';
 import { useOutbox } from '@/offline/outbox-context';
 import { vaultClear } from '@/offline/vault';
@@ -22,6 +22,8 @@ export default function MoreScreen() {
   const [signOutError, setSignOutError] = useState(false);
   const [confirmUnsent, setConfirmUnsent] = useState(false);
   const { items, offline } = useOutbox();
+  const { state } = useHousehold();
+  const email = state.status === 'ready' ? state.me.user.email : null;
   const unsent = items.length;
 
   async function doSignOut() {
@@ -82,6 +84,7 @@ export default function MoreScreen() {
         href="/settings"
         disabled={offline}
       />
+      {email ? <AppText variant="caption" tone="secondary">{`Signed in as ${email}`}</AppText> : null}
       <Pressable
         role="button"
         accessibilityState={{ busy: signingOut, disabled: signingOut || offline }}
@@ -100,7 +103,6 @@ export default function MoreScreen() {
           Couldn&apos;t sign out. Check your connection and try again.
         </AppText>
       ) : null}
-      <SetupCheck />
       {confirmUnsent ? (
         <Dialog
           visible
