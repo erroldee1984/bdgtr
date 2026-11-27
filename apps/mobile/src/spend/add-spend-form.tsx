@@ -61,7 +61,6 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
   const [date, setDate] = useState(today);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
-  const [showDescription, setShowDescription] = useState(false);
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<SpendFormErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -75,10 +74,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
     setDate(editing.input.date);
     setCategoryId(editing.input.categoryId);
     setAmount(amountText(editing.input.amountMinor));
-    if (editing.input.description) {
-      setShowDescription(true);
-      setDescription(editing.input.description);
-    }
+    if (editing.input.description) setDescription(editing.input.description);
   }
 
   useEffect(() => {
@@ -105,7 +101,7 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
 
   async function save() {
     setServerError(null);
-    const result = validateSpendForm({ date, categoryId, amount, description: showDescription ? description : '' }, clientId, now());
+    const result = validateSpendForm({ date, categoryId, amount, description }, clientId, now());
     if (!result.ok) {
       setErrors(result.errors);
       return;
@@ -255,18 +251,14 @@ export function AddSpendForm({ now = () => new Date() }: { now?: () => Date }) {
         ) : null}
       </View>
 
-      {showDescription ? (
-        <TextField
-          label="Description (optional)"
-          value={description}
-          onChangeText={setDescription}
-          error={errors.description}
-          maxLength={500}
-          multiline
-        />
-      ) : (
-        <Button compact icon="text" label="Add a description" onPress={() => setShowDescription(true)} />
-      )}
+      <TextField
+        label="Description (optional)"
+        value={description}
+        onChangeText={setDescription}
+        error={errors.description}
+        maxLength={500}
+        returnKeyType="done"
+      />
 
       {serverError ? (
         <AppText tone="danger" role="alert">
