@@ -2,7 +2,7 @@
 import { screen } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
-import DownloadScreen, { APK_AVAILABLE, APK_URL } from '@/app/download';
+import DownloadScreen, { APK_URL } from '@/app/download';
 
 describe('Download page', () => {
   it('points at the newest GitHub release asset named exactly bdgtr.apk', () => {
@@ -18,13 +18,10 @@ describe('Download page', () => {
     expect(screen.getByText(/Offline mode is only in the Android app/)).toBeTruthy();
   });
 
-  it('until the first release exists: no dead download link, says it’s coming', async () => {
+  it('links to the latest GitHub release (v1.0.0 published 28 Nov 2026)', async () => {
     await renderRouter({ index: () => null, download: DownloadScreen }, { initialUrl: '/download' });
-    if (APK_AVAILABLE) {
-      expect(screen.getByLabelText('Download bdgtr.apk, the Android app')).toBeTruthy();
-    } else {
-      expect(screen.queryByLabelText('Download bdgtr.apk, the Android app')).toBeNull();
-      expect(screen.getByText(/The first release is being prepared/)).toBeTruthy();
-    }
+    expect(screen.getByLabelText('Download bdgtr.apk, the Android app').props.href).toBe(APK_URL);
+    expect(screen.getByText(/About 21 MB/)).toBeTruthy();
+    expect(screen.queryByText(/The first release is being prepared/)).toBeNull();
   });
 });
