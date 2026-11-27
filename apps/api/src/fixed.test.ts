@@ -11,7 +11,6 @@ import {
   TransactionsResponseSchema,
 } from '@bdgtr/shared';
 import { type Db, MongoClient, ObjectId } from 'mongodb';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ALERT_CROSSINGS, ALERTS, ensureAlertIndexes } from './alerts.js';
@@ -27,16 +26,17 @@ import { PUSH_SUBSCRIPTIONS, type PushSubscriptionDoc } from './push.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureTransactionIndexes, TRANSACTIONS } from './transactions.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 const keys = makeTestKeys();
 const SECRET = 's'.repeat(40);
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 let clock = new Date('2026-11-25T02:00:00.000Z'); // 25 Nov, 10:00 Manila
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_fixed_test');
   await Promise.all([

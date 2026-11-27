@@ -1,6 +1,5 @@
 import { MeResponseSchema } from '@bdgtr/shared';
 import { type Db, MongoClient } from 'mongodb';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { VerifyToken } from './auth.js';
@@ -8,16 +7,17 @@ import { createClerkVerifier } from './clerk.js';
 import { createApp } from './create-app.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 const WEB_ORIGIN = 'https://bdgtr.erroldee.com';
 const keys = makeTestKeys();
 
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_test');
   await ensureUserIndexes(db);

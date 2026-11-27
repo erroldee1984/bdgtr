@@ -3,9 +3,8 @@ import { defineConfig } from 'vitest/config';
 // Coverage targets (docs/PLAN.md §11). Enforced by `pnpm test` (which passes --coverage).
 export default defineConfig({
   test: {
-    // Each test file starts its own MongoDB (mongodb-memory-server), which refuses to
-    // start with < 500 MB free where it keeps its files (the OS temp dir). On machines
-    // where /tmp is a small RAM disk (e.g. WSL), 16 at once ran out; 4 at a time fits.
+    // All files share one test MongoDB (vitest.global-setup.ts); 4 at a time keeps
+    // memory modest on small machines and is as fast here.
     maxWorkers: 4,
     globalSetup: ['./vitest.global-setup.ts'],
     coverage: {
