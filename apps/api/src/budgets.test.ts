@@ -8,7 +8,6 @@ import {
   MonthBudgetsSchema,
 } from '@bdgtr/shared';
 import { type Db, MongoClient } from 'mongodb';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ALERT_CROSSINGS, ALERTS, ensureAlertIndexes } from './alerts.js';
@@ -21,15 +20,16 @@ import { ensureInviteIndexes, INVITES } from './invites.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureTransactionIndexes, TRANSACTIONS } from './transactions.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 const keys = makeTestKeys();
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 const clock = new Date('2026-11-25T02:00:00.000Z'); // November in Manila
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_budgets_test');
   await Promise.all([

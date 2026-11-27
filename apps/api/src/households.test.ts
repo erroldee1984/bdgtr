@@ -6,7 +6,6 @@ import {
   ValidationErrorSchema,
 } from '@bdgtr/shared';
 import { type Db, MongoClient, ObjectId } from 'mongodb';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createClerkVerifier } from './clerk.js';
@@ -14,14 +13,15 @@ import { createApp } from './create-app.js';
 import { createHouseholdWithOwner, ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 const keys = makeTestKeys();
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_households_test');
   await ensureUserIndexes(db);

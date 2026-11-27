@@ -1,5 +1,4 @@
 import { type Db, MongoClient } from 'mongodb';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createClerkVerifier } from './clerk.js';
@@ -8,15 +7,16 @@ import { ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js
 import { ensureRateLimitIndexes, MAX_READS_PER_WINDOW, MAX_WRITES_PER_WINDOW, RATE_LIMITS, takeRequest } from './rate-limit.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 const keys = makeTestKeys();
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 let clock = new Date('2026-11-26T02:00:30.000Z');
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_rate_test');
   await Promise.all([ensureUserIndexes(db), ensureHouseholdIndexes(db), ensureRateLimitIndexes(db)]);

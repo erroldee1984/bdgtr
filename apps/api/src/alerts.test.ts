@@ -7,7 +7,6 @@ import {
   HouseholdResponseSchema,
 } from '@bdgtr/shared';
 import { type Db, MongoClient, ObjectId } from 'mongodb';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ALERT_CROSSINGS, ALERT_RETENTION_DAYS, ALERTS, ensureAlertIndexes } from './alerts.js';
@@ -19,16 +18,17 @@ import { ensureInviteIndexes, INVITES } from './invites.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureTransactionIndexes, TRANSACTIONS } from './transactions.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 const keys = makeTestKeys();
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 let clock = new Date('2026-11-25T02:00:00.000Z');
 const tick = (ms = 1000) => (clock = new Date(clock.getTime() + ms));
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_alerts_test');
   await Promise.all([

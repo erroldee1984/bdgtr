@@ -11,7 +11,6 @@ import {
   type Role,
 } from '@bdgtr/shared';
 import { type Db, MongoClient, ObjectId } from 'mongodb';
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createClerkVerifier } from './clerk.js';
@@ -20,16 +19,17 @@ import { ensureHouseholdIndexes, HOUSEHOLDS, MEMBERSHIPS } from './households.js
 import { ensureInviteIndexes, hashToken, INVITE_ATTEMPTS, INVITES, MAX_FAILED_ACCEPTS } from './invites.js';
 import { makeTestKeys, signTestToken } from './test-utils/jwt.js';
 import { ensureUserIndexes, USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
 // Transfer ownership uses a transaction, which needs a replica set.
 const keys = makeTestKeys();
-let mongo: MongoMemoryReplSet;
+let mongo: SharedMongo;
 let client: MongoClient;
 let db: Db;
 let clock = new Date('2026-11-25T02:00:00.000Z');
 
 beforeAll(async () => {
-  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+  mongo = await sharedMongo();
   client = await new MongoClient(mongo.getUri()).connect();
   db = client.db('bdgtr_members_test');
   await Promise.all([ensureUserIndexes(db), ensureHouseholdIndexes(db), ensureInviteIndexes(db)]);

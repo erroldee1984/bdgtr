@@ -1,12 +1,21 @@
-import { MongoBinary } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import type { TestProject } from 'vitest/node';
+
+import './src/test-utils/mongo.js'; // the ProvidedContext type for 'mongoUri'
 
 /**
- * Downloads the MongoDB test binary once, before any test file starts.
- * Regression (M5b, CI): with a cold cache, several test files started their
- * own MongoMemoryServer at once and raced over the download's lock file
- * ("UnableToUnlockLockfileError: Cannot unlock file …/mongodb-binaries/8.2.6.lock"),
- * failing CI at random.
+ * Starts ONE MongoDB (a single-node replica set, so transactions work) for all
+ * API test files; each file uses its own database name on it.
+ *
+ * Regressions (CI on main, random): when every file started its own server,
+ * (1) with a cold cache they raced over the binary download's lock file
+ * ("UnableToUnlockLockfileError"), and (2) two servers picked the same free
+ * port at once ("Port … already in use"). One server avoids both.
  */
-export default async function setup(): Promise<void> {
-  await MongoBinary.getPath();
+export default async function setup(project: TestProject): Promise<() => Promise<void>> {
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+  project.provide('mongoUri', mongo.getUri());
+  return async () => {
+    await mongo.stop();
+  };
 }

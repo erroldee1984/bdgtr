@@ -1,15 +1,15 @@
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { getAppDb } from './app-db.js';
 import { closeDb, getDb, pingDb } from './db.js';
 import { MEMBERSHIPS } from './households.js';
 import { USERS } from './users.js';
+import { sharedMongo, type SharedMongo } from './test-utils/mongo.js';
 
-let mongo: MongoMemoryServer;
+let mongo: SharedMongo;
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await sharedMongo();
 }, 120_000);
 
 afterEach(async () => {
