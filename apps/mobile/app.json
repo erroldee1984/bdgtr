@@ -2,7 +2,7 @@
   "expo": {
     "name": "bdgtr",
     "slug": "bdgtr",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Household budgeting and expense tracker",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -65,6 +65,16 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#5A94FF",
           "defaultChannel": "budget-alerts"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "useLegacyPackaging": true
+          }
         }
       ]
     ],

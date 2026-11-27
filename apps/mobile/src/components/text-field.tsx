@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useId, useState } from 'react';
 import { StyleSheet, TextInput, type TextInputProps, View } from 'react-native';
 

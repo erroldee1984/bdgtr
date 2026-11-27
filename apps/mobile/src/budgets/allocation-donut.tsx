@@ -1,6 +1,6 @@
 import type { Allocation } from '@bdgtr/shared';
 import { formatPHP } from '@bdgtr/shared';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 

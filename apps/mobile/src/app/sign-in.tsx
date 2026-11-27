@@ -1,5 +1,5 @@
 import { useAuth, useSSO } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as AuthSession from 'expo-auth-session';
 import { Redirect, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';

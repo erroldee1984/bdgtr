@@ -1,6 +1,6 @@
 import { CategorySchema, type Category, categoriesForEntry, can, formatPHP, type Transaction } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Crypto from 'expo-crypto';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';

@@ -1,6 +1,6 @@
 import { can, formatPHP, type MonthBudgetCategory } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 

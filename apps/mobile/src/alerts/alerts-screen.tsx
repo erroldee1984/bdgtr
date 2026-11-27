@@ -1,6 +1,6 @@
 import { type Alert, AlertsResponseSchema } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';

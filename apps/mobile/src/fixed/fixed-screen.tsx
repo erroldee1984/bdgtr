@@ -9,7 +9,7 @@ import {
   yearMonthOf,
 } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Crypto from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
