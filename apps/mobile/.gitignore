@@ -50,3 +50,7 @@ google-services.json
 # Playwright (e2e/a11y) output
 test-results/
 playwright-report/
+
+# EAS keystore download (passwords): never commit
+credentials.json
+credentials/
