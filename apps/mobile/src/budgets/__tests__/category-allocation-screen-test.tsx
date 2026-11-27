@@ -147,7 +147,7 @@ describe('with the built-in Unbudgeted category', () => {
       monthlyOverrideMinor: null,
       categories: [
         { id: 'g', name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: 800_000, overrideMinor: null },
-        { id: 'u', name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8', defaultBudgetMinor: 0, overrideMinor: null, kind: 'unbudgeted' },
+        { id: 'u', name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#FF6B6B', defaultBudgetMinor: 0, overrideMinor: null, kind: 'unbudgeted' },
       ],
     });
 

@@ -117,10 +117,10 @@ export function registerSpendingRoutes(
     const input = await parseJsonBody(c, UpdateCategoryInputSchema);
     if (!id) return c.json({ error: 'not_found' }, 404);
     const db = await deps.getDb();
-    // The built-in Unbudgeted category keeps its name, and its budget is automatic
-    // (icon and colour can change).
+    // The built-in Unbudgeted category keeps its name and its red colour, and its
+    // budget is automatic (only the icon can change).
     const target = await findCategory(db, c.get('household')._id, id);
-    if (target && isUnbudgeted(target) && (input.name !== undefined || input.defaultBudgetMinor !== undefined)) {
+    if (target && isUnbudgeted(target) && (input.name !== undefined || input.colour !== undefined || input.defaultBudgetMinor !== undefined)) {
       return c.json({ error: 'protected_category' }, 409);
     }
     const { doc, error } = await updateCategory(db, c.get('household')._id, id, input, deps.now());

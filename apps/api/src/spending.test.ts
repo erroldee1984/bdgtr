@@ -117,15 +117,24 @@ describe('categories', () => {
     for (const who of ['owner', 'co', 'mem']) expect((await categories(who, h)).some((c) => c.kind === 'unbudgeted')).toBe(true);
   });
 
-  it('Unbudgeted can’t be removed or renamed (409); its icon and colour can change', async () => {
+  it('Unbudgeted is red, and can’t be removed, renamed or recoloured (409); its icon can change', async () => {
     const h = await setup();
     const u = (await categories('owner', h)).find((c) => c.kind === 'unbudgeted')!;
     const del = await call('owner', 'DELETE', `/categories/${u.id}`, { householdId: h });
     expect(del.status).toBe(409);
     expect(await del.json()).toEqual({ error: 'protected_category' });
+    expect(u.colour).toBe('#FF6B6B');
     expect((await call('co', 'PATCH', `/categories/${u.id}`, { householdId: h, body: { name: 'Misc' } })).status).toBe(409);
-    const ok = await call('owner', 'PATCH', `/categories/${u.id}`, { householdId: h, body: { icon: 'cash', colour: '#2DD4BF' } });
-    expect(CategoryResponseSchema.parse(await ok.json()).category).toMatchObject({ name: 'Unbudgeted', icon: 'cash', kind: 'unbudgeted' });
+    expect((await call('owner', 'PATCH', `/categories/${u.id}`, { householdId: h, body: { colour: '#2DD4BF' } })).status).toBe(409);
+    const ok = await call('owner', 'PATCH', `/categories/${u.id}`, { householdId: h, body: { icon: 'cash' } });
+    expect(CategoryResponseSchema.parse(await ok.json()).category).toMatchObject({ name: 'Unbudgeted', icon: 'cash', colour: '#FF6B6B', kind: 'unbudgeted' });
+  });
+
+  it('an Unbudgeted made before it was red is switched to red at start-up', async () => {
+    const h = await setup();
+    await db.collection(CATEGORIES).updateOne({ householdId: new ObjectId(h), kind: 'unbudgeted' }, { $set: { colour: '#94A3B8' } });
+    await ensureCategoryIndexes(db);
+    expect((await categories('owner', h)).find((c) => c.kind === 'unbudgeted')!.colour).toBe('#FF6B6B');
   });
 
   it('an older household gets Unbudgeted added; one already named "Unbudgeted" becomes it (no duplicate)', async () => {

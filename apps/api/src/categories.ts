@@ -51,6 +51,10 @@ export async function ensureCategoryIndexes(db: Db): Promise<void> {
       partialFilterExpression: { kind: 'unbudgeted', isRemoved: false },
     },
   ]);
+  // Unbudgeted's colour is fixed (red, owner's choice): bring any older ones in line. Safe to rerun.
+  await db
+    .collection<CategoryDoc>(CATEGORIES)
+    .updateMany({ kind: 'unbudgeted', colour: { $ne: UNBUDGETED_CATEGORY.colour } }, { $set: { colour: UNBUDGETED_CATEGORY.colour } });
 }
 
 export const isDuplicateKey = (err: unknown) => err instanceof MongoServerError && err.code === 11000;
@@ -145,7 +149,7 @@ export async function ensureDefaultCategory(db: Db, householdId: ObjectId, by: O
   try {
     const named = await coll.updateOne(
       { householdId, nameKey: categoryNameKey(UNBUDGETED_CATEGORY.name), isRemoved: false },
-      { $set: { kind: 'unbudgeted', updatedAt: now } },
+      { $set: { kind: 'unbudgeted', colour: UNBUDGETED_CATEGORY.colour, updatedAt: now } },
     );
     if (named.matchedCount === 1) return;
     await coll.insertOne({ ...newDoc(householdId, { ...UNBUDGETED_CATEGORY, defaultBudgetMinor: 0 }, by, now), kind: 'unbudgeted' });
@@ -154,7 +158,7 @@ export async function ensureDefaultCategory(db: Db, householdId: ObjectId, by: O
   }
 }
 
-/** The built-in Unbudgeted category can't be removed or renamed, and its budget is automatic. */
+/** The built-in Unbudgeted category can't be removed, renamed or recoloured, and its budget is automatic. */
 export function isUnbudgeted(doc: Pick<CategoryDoc, 'kind'>): boolean {
   return doc.kind === 'unbudgeted';
 }
