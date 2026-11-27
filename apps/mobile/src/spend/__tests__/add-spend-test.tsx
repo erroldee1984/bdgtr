@@ -165,12 +165,13 @@ describe('Add spend', () => {
     });
   });
 
-  it('Yesterday, and a description when opened', async () => {
+  it('Yesterday, and a description in a single-line field shown straight away', async () => {
     await open();
     await fireEvent.press(await screen.findByText('Yesterday'));
     expect(screen.getByText('Tue, Nov 24, 2026')).toBeTruthy();
-    await fireEvent.press(screen.getByText('Add a description'));
-    await fireEvent.changeText(screen.getByLabelText('Description (optional)'), 'Bus to Makati');
+    const field = screen.getByLabelText('Description (optional)');
+    expect(field.props.multiline).toBeFalsy();
+    await fireEvent.changeText(field, 'Bus to Makati');
     await fillAndSave('50');
     expect(mockCreate.mock.calls[0][2]).toMatchObject({ date: '2026-11-24', amountMinor: 5_000, description: 'Bus to Makati' });
   });

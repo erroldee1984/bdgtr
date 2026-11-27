@@ -153,7 +153,7 @@ export function FixedFormCard({
         value={v.description}
         onChangeText={(description) => set({ description })}
         error={errors.description}
-        multiline
+        returnKeyType="done"
       />
       {problem ? (
         <AppText tone="danger" role="alert">

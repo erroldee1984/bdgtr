@@ -80,7 +80,7 @@ export function CategoryAllocationScreen() {
             <AppText variant="caption" tone="secondary" style={styles.centred}>
               {`Of the ${formatPHP(budgets.totalBudgetMinor)} monthly budget`}
             </AppText>
-            <AllocationDonut allocation={budgets.thisMonth} totalMinor={budgets.totalBudgetMinor} />
+            <AllocationDonut allocation={budgets.thisMonth} totalMinor={budgets.totalBudgetMinor} categories={budgets.categories} />
           </Card>
 
           {message ? (
