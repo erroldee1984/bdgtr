@@ -1,0 +1,70 @@
+name: Android app update
+
+# After CI passes on main, sends the change to the Android app as an
+# over-the-air update (EAS Update, docs/PLAN.md §2c). Phones download it in
+# the background and run it the next time bdgtr opens.
+# Native changes can't go this way: the guard skips publishing and says a new
+# APK release is needed.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Publish update
+    # Only for CI runs on main that passed (workflow_run also fires on failures).
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Publish exactly the commit CI checked.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Native code unchanged since the released APK?
+        id: guard
+        working-directory: apps/mobile
+        run: |
+          if node scripts/native-fingerprint.mjs check; then
+            echo "safe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "### No update sent: native code changed" >> "$GITHUB_STEP_SUMMARY"
+            echo "This change needs a new APK release (bump the version in app.json, build, release, then record the fingerprint). See PLAN §2c." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publish to the production channel
+        if: steps.guard.outputs.safe == 'true'
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # The same public values the production APK is built with (eas.json).
+          EXPO_PUBLIC_API_URL: https://bdgtr-api.erroldee.com
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsuYmRndHIuZXJyb2xkZWUuY29tJA
+          MESSAGE: ${{ github.event.workflow_run.head_commit.message || 'Manual update' }}
+        run: |
+          pnpm --filter @bdgtr/shared build
+          npx eas-cli@latest update --channel production --platform android --environment production \
+            --message "$(printf '%s' "$MESSAGE" | head -n 1 | cut -c1-200)" --non-interactive
+          echo "### Update published to the Android app" >> "$GITHUB_STEP_SUMMARY"

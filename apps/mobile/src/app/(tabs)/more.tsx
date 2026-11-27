@@ -10,6 +10,7 @@ import { clearAllPins } from '@/breakdown/pins';
 import { Button } from '@/components/button';
 import { Dialog } from '@/components/dialog';
 import { useHousehold } from '@/household/household-context';
+import { AppVersion } from '@/updates/app-version';
 import { forgetPushOnSignOut } from '@/notifications/device-push';
 import { useOutbox } from '@/offline/outbox-context';
 import { vaultClear } from '@/offline/vault';
@@ -103,6 +104,7 @@ export default function MoreScreen() {
           Couldn&apos;t sign out. Check your connection and try again.
         </AppText>
       ) : null}
+      <AppVersion />
       {confirmUnsent ? (
         <Dialog
           visible
