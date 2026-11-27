@@ -377,8 +377,8 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore.
 
 **The built-in "Unbudgeted" category (owner's decision after M6; it replaced the default "Groceries"):**
-- Every household has exactly one (`kind: 'unbudgeted'`, "⋯" icon, slate grey). New households start with only this. Older households get it added the next time they're opened, and their existing categories (e.g. Groceries) stay as normal ones. An existing active category named "Unbudgeted" becomes the built-in one rather than a duplicate. A partial unique index allows one active per household.
-- It **can't be removed or renamed** (409 `protected_category`); its icon and colour can change. The app shows "Built in…" instead of Edit/Remove.
+- Every household has exactly one (`kind: 'unbudgeted'`, "⋯" icon, **red** `#FF6B6B`, the owner's choice; older ones are switched to red at start-up). New households start with only this. Older households get it added the next time they're opened, and their existing categories (e.g. Groceries) stay as normal ones. An existing active category named "Unbudgeted" becomes the built-in one rather than a duplicate. A partial unique index allows one active per household.
+- It **can't be removed, renamed or recoloured** (409 `protected_category`); only its icon can change. The app shows "Built in…" instead of Edit/Remove.
 - **Its budget is automatic:** the month's total minus the other active categories' budgets, never below ₱0 (`unbudgetedMinor` in shared). It can't be set by hand: its default (409 `protected_category`) and its month budget (409 `automatic_budget`) are both refused.
 - The same number is used by Budget per Category (listed last, "Automatic"), the dashboard and the budget alerts. On Budget per Category the unallocated rest is drawn as its slice and worded "₱X in Unbudgeted".
 - Spends can be recorded in it like any category.

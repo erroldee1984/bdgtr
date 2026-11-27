@@ -97,7 +97,7 @@ describe('GET /budgets', () => {
     expect(b.categories).toEqual([
       { id: groceries, name: 'Groceries', icon: expect.any(String), colour: expect.any(String), defaultBudgetMinor: 800_000, overrideMinor: null, budgetMinor: 800_000, kind: 'normal' },
       // The built-in Unbudgeted category: the rest of the month's total, listed last.
-      { id: expect.any(String), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8', defaultBudgetMinor: 3_200_000, overrideMinor: null, budgetMinor: 3_200_000, kind: 'unbudgeted' },
+      { id: expect.any(String), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#FF6B6B', defaultBudgetMinor: 3_200_000, overrideMinor: null, budgetMinor: 3_200_000, kind: 'unbudgeted' },
     ]);
     expect(b.thisMonth).toEqual({ allocatedMinor: 800_000, unallocatedMinor: 3_200_000, percentAllocated: 20 });
   });

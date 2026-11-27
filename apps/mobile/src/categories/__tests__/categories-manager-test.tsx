@@ -164,7 +164,7 @@ describe('Categories (House Owner / Co-Owner)', () => {
   it('the built-in Unbudgeted category: explained, with no Edit or Remove (it can’t be removed or renamed)', async () => {
     mockDb = [
       ...mockDb,
-      { id: 'u'.repeat(24), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0, kind: 'unbudgeted' },
+      { id: 'u'.repeat(24), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#FF6B6B', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0, kind: 'unbudgeted' },
     ];
     await open();
     expect(screen.getByText('Unbudgeted')).toBeTruthy();

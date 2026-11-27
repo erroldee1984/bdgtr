@@ -57,7 +57,7 @@ describe('UpdateCategoryInputSchema', () => {
 
 describe('default category', () => {
   it('is Unbudgeted (owner’s decision, replacing Groceries), and a valid category', () => {
-    expect(UNBUDGETED_CATEGORY).toEqual({ name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8' });
+    expect(UNBUDGETED_CATEGORY).toEqual({ name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#FF6B6B' });
     expect(CreateCategoryInputSchema.safeParse({ ...UNBUDGETED_CATEGORY, defaultBudgetMinor: 0 }).success).toBe(true);
   });
 

@@ -67,14 +67,14 @@ export type CategoryColour = (typeof CATEGORY_COLOURS)[number];
  */
 /**
  * Every household has exactly one "Unbudgeted" category (owner's decision,
- * replacing the old default "Groceries"). It can't be removed or renamed, and
+ * replacing the old default "Groceries"). It can't be removed, renamed or recoloured, and
  * its budget isn't set by hand: it's whatever the monthly budget doesn't give
  * the other categories (see unbudgetedMinor in budgets.ts).
  */
 export const UNBUDGETED_CATEGORY: { name: string; icon: CategoryIcon; colour: CategoryColour } = {
   name: 'Unbudgeted',
   icon: 'dots-horizontal',
-  colour: '#94A3B8',
+  colour: '#FF6B6B', // red (owner's choice); fixed: can't be changed
 };
 
 export const CATEGORY_KINDS = ['normal', 'unbudgeted'] as const;
