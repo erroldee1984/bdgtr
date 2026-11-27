@@ -1,6 +1,7 @@
 import type { Alert, CreateTransactionInput } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import NetInfo from '@react-native-community/netinfo';
 import { AppState } from 'react-native';
 
 import { ApiError, createTransaction } from '@/lib/api';
@@ -8,6 +9,7 @@ import { isRetryableNetworkError } from '@/lib/retry';
 import { useToast } from '@/toast/toast';
 
 import { loadOutbox, type OutboxItem, retryDelayMs, saveOutbox } from './outbox';
+import { setDeviceOffline } from './network';
 import { OFFLINE_SUPPORTED } from './vault';
 
 /** A save that doesn't answer in this long is treated as offline and queued. */
@@ -72,7 +74,11 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
   const { isSignedIn, userId, getToken } = useAuth();
   const toast = useToast();
   const [loaded, setLoaded] = useState<{ userId: string; items: OutboxItem[] } | null>(null);
-  const [offline, setOffline] = useState(false);
+  /** The last request couldn't reach the server. */
+  const [requestFailed, setOffline] = useState(false);
+  /** The phone reports no connection (NetInfo). */
+  const [noConnection, setNoConnection] = useState(false);
+  const offline = requestFailed || noConnection;
   const user = OFFLINE_SUPPORTED && isSignedIn && userId ? userId : null;
   const itemsRef = useRef<OutboxItem[]>(NONE);
   const syncing = useRef(false);
@@ -154,6 +160,11 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
     }
   }, [user, write, timeoutMs]);
 
+  const syncRef = useRef(sync);
+  useEffect(() => {
+    syncRef.current = sync;
+  }, [sync]);
+
   // Load this person's outbox, then send what's waiting.
   useEffect(() => {
     if (!user) return;
@@ -168,6 +179,22 @@ export function OutboxProvider({ children, timeoutMs = SAVE_TIMEOUT_MS }: { chil
       alive = false;
     };
   }, [user, sync]);
+
+  // The phone's own connection status (Android app): offline at once, and back
+  // online → clear the failure flag and send what's waiting.
+  useEffect(() => {
+    if (!OFFLINE_SUPPORTED) return;
+    return NetInfo.addEventListener((state) => {
+      const none = state.isConnected === false;
+      setDeviceOffline(none);
+      setNoConnection(none);
+      if (!none) {
+        setOffline(false);
+        failures.current = 0;
+        void syncRef.current();
+      }
+    });
+  }, []);
 
   // Coming back to the app is a good moment to try again.
   useEffect(() => {
