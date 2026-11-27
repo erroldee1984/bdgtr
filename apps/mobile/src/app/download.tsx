@@ -14,11 +14,6 @@ import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
  */
 export const APK_URL = 'https://github.com/erroldee1984/bdgtr/releases/latest/download/bdgtr.apk';
 export const RELEASES_URL = 'https://github.com/erroldee1984/bdgtr/releases';
-/**
- * Flip to true once the first GitHub release with bdgtr.apk is published.
- * Until then the button would lead to GitHub's "not found" page.
- */
-export const APK_AVAILABLE = false;
 
 /** bdgtr.erroldee.com/download (docs/PLAN.md §2a): the Android app and how to install it. Public, no sign-in. */
 export default function DownloadScreen() {
@@ -29,33 +24,22 @@ export default function DownloadScreen() {
         the same account as this website.
       </P>
 
-      {APK_AVAILABLE ? (
-        <>
-          <Link href={APK_URL} style={styles.button} accessibilityLabel="Download bdgtr.apk, the Android app">
-            <View style={styles.buttonInner}>
-              <MaterialCommunityIcons name="download" size={22} color={colors.onPrimary} aria-hidden />
-              <AppText variant="bodyStrong" style={styles.buttonText}>
-                Download bdgtr.apk
-              </AppText>
-            </View>
-          </Link>
-          <AppText variant="caption" tone="secondary">
-            Needs Android 7.0 or newer. About 50–120 MB.{' '}
-            <Link href={RELEASES_URL}>
-              <AppText variant="caption" tone="accent">
-                All versions and checksums
-              </AppText>
-            </Link>
-          </AppText>
-        </>
-      ) : (
-        <View style={styles.soon} role="status">
-          <MaterialCommunityIcons name="progress-clock" size={22} color={colors.primaryLight} aria-hidden />
-          <AppText style={styles.flex}>
-            The first release is being prepared. Check back soon, or use bdgtr in your browser meanwhile.
+      <Link href={APK_URL} style={styles.button} accessibilityLabel="Download bdgtr.apk, the Android app">
+        <View style={styles.buttonInner}>
+          <MaterialCommunityIcons name="download" size={22} color={colors.onPrimary} aria-hidden />
+          <AppText variant="bodyStrong" style={styles.buttonText}>
+            Download bdgtr.apk
           </AppText>
         </View>
-      )}
+      </Link>
+      <AppText variant="caption" tone="secondary">
+        Needs Android 7.0 or newer on a 64-bit phone. About 21 MB.{' '}
+        <Link href={RELEASES_URL}>
+          <AppText variant="caption" tone="accent">
+            All versions and checksums
+          </AppText>
+        </Link>
+      </AppText>
 
       <Section heading="Install it">
         <Bullet marker="1.">Open this page on your Android phone and tap Download bdgtr.apk.</Bullet>
@@ -104,13 +88,4 @@ const styles = StyleSheet.create({
   button: { alignSelf: 'flex-start', borderRadius: radius.button, backgroundColor: colors.primary, marginTop: spacing.sm },
   buttonInner: { minHeight: MIN_TOUCH, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
   buttonText: { color: colors.onPrimary },
-  soon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.card,
-    backgroundColor: colors.surface,
-  },
-  flex: { flex: 1 },
 });

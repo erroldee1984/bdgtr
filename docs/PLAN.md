@@ -164,9 +164,10 @@ Step-by-step Cloudflare instructions will come in M0. §13 has the outline.
 
 **Distribution as built (M6c):**
 - `bdgtr.erroldee.com/download` is a public install guide: numbered steps, Play Protect's "Install anyway", updating, notifications, and the browser alternative.
-- The APK is too big for Cloudflare Pages (25 MB per file; the M4 preview APK was 115 MB), so it's published as a **GitHub Release asset named exactly `bdgtr.apk`**. The page links to `releases/latest/download/bdgtr.apk`.
-- `APK_AVAILABLE` in `src/app/download.tsx` stays `false`, showing "first release is being prepared", until the first release is published.
-- **Each release:** build the APK (production profile), publish a GitHub release with `bdgtr.apk` and its SHA-256 in the notes, then check the download link.
+- The APK is too big for Cloudflare Pages (25 MB per file; the M4 preview APK was 115 MB, and a later APK could pass 25 MB again), so it's published as a **GitHub Release asset named exactly `bdgtr.apk`**. The page links to `releases/latest/download/bdgtr.apk`.
+- **v1.0.0 published 28 Nov 2026** (versionCode 2): 21.4 MB, arm64-v8a only, Android 7.0+ (minSdk 24), signing certificate SHA-256 `2ce0657a…78baa8` (the EAS keystore).
+- **Size:** 44 MB → 21 MB by bundling only the fonts used (56 → 6; a lint rule bans `@expo/vector-icons` and `@expo-google-fonts/*` root imports), R8 minify + resource shrinking, and compressed native libraries (`useLegacyPackaging`: smaller download, slightly larger install).
+- **Each release:** bump `version` in `app.json`; build locally with the production profile (see the local-build recipe: `eas build --local`, `GOOGLE_SERVICES_JSON` path, `ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a`; versionCode auto-increments on EAS); verify the certificate and `google_app_id` with `apksigner`/`aapt2`; `gh release create vX.Y.Z bdgtr.apk` with its SHA-256 and the certificate fingerprint in the notes; then download `releases/latest/download/bdgtr.apk` and compare the SHA-256.
 - **PWA check (M6c):** Chrome's installability check reports no errors (live site and build). The manifest gained `id`, `scope` and long-press shortcuts (Add spend, Spend).
 
 ### 2b. Notifications to all household members
