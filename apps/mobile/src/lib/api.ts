@@ -21,6 +21,9 @@ import {
   type CreateTransactionInput,
   type Transaction,
   TransactionsResponseSchema,
+  type UpdateTransactionInput,
+  type UpdateTransactionResponse,
+  UpdateTransactionResponseSchema,
   type BulkPostInput,
   type BulkPostResponse,
   BulkPostResponseSchema,
@@ -225,6 +228,21 @@ export async function fetchTransactions(getToken: GetToken, householdId: string,
   return TransactionsResponseSchema.parse(
     await apiFetch(`/transactions?month=${encodeURIComponent(month)}`, getToken, inHousehold(householdId)),
   ).transactions;
+}
+
+/**
+ * Changes a saved spend. House Members get 403 for one they didn't enter.
+ * Answers with the changed spend and any budget alerts the change set off.
+ */
+export async function updateTransaction(
+  getToken: GetToken,
+  householdId: string,
+  id: string,
+  input: UpdateTransactionInput,
+): Promise<UpdateTransactionResponse> {
+  return UpdateTransactionResponseSchema.parse(
+    await apiFetch(`/transactions/${encodeURIComponent(id)}`, getToken, inHousehold(householdId, json('PATCH', input))),
+  );
 }
 
 /** Deletes a spend. House Members get 403 for one they didn't enter. */

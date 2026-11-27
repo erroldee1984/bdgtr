@@ -145,6 +145,10 @@ export const CreateTransactionResponseSchema = z.object({
 });
 export type CreateTransactionResponse = z.infer<typeof CreateTransactionResponseSchema>;
 
+/** PATCH /transactions/:id: the changed spend and any budget alerts the change set off. */
+export const UpdateTransactionResponseSchema = CreateTransactionResponseSchema;
+export type UpdateTransactionResponse = CreateTransactionResponse;
+
 export const AlertsResponseSchema = z.object({
   alerts: z.array(AlertSchema),
   unreadCount: z.number().int().min(0),

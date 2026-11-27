@@ -28,7 +28,11 @@ jest.mock('@/toast/toast', () => ({ useToast: () => ({ show: mockShow }) }));
 const mockCategories = jest.fn();
 const mockCreate = jest.fn();
 const mockCreateCategory = jest.fn();
+const mockFetchTxs = jest.fn();
+const mockUpdate = jest.fn();
 jest.mock('@/lib/api', () => ({
+  fetchTransactions: (...a: unknown[]) => mockFetchTxs(...a),
+  updateTransaction: (...a: unknown[]) => mockUpdate(...a),
   createCategory: (...a: unknown[]) => mockCreateCategory(...a),
   ApiError: jest.requireActual('@/lib/api-error').ApiError,
   fetchCategories: (...a: unknown[]) => mockCategories(...a),
@@ -67,6 +71,70 @@ async function fillAndSave(amount = '1,234.50', category = 'Transport') {
 }
 
 describe('Add spend', () => {
+  describe('editing a saved spend (/add?edit=…&month=…)', () => {
+    const saved = {
+      id: 'f'.repeat(24),
+      clientId: '00000000-0000-4000-8000-0000000000ff',
+      date: '2026-11-20',
+      yearMonth: '2026-11',
+      categoryId: 'c'.repeat(24), // "Old": removed since
+      amountMinor: 120_000,
+      description: 'Rice',
+      createdBy: 'u'.repeat(24),
+      isYours: true,
+    };
+    const openEdit = (id = saved.id) =>
+      renderRouter(
+        { index: () => <Text>Dashboard</Text>, add: () => <AddSpendForm now={now} /> },
+        { initialUrl: `/add?edit=${id}&month=2026-11` },
+      );
+    beforeEach(() => {
+      mockFetchTxs.mockReset().mockResolvedValue([saved]);
+      mockUpdate.mockReset().mockResolvedValue({ transaction: saved, alerts: [{ level: 'over', title: 'Over budget · Old', body: 'b' }] });
+    });
+
+    it('opens filled in (its removed category still offered); saving changes it on the server', async () => {
+      await openEdit();
+      const amount = await screen.findByPlaceholderText('0.00');
+      expect(amount.props.value).toBe('1200');
+      expect(screen.getByLabelText('Old')).toBeChecked();
+      expect(screen.getByDisplayValue('Rice')).toBeTruthy();
+      await fireEvent.changeText(amount, '1,350');
+      await fireEvent.press(screen.getByText('Save spend'));
+      await screen.findByText('Dashboard');
+      expect(mockFetchTxs).toHaveBeenCalledWith(expect.any(Function), 'h1', '2026-11');
+      expect(mockUpdate).toHaveBeenCalledWith(expect.any(Function), 'h1', saved.id, {
+        date: '2026-11-20',
+        categoryId: 'c'.repeat(24),
+        amountMinor: 135_000,
+        description: 'Rice',
+      });
+      expect(mockShow.mock.calls.map((c) => c[0].title)).toEqual(['Spend updated', 'Over budget · Old']);
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [new (jest.requireActual('@/lib/api-error').ApiError)(403, 'forbidden'), 'You can only edit spends you entered.'],
+      [new (jest.requireActual('@/lib/api-error').ApiError)(404, 'not_found'), 'That spend was deleted.'],
+      [new TypeError('Network request failed'), "Couldn't save the change. Check your connection and try again."],
+    ])('a refused or failed save explains (%s) and stays', async (err, text) => {
+      mockUpdate.mockRejectedValueOnce(err);
+      await openEdit();
+      await screen.findByPlaceholderText('0.00');
+      await fireEvent.press(screen.getByText('Save spend'));
+      expect(await screen.findByText(text)).toBeTruthy();
+      expect(screen.queryByText('Dashboard')).toBeNull();
+    });
+
+    it('gone meanwhile, or no connection: says so instead of an empty form', async () => {
+      await openEdit('e'.repeat(24));
+      expect(await screen.findByText('That spend was deleted, or moved to another month.')).toBeTruthy();
+      mockFetchTxs.mockRejectedValueOnce(new TypeError('Network request failed'));
+      await openEdit();
+      expect(await screen.findByText("Couldn't load that spend. Check your connection and try again.")).toBeTruthy();
+    });
+  });
+
   describe('editing a spend still waiting to be sent (/add?pending=…)', () => {
     const waiting = {
       clientId: '00000000-0000-4000-8000-00000000abcd',
