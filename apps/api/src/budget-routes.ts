@@ -3,7 +3,7 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { type Db, ObjectId } from 'mongodb';
 
 import { monthBudgets, resetCategoryBudget, resetMonthlyBudget, setCategoryBudget, setMonthlyBudget } from './budgets.js';
-import { type CategoryDoc, ensureDefaultCategory, findCategory } from './categories.js';
+import { type CategoryDoc, ensureDefaultCategory, findCategory, isUnbudgeted } from './categories.js';
 import { type AppVariables, requireHousehold } from './household-routes.js';
 import { parseJsonBody } from './validation.js';
 
@@ -37,6 +37,8 @@ export function registerBudgetRoutes(app: Hono<AppEnv>, auth: MiddlewareHandler<
     const doc = await findCategory(db, c.get('household')._id, new ObjectId(raw));
     if (!doc) return { doc: null, res: c.json({ error: 'not_found' }, 404) };
     if (doc.isRemoved) return { doc: null, res: c.json({ error: 'category_removed' }, 409) };
+    // Unbudgeted's budget is automatic (the rest of the month's total): never set by hand.
+    if (isUnbudgeted(doc)) return { doc: null, res: c.json({ error: 'automatic_budget' }, 409) };
     return { doc, res: null };
   }
 

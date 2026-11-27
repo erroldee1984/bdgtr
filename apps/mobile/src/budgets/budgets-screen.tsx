@@ -27,9 +27,9 @@ export function saveProblem(err: unknown): string {
 }
 
 /** One line about how much of the total the categories take. */
-export function allocationSummary(a: MonthBudgets['thisMonth'], totalMinor: number): string {
+export function allocationSummary(a: MonthBudgets['thisMonth'], totalMinor: number, hasUnbudgeted = false): string {
   if (a.unallocatedMinor < 0) return `Over-allocated by ${formatPHP(-a.unallocatedMinor)}`;
-  return `${formatPHP(a.allocatedMinor)} of ${formatPHP(totalMinor)} allocated · ${formatPHP(a.unallocatedMinor)} unallocated`;
+  return `${formatPHP(a.allocatedMinor)} of ${formatPHP(totalMinor)} allocated · ${formatPHP(a.unallocatedMinor)} ${hasUnbudgeted ? 'in Unbudgeted' : 'unallocated'}`;
 }
 
 export function CustomBadge() {
@@ -183,7 +183,7 @@ export function BudgetsScreen() {
 
           <Pressable
             role="link"
-            accessibilityLabel={`Budget per Category. ${allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor)}`}
+            accessibilityLabel={`Budget per Category. ${allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor, budgets.categories.some((c) => c.kind === 'unbudgeted'))}`}
             onPress={() => router.push({ pathname: '/budgets/categories', params: { month } })}
             style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
           >
@@ -191,7 +191,7 @@ export function BudgetsScreen() {
             <View style={styles.flex}>
               <AppText variant="bodyStrong">Budget per Category</AppText>
               <AppText variant="caption" tone={budgets.thisMonth.unallocatedMinor < 0 ? 'danger' : 'secondary'}>
-                {allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor)}
+                {allocationSummary(budgets.thisMonth, budgets.totalBudgetMinor, budgets.categories.some((c) => c.kind === 'unbudgeted'))}
               </AppText>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textSecondary} aria-hidden />

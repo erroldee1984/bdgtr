@@ -79,7 +79,7 @@ async function setup() {
     );
     expect((await call(who, 'POST', '/invites/accept', { body: { token: inv.token } })).status).toBe(200);
   }
-  // Groceries comes automatically; add a few more for the tests.
+  // Only the built-in Unbudgeted comes automatically; add a few more for the tests.
   for (const [name, icon] of EXTRA_CATEGORIES) {
     const r = await call('owner', 'POST', '/categories', { householdId: h.id, body: { name, icon, colour: '#5A94FF', defaultBudgetMinor: 0 } });
     expect(r.status).toBe(201);
@@ -87,8 +87,8 @@ async function setup() {
   return h.id;
 }
 
-const EXTRA_CATEGORIES = [['Dining out', 'food'], ['Transport', 'car'], ['Others', 'dots-horizontal']] as const;
-/** Groceries + the extras. */
+const EXTRA_CATEGORIES = [['Groceries', 'cart'], ['Dining out', 'food'], ['Transport', 'car'], ['Others', 'dots-horizontal']] as const;
+/** Unbudgeted + the extras. */
 const SETUP_CATEGORY_COUNT = 1 + EXTRA_CATEGORIES.length;
 
 async function categories(who: string, householdId: string) {
@@ -109,12 +109,35 @@ async function spend(who: string, householdId: string, categoryId: string, amoun
 const NEW_CAT = { name: 'Pets', icon: 'paw', colour: '#C084FC', defaultBudgetMinor: 200_000 };
 
 describe('categories', () => {
-  it('a new household starts with just Groceries, visible to every role', async () => {
+  it('a new household starts with just the built-in Unbudgeted category, visible to every role', async () => {
     const res = await call('owner', 'POST', '/households', { body: { name: 'Fresh', defaultMonthlyBudgetMinor: 0 } });
     const fresh = HouseholdResponseSchema.parse(await res.json()).household.id;
-    expect((await categories('owner', fresh)).map((c) => [c.name, c.icon, c.isRemoved])).toEqual([['Groceries', 'cart', false]]);
+    expect((await categories('owner', fresh)).map((c) => [c.name, c.icon, c.isRemoved, c.kind])).toEqual([['Unbudgeted', 'dots-horizontal', false, 'unbudgeted']]);
     const h = await setup();
-    for (const who of ['owner', 'co', 'mem']) expect((await categories(who, h)).some((c) => c.name === 'Groceries')).toBe(true);
+    for (const who of ['owner', 'co', 'mem']) expect((await categories(who, h)).some((c) => c.kind === 'unbudgeted')).toBe(true);
+  });
+
+  it('Unbudgeted can’t be removed or renamed (409); its icon and colour can change', async () => {
+    const h = await setup();
+    const u = (await categories('owner', h)).find((c) => c.kind === 'unbudgeted')!;
+    const del = await call('owner', 'DELETE', `/categories/${u.id}`, { householdId: h });
+    expect(del.status).toBe(409);
+    expect(await del.json()).toEqual({ error: 'protected_category' });
+    expect((await call('co', 'PATCH', `/categories/${u.id}`, { householdId: h, body: { name: 'Misc' } })).status).toBe(409);
+    const ok = await call('owner', 'PATCH', `/categories/${u.id}`, { householdId: h, body: { icon: 'cash', colour: '#2DD4BF' } });
+    expect(CategoryResponseSchema.parse(await ok.json()).category).toMatchObject({ name: 'Unbudgeted', icon: 'cash', kind: 'unbudgeted' });
+  });
+
+  it('an older household gets Unbudgeted added; one already named "Unbudgeted" becomes it (no duplicate)', async () => {
+    const h = await setup();
+    await db.collection(CATEGORIES).deleteMany({ householdId: new ObjectId(h), kind: 'unbudgeted' }); // as before this existed
+    const list = await categories('owner', h);
+    expect(list.filter((c) => c.kind === 'unbudgeted').map((c) => c.name)).toEqual(['Unbudgeted']);
+    expect(list.find((c) => c.name === 'Groceries')).toMatchObject({ kind: 'normal', isRemoved: false }); // kept as a normal category
+
+    await db.collection(CATEGORIES).updateMany({ householdId: new ObjectId(h), kind: 'unbudgeted' }, { $unset: { kind: '' } });
+    const again = await categories('owner', h);
+    expect(again.filter((c) => c.name === 'Unbudgeted').map((c) => c.kind)).toEqual(['unbudgeted']);
   });
 
   it.each(['owner', 'co'])('%s can add, edit, remove and restore', async (who) => {
@@ -191,59 +214,36 @@ describe('categories', () => {
     expect((await call('owner', 'DELETE', `/categories/${c.id}`, { householdId: h })).status).toBe(404);
   });
 
-  it('a household with no active categories gets Groceries automatically when categories or the dashboard load', async () => {
+  it('a household with no categories gets Unbudgeted when categories or the dashboard load', async () => {
     const h = await setup();
     // e.g. a household created before categories existed
     await db.collection(CATEGORIES).deleteMany({ householdId: new ObjectId(h) });
-    expect((await categories('mem', h)).map((c) => c.name)).toEqual(['Groceries']);
+    expect((await categories('mem', h)).map((c) => c.name)).toEqual(['Unbudgeted']);
     await db.collection(CATEGORIES).deleteMany({ householdId: new ObjectId(h) });
     const d = DashboardSchema.parse(await (await call('owner', 'GET', '/dashboard', { householdId: h })).json());
-    expect(d.categories.map((c) => c.name)).toEqual(['Groceries']);
+    expect(d.categories.map((c) => c.name)).toEqual(['Unbudgeted']);
   });
 
-  it('many simultaneous first loads still add Groceries only once', async () => {
+  it('many simultaneous first loads still add Unbudgeted only once', async () => {
     const h = await setup();
     await db.collection(CATEGORIES).deleteMany({ householdId: new ObjectId(h) });
     await Promise.all(['owner', 'co', 'mem', 'owner', 'co'].map((who) => call(who, 'GET', '/categories', { householdId: h })));
     expect(await db.collection(CATEGORIES).countDocuments({ householdId: new ObjectId(h), isRemoved: false })).toBe(1);
   });
 
-  it('only active categories count: a household whose categories are all removed gets Groceries back', async () => {
+  it('only active categories count: a household whose categories are all removed gets Unbudgeted back', async () => {
     const h = await setup();
     await db.collection(CATEGORIES).updateMany({ householdId: new ObjectId(h) }, { $set: { isRemoved: true } });
     const list = await categories('owner', h);
-    expect(list.filter((c) => !c.isRemoved).map((c) => c.name)).toEqual(['Groceries']);
+    expect(list.filter((c) => !c.isRemoved).map((c) => c.name)).toEqual(['Unbudgeted']);
   });
 
-  it('the last active category cannot be removed → 409, and stays', async () => {
+  it('every other category can be removed (even all at once); Unbudgeted always stays', async () => {
     const h = await setup();
-    const all = await categories('owner', h);
-    for (const c of all.slice(1)) expect((await call('owner', 'DELETE', `/categories/${c.id}`, { householdId: h })).status).toBe(204);
-    const last = all[0]!;
-    const res = await call('co', 'DELETE', `/categories/${last.id}`, { householdId: h });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'last_category' });
-    expect((await categories('owner', h)).filter((c) => !c.isRemoved).map((c) => c.id)).toEqual([last.id]);
-    // Once another exists (e.g. restored), it can be removed.
-    expect((await call('owner', 'POST', `/categories/${all[1]!.id}/restore`, { householdId: h })).status).toBe(204);
-    expect((await call('owner', 'DELETE', `/categories/${last.id}`, { householdId: h })).status).toBe(204);
-  });
-
-  // Never zero. In this rare race both may be refused (each sees the other's removal and
-  // undoes its own); the person simply tries again.
-  it('two people removing the last two categories at the same moment: never zero, at least one refused', async () => {
-    const h = await setup();
-    const all = await categories('owner', h);
-    for (const c of all.slice(2)) await call('owner', 'DELETE', `/categories/${c.id}`, { householdId: h });
-    const [a, b] = all;
-    const statuses = (await Promise.all([
-      call('owner', 'DELETE', `/categories/${a!.id}`, { householdId: h }),
-      call('co', 'DELETE', `/categories/${b!.id}`, { householdId: h }),
-    ])).map((r) => r.status);
-    expect(statuses).toContain(409);
-    const left = await db.collection(CATEGORIES).countDocuments({ householdId: new ObjectId(h), isRemoved: false });
-    expect(left).toBeGreaterThanOrEqual(1);
-    expect(left).toBe(2 - statuses.filter((x) => x === 204).length);
+    const others = (await categories('owner', h)).filter((c) => c.kind !== 'unbudgeted');
+    const statuses = (await Promise.all(others.map((c, i) => call(i % 2 ? 'co' : 'owner', 'DELETE', `/categories/${c.id}`, { householdId: h })))).map((r) => r.status);
+    expect(statuses.every((x) => x === 204)).toBe(true);
+    expect((await categories('owner', h)).filter((c) => !c.isRemoved).map((c) => c.name)).toEqual(['Unbudgeted']);
   });
 
   it(`409 at ${MAX_CATEGORIES} categories (removed ones count)`, async () => {
@@ -312,7 +312,7 @@ describe('transactions', () => {
     const { h, food } = await ready();
     const res = await call('owner', 'POST', '/households', { body: { name: 'Second', defaultMonthlyBudgetMinor: 0 } });
     const h2 = HouseholdResponseSchema.parse(await res.json()).household.id;
-    const food2 = (await categories('owner', h2)).find((c) => c.name === 'Groceries')!;
+    const food2 = (await categories('owner', h2)).find((c) => c.kind === 'unbudgeted')!; // a fresh household only has Unbudgeted
     const clientId = uuid();
     expect((await call('owner', 'POST', '/transactions', { householdId: h, body: { clientId, date: '2026-11-25', categoryId: food.id, amountMinor: 1 } })).status).toBe(201);
     expect((await call('owner', 'POST', '/transactions', { householdId: h2, body: { clientId, date: '2026-11-25', categoryId: food2.id, amountMinor: 1 } })).status).toBe(201);

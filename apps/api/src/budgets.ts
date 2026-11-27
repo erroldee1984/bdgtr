@@ -1,4 +1,4 @@
-import { buildMonthBudgets, effectiveBudget, type MonthBudgets } from '@bdgtr/shared';
+import { buildMonthBudgets, effectiveBudget, type MonthBudgets, unbudgetedMinor } from '@bdgtr/shared';
 import { type Db, MongoServerError, type ObjectId } from 'mongodb';
 
 import { CATEGORIES, type CategoryDoc } from './categories.js';
@@ -57,11 +57,16 @@ export async function effectiveBudgets(
   household: HouseholdDoc,
   yearMonth: string,
 ): Promise<{ totalMinor: number; categoryMinor: (category: CategoryDoc) => number }> {
-  const overrides = await monthOverrides(db, household._id, yearMonth);
-  return {
-    totalMinor: effectiveBudget(household.defaultMonthlyBudgetMinor, overrides.total),
-    categoryMinor: (category) => effectiveBudget(category.defaultBudgetMinor, overrides.categories.get(category._id.toHexString())),
-  };
+  const [overrides, active] = await Promise.all([
+    monthOverrides(db, household._id, yearMonth),
+    db.collection<CategoryDoc>(CATEGORIES).find({ householdId: household._id, isRemoved: false }, { projection: { defaultBudgetMinor: 1, kind: 1 } }).toArray(),
+  ]);
+  const totalMinor = effectiveBudget(household.defaultMonthlyBudgetMinor, overrides.total);
+  const own = (c: Pick<CategoryDoc, '_id' | 'defaultBudgetMinor'>) => effectiveBudget(c.defaultBudgetMinor, overrides.categories.get(c._id.toHexString()));
+  // The built-in Unbudgeted category gets what the others don't: one rule for the
+  // dashboard, alerts and Budget per Category (shared unbudgetedMinor).
+  const rest = unbudgetedMinor(totalMinor, active.filter((c) => c.kind !== 'unbudgeted').map(own));
+  return { totalMinor, categoryMinor: (category) => (category.kind === 'unbudgeted' ? rest : own(category)) };
 }
 
 /** Upsert that survives two people saving the same month at once (unique index race). */
@@ -126,6 +131,7 @@ export async function monthBudgets(db: Db, household: HouseholdDoc, yearMonth: s
       colour: c.colour,
       defaultBudgetMinor: c.defaultBudgetMinor,
       overrideMinor: overrides.categories.get(c._id.toHexString()) ?? null,
+      kind: c.kind === 'unbudgeted' ? ('unbudgeted' as const) : ('normal' as const),
     })),
   });
 }

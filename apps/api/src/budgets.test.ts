@@ -72,8 +72,10 @@ async function setup() {
   ).household.id;
   const inv = CreatedInviteResponseSchema.parse(await (await call('owner', 'POST', '/invites', { householdId: h, body: { email: 'mem@example.com', role: 'member' } })).json());
   await call('mem', 'POST', '/invites/accept', { body: { token: inv.token } });
-  const groceries = CategoriesResponseSchema.parse(await (await call('owner', 'GET', '/categories', { householdId: h })).json()).categories[0]!.id;
-  await call('owner', 'PATCH', `/categories/${groceries}`, { householdId: h, body: { defaultBudgetMinor: 800_000 } });
+  // New households start with only the built-in Unbudgeted category: add Groceries for the tests.
+  const groceries = CategoryResponseSchema.parse(
+    await (await call('owner', 'POST', '/categories', { householdId: h, body: { name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: 800_000 } })).json(),
+  ).category.id;
   return { h, groceries };
 }
 const budgets = async (who: string, h: string, month?: string) => {
@@ -93,7 +95,9 @@ describe('GET /budgets', () => {
     const b = await budgets('mem', h);
     expect(b).toMatchObject({ month: '2026-11', defaultMonthlyBudgetMinor: 4_000_000, monthlyOverrideMinor: null, totalBudgetMinor: 4_000_000 });
     expect(b.categories).toEqual([
-      { id: groceries, name: 'Groceries', icon: expect.any(String), colour: expect.any(String), defaultBudgetMinor: 800_000, overrideMinor: null, budgetMinor: 800_000 },
+      { id: groceries, name: 'Groceries', icon: expect.any(String), colour: expect.any(String), defaultBudgetMinor: 800_000, overrideMinor: null, budgetMinor: 800_000, kind: 'normal' },
+      // The built-in Unbudgeted category: the rest of the month's total, listed last.
+      { id: expect.any(String), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8', defaultBudgetMinor: 3_200_000, overrideMinor: null, budgetMinor: 3_200_000, kind: 'unbudgeted' },
     ]);
     expect(b.thisMonth).toEqual({ allocatedMinor: 800_000, unallocatedMinor: 3_200_000, percentAllocated: 20 });
   });
@@ -102,7 +106,7 @@ describe('GET /budgets', () => {
     const { h } = await setup();
     const extra = CategoryResponseSchema.parse(await (await call('owner', 'POST', '/categories', { householdId: h, body: { name: 'Old', icon: 'cart', colour: '#5A94FF', defaultBudgetMinor: 100 } })).json()).category.id;
     await call('owner', 'DELETE', `/categories/${extra}`, { householdId: h });
-    expect((await budgets('owner', h)).categories.map((c) => c.name)).toEqual(['Groceries']);
+    expect((await budgets('owner', h)).categories.map((c) => c.name)).toEqual(['Groceries', 'Unbudgeted']);
   });
 
   it.each(['2026-13', '1999-12', '2100-01', 'nov'])('400 for month %s', async (m) => {
@@ -114,6 +118,44 @@ describe('GET /budgets', () => {
     const { h } = await setup();
     expect((await call('stranger', 'GET', '/budgets', { householdId: h })).status).toBe(404);
     expect((await app.request('/budgets', { headers: { 'X-Household-Id': h } })).status).toBe(401);
+  });
+});
+
+describe('Unbudgeted: automatic budget', () => {
+  const unbudgetedOf = async (h: string, month?: string) => (await budgets('owner', h, month)).categories.find((c) => c.kind === 'unbudgeted')!;
+
+  it('follows the month’s total and the other categories, never below ₱0; dashboard and alerts agree', async () => {
+    const { h, groceries } = await setup(); // ₱40,000; Groceries ₱8,000
+    expect((await unbudgetedOf(h)).budgetMinor).toBe(3_200_000);
+    await call('owner', 'PUT', `/budgets/categories/2026-11/${groceries}`, { householdId: h, body: { budgetMinor: 3_900_000 } });
+    expect((await unbudgetedOf(h)).budgetMinor).toBe(100_000);
+    const dash = await dashboard(h, '2026-11');
+    expect(dash.categories.find((c) => c.name === 'Unbudgeted')!.budgetMinor).toBe(100_000);
+    await call('owner', 'PUT', `/budgets/categories/2026-11/${groceries}`, { householdId: h, body: { budgetMinor: 4_500_000 } });
+    expect((await unbudgetedOf(h)).budgetMinor).toBe(0); // over-allocated
+    expect((await unbudgetedOf(h, '2026-12')).budgetMinor).toBe(3_200_000); // another month: the defaults
+  });
+
+  it('can’t be set by hand: month budget, reset, or its default → 409', async () => {
+    const { h } = await setup();
+    const u = (await unbudgetedOf(h)).id;
+    expect((await call('owner', 'PUT', `/budgets/categories/2026-11/${u}`, { householdId: h, body: { budgetMinor: 1 } })).status).toBe(409);
+    expect((await call('owner', 'DELETE', `/budgets/categories/2026-11/${u}`, { householdId: h })).status).toBe(409);
+    const patch = await call('owner', 'PATCH', `/categories/${u}`, { householdId: h, body: { defaultBudgetMinor: 1 } });
+    expect(patch.status).toBe(409);
+    expect(await patch.json()).toEqual({ error: 'protected_category' });
+  });
+
+  it('spending in Unbudgeted is alerted against its automatic budget', async () => {
+    const { h, groceries } = await setup();
+    await call('owner', 'PUT', `/budgets/categories/2026-11/${groceries}`, { householdId: h, body: { budgetMinor: 3_900_000 } }); // Unbudgeted ₱1,000
+    const u = (await unbudgetedOf(h)).id;
+    const res = await call('owner', 'POST', '/transactions', {
+      householdId: h,
+      body: { clientId: '00000000-0000-4000-8000-0000000000aa', date: '2026-11-25', categoryId: u, amountMinor: 95_000 },
+    });
+    const { alerts } = CreateTransactionResponseSchema.parse(await res.json());
+    expect(alerts.map((a) => [a.level, a.title])).toEqual([['near', 'Nearly at budget · Unbudgeted']]);
   });
 });
 

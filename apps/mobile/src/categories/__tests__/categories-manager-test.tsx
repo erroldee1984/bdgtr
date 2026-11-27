@@ -32,7 +32,7 @@ jest.mock('@/components/screen', () => {
   };
 });
 
-type C = { id: string; name: string; icon: string; colour: string; defaultBudgetMinor: number; isRemoved: boolean; recentUseCount: number };
+type C = { id: string; name: string; icon: string; colour: string; defaultBudgetMinor: number; isRemoved: boolean; recentUseCount: number; kind?: 'normal' | 'unbudgeted' };
 let mockDb: C[];
 let mockFailNext: unknown = null;
 const mockCalls: string[] = [];
@@ -161,16 +161,17 @@ describe('Categories (House Owner / Co-Owner)', () => {
     expect(mockCalls).not.toContain('create');
   });
 
-  it('the last category shows Remove disabled, with an explanation; pressing it does nothing', async () => {
-    mockDb = mockDb.filter((c) => c.name === 'Groceries');
+  it('the built-in Unbudgeted category: explained, with no Edit or Remove (it can’t be removed or renamed)', async () => {
+    mockDb = [
+      ...mockDb,
+      { id: 'u'.repeat(24), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0, kind: 'unbudgeted' },
+    ];
     await open();
-    const remove = screen.getByLabelText('Remove Groceries');
-    expect(remove).toBeDisabled();
-    await fireEvent.press(remove);
-    expect(screen.queryByText(/Remove Groceries\?/)).toBeNull();
-    expect(mockCalls).not.toContain('remove');
-    expect(screen.getByLabelText('Edit Groceries')).toBeTruthy();
-    expect(screen.getByText('A household needs at least one category. Add another before removing this one.')).toBeTruthy();
+    expect(screen.getByText('Unbudgeted')).toBeTruthy();
+    expect(screen.getByText(/^Built in: gets whatever the monthly budget doesn’t give the other categories/)).toBeTruthy();
+    expect(screen.queryByLabelText('Edit Unbudgeted')).toBeNull();
+    expect(screen.queryByLabelText('Remove Unbudgeted')).toBeNull();
+    expect(screen.getByLabelText('Remove Groceries')).not.toBeDisabled(); // the others can go
   });
 
   it('if the server refuses because it would be the last one (someone else removed the other), it says so', async () => {

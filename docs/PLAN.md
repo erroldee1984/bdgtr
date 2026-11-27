@@ -282,8 +282,8 @@ Amounts are `amountMinor: int` in **centavos** (₱1.00 = 100). Household-owned 
 
 **Effective-budget resolution** (pure functions in `shared`):
 - `totalBudget(month) = monthlyBudgets[month] ?? household.defaultMonthlyBudget`
-- `categoryBudget(month, cat) = categoryBudgets[month, cat] ?? category.defaultBudget`
-- `unallocated(month) = totalBudget − Σ categoryBudget`. A negative value means over-allocated, which shows a warning.
+- `categoryBudget(month, cat) = categoryBudgets[month, cat] ?? category.defaultBudget`, except the built-in **Unbudgeted** category: `max(0, totalBudget − Σ the other active categories' budgets)` (§6.4)
+- `unallocated(month) = totalBudget − Σ categoryBudget` (Unbudgeted not counted, so when positive it equals Unbudgeted's budget). A negative value means over-allocated, which shows a warning.
 - `remaining(month) = totalBudget − Σ transactions(month)`
 
 Overrides are stored only when they differ from the default, so editing a default flows into every month that has no override.
@@ -374,7 +374,15 @@ Gradient-arc hero, "Get Started", Google sign-in, then one of: create a househol
 > The check is "what level has spending reached, and has this household had that alert yet this month?" rather than "did this one spend cross the line?", so simultaneous spends that only together cross a line still produce exactly one alert. Only new spends set off alerts (not edits or deletes).
 
 ### 6.4 Categories
-Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore. **A household always has at least one active category:** new households start with **Groceries**, any household found with none gets Groceries added automatically, and the last active category can't be removed (the API refuses with 409 `last_category`; the app shows Remove disabled on it and says why).
+Add, edit (name, icon, colour, default budget) and remove, with confirmation explaining that past transactions keep the category. A "Show removed" toggle allows restore.
+
+**The built-in "Unbudgeted" category (owner's decision after M6; it replaced the default "Groceries"):**
+- Every household has exactly one (`kind: 'unbudgeted'`, "⋯" icon, slate grey). New households start with only this. Older households get it added the next time they're opened, and their existing categories (e.g. Groceries) stay as normal ones. An existing active category named "Unbudgeted" becomes the built-in one rather than a duplicate. A partial unique index allows one active per household.
+- It **can't be removed or renamed** (409 `protected_category`); its icon and colour can change. The app shows "Built in…" instead of Edit/Remove.
+- **Its budget is automatic:** the month's total minus the other active categories' budgets, never below ₱0 (`unbudgetedMinor` in shared). It can't be set by hand: its default (409 `protected_category`) and its month budget (409 `automatic_budget`) are both refused.
+- The same number is used by Budget per Category (listed last, "Automatic"), the dashboard and the budget alerts. On Budget per Category the unallocated rest is drawn as its slice and worded "₱X in Unbudgeted".
+- Spends can be recorded in it like any category.
+- Because it always exists, a household can never run out of categories. The old "last category can't be removed" rule is now never reached.
 
 ### 6.5 Monthly Fixed Transactions
 **As built (M5a):** More → Fixed transactions (`src/fixed/`, route `/fixed`).

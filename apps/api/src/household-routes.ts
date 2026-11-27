@@ -101,7 +101,7 @@ export function registerHouseholdRoutes(app: Hono<AppEnv>, auth: MiddlewareHandl
     }
     const now = deps.now();
     const { household, membership } = await createHouseholdWithOwner(db, me._id, input, now);
-    // Every household always has at least one category; new ones start with Groceries.
+    // Every household has the built-in Unbudgeted category (it used to start with Groceries).
     await ensureDefaultCategory(db, household._id, me._id, now);
     return c.json<HouseholdResponse>({ household: toHousehold(household, membership) }, 201);
   });

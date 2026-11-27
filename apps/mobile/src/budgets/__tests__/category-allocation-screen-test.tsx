@@ -22,7 +22,9 @@ let mockDefaults: Record<string, number>;
 let mockOverrides: Record<string, number>;
 let mockFail: Error | null;
 const mockCalls: string[] = [];
+let mockUnbudgeted: ((month: string) => MonthBudgets) | null = null;
 function mockMonth(month: string): MonthBudgets {
+  if (mockUnbudgeted) return mockUnbudgeted(month);
   return buildMonthBudgets({
     month,
     defaultMonthlyBudgetMinor: mockTotal,
@@ -55,6 +57,7 @@ jest.mock('@/lib/api', () => {
 });
 
 beforeEach(() => {
+  mockUnbudgeted = null;
   mockRole = 'owner';
   mockTotal = 4_000_000;
   mockDefaults = { c1: 800_000, c2: 200_000 };
@@ -133,6 +136,32 @@ describe('Budget per Category', () => {
     expect(screen.queryByText('Edit')).toBeNull();
     expect(screen.queryByText('Reset to default')).toBeNull();
     expect(screen.getByText('Only the House Owner or a Co-Owner can change these.')).toBeTruthy();
+  });
+});
+
+describe('with the built-in Unbudgeted category', () => {
+  const withUnbudgeted = (month: string): MonthBudgets =>
+    buildMonthBudgets({
+      month,
+      defaultMonthlyBudgetMinor: 4_000_000,
+      monthlyOverrideMinor: null,
+      categories: [
+        { id: 'g', name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: 800_000, overrideMinor: null },
+        { id: 'u', name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#94A3B8', defaultBudgetMinor: 0, overrideMinor: null, kind: 'unbudgeted' },
+      ],
+    });
+
+  it('its budget is the rest, marked Automatic, with no Edit or Reset; the ring says "in Unbudgeted"', async () => {
+    mockUnbudgeted = withUnbudgeted;
+    await open();
+    expect(await screen.findByText('Unbudgeted')).toBeTruthy();
+    expect(screen.getByText('₱32,000.00')).toBeTruthy();
+    expect(screen.getByText('Automatic: what the monthly budget doesn\'t give the other categories.')).toBeTruthy();
+    expect(screen.queryByLabelText('Edit Unbudgeted')).toBeNull();
+    expect(screen.getByLabelText('Edit Groceries')).toBeTruthy();
+    expect(screen.getByLabelText('20% of ₱40,000.00 allocated, ₱32,000.00 in Unbudgeted')).toBeTruthy();
+    expect(screen.getByText('₱32,000.00 in Unbudgeted', { includeHiddenElements: true })).toBeTruthy();
+    mockUnbudgeted = null;
   });
 });
 
