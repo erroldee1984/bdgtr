@@ -2,8 +2,9 @@
 /**
  * Guards over-the-air updates (docs/PLAN.md §2c). An update only carries
  * JavaScript and images; it can't change native code. Updates go to phones
- * whose app version matches (runtimeVersion policy "appVersion"), so a native
- * change shipped as an update without a new APK would crash those phones.
+ * whose runtimeVersion matches (set by hand in app.json, so a rebuilt APK with a
+ * new display version keeps getting the same updates), so a native change
+ * shipped as an update without a new APK would crash those phones.
  *
  *   node scripts/native-fingerprint.mjs record   after building a release APK
  *   node scripts/native-fingerprint.mjs check    exit 0: safe to publish an update
@@ -24,21 +25,23 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const recordFile = join(root, 'native-fingerprint.json');
 process.env.GOOGLE_SERVICES_JSON = '/nonexistent/google-services.json';
 
-const version = JSON.parse(readFileSync(join(root, 'app.json'), 'utf8')).expo.version;
+const expo = JSON.parse(readFileSync(join(root, 'app.json'), 'utf8')).expo;
+const { version, runtimeVersion } = expo;
+if (typeof runtimeVersion !== 'string') throw new Error('app.json runtimeVersion must be a plain string (PLAN §2c)');
 const { hash } = await createFingerprintAsync(root, { platforms: ['android'] });
 const mode = process.argv[2];
 
 if (mode === 'record') {
-  writeFileSync(recordFile, `${JSON.stringify({ version, hash }, null, 2)}\n`);
-  console.log(`Recorded native fingerprint for ${version}: ${hash}`);
+  writeFileSync(recordFile, `${JSON.stringify({ runtimeVersion, version, hash }, null, 2)}\n`);
+  console.log(`Recorded native fingerprint for runtime ${runtimeVersion} (APK ${version}): ${hash}`);
 } else if (mode === 'check') {
   const recorded = JSON.parse(readFileSync(recordFile, 'utf8'));
-  if (recorded.version === version && recorded.hash === hash) {
-    console.log(`Native code unchanged since the ${version} APK: safe to publish an update.`);
+  if (recorded.runtimeVersion === runtimeVersion && recorded.hash === hash) {
+    console.log(`Native code unchanged since the ${recorded.version} APK (runtime ${runtimeVersion}): safe to publish an update.`);
   } else {
     console.log(
-      `Native code or app version changed since the ${recorded.version} APK (fingerprint ${hash}, recorded ${recorded.hash}). ` +
-        'An update would not be safe: build and release a new APK (bump "version" in app.json), then run "record".',
+      `Native code or app config changed since the ${recorded.version} APK (fingerprint ${hash}, recorded ${recorded.hash}). ` +
+        'An update would not be safe: build and release a new APK, then run "record". If native code changed, also bump runtimeVersion in app.json.',
     );
     process.exit(1);
   }

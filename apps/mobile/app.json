@@ -2,7 +2,7 @@
   "expo": {
     "name": "bdgtr",
     "slug": "bdgtr",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Household budgeting and expense tracker",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -93,9 +93,7 @@
       }
     },
     "owner": "erroldee1984",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.2",
     "updates": {
       "url": "https://u.expo.dev/29a02e74-ba1c-421f-8a84-f5a96f49a871",
       "checkAutomatically": "ON_LOAD",
