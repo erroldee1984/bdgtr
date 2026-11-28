@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useUnreadAlerts } from '@/alerts/unread-alerts';
+import { useUpdateReady } from '@/updates/update-ready';
 import { AppText } from '@/components/app-text';
 import { usesNavRail, useWindowClass } from '@/layout/window-class';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
@@ -30,7 +31,8 @@ export function AppNav() {
   const windowClass = useWindowClass();
   const rail = usesNavRail(windowClass);
   const insets = useSafeAreaInsets();
-  const unread = useUnreadAlerts().count;
+  // A downloaded app update counts too: its card sits at the top of Alerts.
+  const unread = useUnreadAlerts().count + (useUpdateReady().ready ? 1 : 0);
 
   const tabList = (
     <TabList
@@ -47,12 +49,7 @@ export function AppNav() {
       {rail ? <RailHeader /> : null}
       {NAV_ITEMS.map((item) => (
         <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
-          <NavButton
-            icon={item.icon}
-            label={item.label}
-            orientation={rail ? 'rail' : 'bar'}
-            badge={item.name === 'alerts' ? unread : 0}
-          />
+          <NavButton icon={item.icon} label={item.label} orientation={rail ? 'rail' : 'bar'} badge={item.name === 'alerts' ? unread : 0} />
         </TabTrigger>
       ))}
     </TabList>

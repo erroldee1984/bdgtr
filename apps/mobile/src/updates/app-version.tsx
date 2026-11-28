@@ -1,11 +1,12 @@
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
-import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { Button } from '@/components/button';
 import { spacing } from '@/theme/tokens';
+
+import { useUpdateReady } from './update-ready';
 
 const DAY = new Intl.DateTimeFormat('en-PH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Manila' });
 
@@ -27,25 +28,17 @@ export function AppVersion() {
 }
 
 function NativeAppVersion() {
-  const { currentlyRunning, isUpdatePending } = Updates.useUpdates();
-  const [restarting, setRestarting] = useState(false);
+  const { currentlyRunning } = Updates.useUpdates();
+  const { ready, restarting, restart } = useUpdateReady();
   return (
     <View style={styles.wrap}>
       <AppText variant="caption" tone="secondary">
         {versionText(Constants.expoConfig?.version, currentlyRunning.isEmbeddedLaunch, currentlyRunning.createdAt)}
       </AppText>
-      {isUpdatePending ? (
+      {ready ? (
         <View style={styles.pending} role="status">
           <AppText>An update is ready. It applies the next time you open bdgtr, or restart now.</AppText>
-          <Button
-            label="Restart now"
-            compact
-            busy={restarting}
-            onPress={() => {
-              setRestarting(true);
-              void Updates.reloadAsync().catch(() => setRestarting(false));
-            }}
-          />
+          <Button label="Restart now" compact busy={restarting} onPress={restart} />
         </View>
       ) : null}
     </View>

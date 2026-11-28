@@ -25,6 +25,8 @@ jest.mock('@/layout/window-class', () => ({
 
 /** Simulates the screen width; the width→class mapping itself is tested in window-class-test. */
 let mockUnread = 0;
+let mockUpdateReady = false;
+jest.mock('@/updates/update-ready', () => ({ useUpdateReady: () => ({ ready: mockUpdateReady, restarting: false, restart: () => {} }) }));
 jest.mock('@/alerts/unread-alerts', () => ({ useUnreadAlerts: () => ({ count: mockUnread, refresh: () => {}, clear: () => {} }) }));
 
 function mockWidth(width: number) {
@@ -199,5 +201,14 @@ describe('AppNav', () => {
     expect(screen.getByText('9+', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByLabelText('Alerts, 14 unread')).toBeTruthy();
     mockUnread = 0;
+  });
+
+  it('a downloaded app update counts on the Alerts badge (its card is on that screen)', async () => {
+    mockUnread = 1;
+    mockUpdateReady = true;
+    await renderNav();
+    expect(screen.getByLabelText('Alerts, 2 unread')).toBeTruthy();
+    mockUnread = 0;
+    mockUpdateReady = false;
   });
 });

@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from 'expo-router';
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,10 @@ export interface ToastInput {
   level: 'near' | 'over';
   title: string;
   body: string;
+  /** Replaces the "View" link, e.g. "Restart" for a downloaded app update. */
+  action?: { label: string; onPress: () => void };
+  /** Overrides the level's icon. */
+  icon?: ComponentProps<typeof MaterialCommunityIcons>['name'];
 }
 interface ToastItem extends ToastInput {
   id: number;
@@ -58,10 +62,7 @@ function ToastStack({ items, onDismiss }: { items: ToastItem[]; onDismiss: (id: 
   const wide = usesNavRail(useWindowClass());
   if (items.length === 0) return null;
   return (
-    <View
-      pointerEvents="box-none"
-      style={[styles.stack, wide ? styles.stackWide : styles.stackNarrow, { top: insets.top + spacing.sm }]}
-    >
+    <View pointerEvents="box-none" style={[styles.stack, wide ? styles.stackWide : styles.stackNarrow, { top: insets.top + spacing.sm }]}>
       {items.map((t) => (
         <Toast key={t.id} toast={t} onDismiss={() => onDismiss(t.id)} />
       ))}
@@ -97,7 +98,12 @@ function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }
         aria-live={over ? 'assertive' : 'polite'}
       >
         <View style={styles.titleRow}>
-          <MaterialCommunityIcons name={over ? 'alert' : 'alert-circle-outline'} size={20} color={over ? colors.danger : colors.primaryLight} aria-hidden />
+          <MaterialCommunityIcons
+            name={toast.icon ?? (over ? 'alert' : 'alert-circle-outline')}
+            size={20}
+            color={over ? colors.danger : colors.primaryLight}
+            aria-hidden
+          />
           <AppText variant="bodyStrong" tone={over ? 'danger' : 'primary'} style={styles.flex}>
             {toast.title}
           </AppText>
@@ -105,21 +111,38 @@ function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }
         <AppText>{toast.body}</AppText>
       </View>
       <View style={styles.actions}>
-        <Pressable
-          role="link"
-          accessibilityLabel="View alerts"
-          onFocus={pause}
-          onBlur={resume}
-          onPress={() => {
-            onDismiss();
-            router.push('/alerts');
-          }}
-          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-        >
-          <AppText variant="bodyStrong" tone="accent">
-            View
-          </AppText>
-        </Pressable>
+        {toast.action ? (
+          <Pressable
+            role="button"
+            onFocus={pause}
+            onBlur={resume}
+            onPress={() => {
+              onDismiss();
+              toast.action!.onPress();
+            }}
+            style={({ pressed }) => [styles.action, styles.actionText, pressed && styles.pressed]}
+          >
+            <AppText variant="bodyStrong" tone="accent">
+              {toast.action.label}
+            </AppText>
+          </Pressable>
+        ) : (
+          <Pressable
+            role="link"
+            accessibilityLabel="View alerts"
+            onFocus={pause}
+            onBlur={resume}
+            onPress={() => {
+              onDismiss();
+              router.push('/alerts');
+            }}
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+          >
+            <AppText variant="bodyStrong" tone="accent">
+              View
+            </AppText>
+          </Pressable>
+        )}
         <Pressable
           role="button"
           accessibilityLabel="Dismiss"
@@ -159,5 +182,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   actions: { flexDirection: 'row', alignItems: 'center' },
   action: { minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
+  actionText: { paddingHorizontal: spacing.sm },
   pressed: { opacity: 0.7 },
 });

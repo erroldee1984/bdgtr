@@ -17,12 +17,18 @@ import { CachedNotice } from '@/offline/cached-notice';
 import { useCachedLoader } from '@/offline/use-cached-loader';
 import { NeedsAttention } from '@/offline/waiting-spends';
 import { useToast } from '@/toast/toast';
+import { UpdateReadyCard } from '@/updates/update-ready';
 import { colors, spacing } from '@/theme/tokens';
 
 import { useUnreadAlerts } from './unread-alerts';
 
-const WHEN = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
-
+const WHEN = new Intl.DateTimeFormat('en-PH', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'Asia/Manila',
+});
 
 /**
  * Alerts (docs/PLAN.md §6.10): budget alerts, daily summaries and
@@ -106,7 +112,7 @@ export function AlertsScreen() {
 
   return (
     <Screen title="Alerts" subtitle="This household's budget alerts, daily summaries and fixed-transaction notices from the last 7 days">
-
+      <UpdateReadyCard />
       {householdId ? <NeedsAttention householdId={householdId} /> : null}
       {current?.alerts ? <CachedNotice cachedAt={cachedAt} /> : null}
       {message ? (
