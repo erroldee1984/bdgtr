@@ -2,7 +2,7 @@
 import type { BulkPostInput, Category, CreateFixedInput, FixedTransaction } from '@bdgtr/shared';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { addLabel, FixedScreen, fixedProblem } from '@/fixed/fixed-screen';
 import { ApiError } from '@/lib/api-error';
@@ -36,8 +36,24 @@ jest.mock('@/spend/date-picker-button', () => {
 });
 
 const id = (n: number) => n.toString(16).padStart(24, '0');
-const mockGroceries: Category = { id: id(100), name: 'Groceries', icon: 'cart', colour: '#5A94FF', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0 };
-const mockBills: Category = { id: id(101), name: 'Bills', icon: 'flash', colour: '#4ADE80', defaultBudgetMinor: 0, isRemoved: true, recentUseCount: 0 };
+const mockGroceries: Category = {
+  id: id(100),
+  name: 'Groceries',
+  icon: 'cart',
+  colour: '#5A94FF',
+  defaultBudgetMinor: 0,
+  isRemoved: false,
+  recentUseCount: 0,
+};
+const mockBills: Category = {
+  id: id(101),
+  name: 'Bills',
+  icon: 'flash',
+  colour: '#4ADE80',
+  defaultBudgetMinor: 0,
+  isRemoved: true,
+  recentUseCount: 0,
+};
 
 let mockItems: FixedTransaction[];
 let mockPosted: Record<string, Record<string, string>>; // month → id → date
@@ -64,7 +80,13 @@ jest.mock('@/lib/api', () => {
     createFixed: async (_t: unknown, _h: string, input: CreateFixedInput) => {
       mockCalls.push({ op: 'create', body: input });
       if (mockFail) throw mockFail;
-      const item = { ...input, id: id(mockItems.length + 1), description: input.description ?? null, autoPostEnabled: input.autoPostEnabled, postedOn: null };
+      const item = {
+        ...input,
+        id: id(mockItems.length + 1),
+        description: input.description ?? null,
+        autoPostEnabled: input.autoPostEnabled,
+        postedOn: null,
+      };
       mockItems.push(item);
       return item;
     },
@@ -87,9 +109,36 @@ jest.mock('@/lib/api', () => {
   };
 });
 
-const RENT: FixedTransaction = { id: id(1), name: 'Rent', categoryId: mockGroceries.id, amountMinor: 1_500_000, description: null, dayOfMonth: 5, autoPostEnabled: true, postedOn: null };
-const NET: FixedTransaction = { id: id(2), name: 'Internet', categoryId: mockGroceries.id, amountMinor: 150_000, description: null, dayOfMonth: 31, autoPostEnabled: false, postedOn: null };
-const POWER: FixedTransaction = { id: id(3), name: 'Power', categoryId: mockBills.id, amountMinor: 300_000, description: null, dayOfMonth: 15, autoPostEnabled: true, postedOn: null };
+const RENT: FixedTransaction = {
+  id: id(1),
+  name: 'Rent',
+  categoryId: mockGroceries.id,
+  amountMinor: 1_500_000,
+  description: null,
+  dayOfMonth: 5,
+  autoPostEnabled: true,
+  postedOn: null,
+};
+const NET: FixedTransaction = {
+  id: id(2),
+  name: 'Internet',
+  categoryId: mockGroceries.id,
+  amountMinor: 150_000,
+  description: null,
+  dayOfMonth: 31,
+  autoPostEnabled: false,
+  postedOn: null,
+};
+const POWER: FixedTransaction = {
+  id: id(3),
+  name: 'Power',
+  categoryId: mockBills.id,
+  amountMinor: 300_000,
+  description: null,
+  dayOfMonth: 15,
+  autoPostEnabled: true,
+  postedOn: null,
+};
 
 const NOW = () => new Date('2026-11-26T02:00:00.000Z'); // 26 Nov Manila
 
@@ -113,6 +162,16 @@ async function open() {
 const press = (name: string | RegExp) => fireEvent.press(screen.getByRole('button', { name }));
 
 describe('the list', () => {
+  it('every item is its own card (regression: a hairline divider vanished, so some cards seemed to hold two items)', async () => {
+    await open();
+    const rows = screen.getAllByTestId('fixed-row');
+    expect(rows.length).toBeGreaterThan(1);
+    for (const r of rows)
+      expect(StyleSheet.flatten(r.props.style)).toMatchObject({ borderRadius: expect.any(Number), backgroundColor: expect.any(String) });
+    const gap = StyleSheet.flatten(rows[0]!.parent!.props.style)?.gap ?? StyleSheet.flatten(rows[0]!.parent!.parent!.props.style)?.gap;
+    expect(gap).toBeGreaterThanOrEqual(4);
+  });
+
   it('each item: name, amount, category, day, how it’s added, and whether it’s in this month', async () => {
     await open();
     expect(screen.getByText('Rent')).toBeTruthy();

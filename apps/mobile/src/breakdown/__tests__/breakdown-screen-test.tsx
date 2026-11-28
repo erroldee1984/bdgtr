@@ -5,7 +5,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { BreakdownScreen, deleteProblem, listSummary } from '@/breakdown/breakdown-screen';
 import { ApiError } from '@/lib/api-error';
@@ -25,17 +25,35 @@ jest.mock('@/household/household-context', () => ({
 const mockSwipeables: { onSwipeableOpen: (d: string) => void; renderRightActions?: unknown }[] = [];
 jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
   const { forwardRef, useImperativeHandle } = jest.requireActual('react');
-  const Swipeable = forwardRef((props: { children: ReactNode; onSwipeableOpen: (d: string) => void; renderRightActions?: unknown }, ref: unknown) => {
-    useImperativeHandle(ref, () => ({ close: () => {}, openLeft: () => {}, openRight: () => {}, reset: () => {} }));
-    mockSwipeables.push(props);
-    return props.children;
-  });
+  const Swipeable = forwardRef(
+    (props: { children: ReactNode; onSwipeableOpen: (d: string) => void; renderRightActions?: unknown }, ref: unknown) => {
+      useImperativeHandle(ref, () => ({ close: () => {}, openLeft: () => {}, openRight: () => {}, reset: () => {} }));
+      mockSwipeables.push(props);
+      return props.children;
+    },
+  );
   return { __esModule: true, default: Swipeable, SwipeDirection: { LEFT: 'left', RIGHT: 'right' } };
 });
 
 const id = (n: number) => n.toString(16).padStart(24, '0');
-const mockGroceries: Category = { id: id(100), name: 'Groceries', icon: 'cart', colour: '#5A94FF', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0 };
-const mockBills: Category = { id: id(101), name: 'Bills', icon: 'flash', colour: '#4ADE80', defaultBudgetMinor: 0, isRemoved: true, recentUseCount: 0 };
+const mockGroceries: Category = {
+  id: id(100),
+  name: 'Groceries',
+  icon: 'cart',
+  colour: '#5A94FF',
+  defaultBudgetMinor: 0,
+  isRemoved: false,
+  recentUseCount: 0,
+};
+const mockBills: Category = {
+  id: id(101),
+  name: 'Bills',
+  icon: 'flash',
+  colour: '#4ADE80',
+  defaultBudgetMinor: 0,
+  isRemoved: true,
+  recentUseCount: 0,
+};
 
 function tx(n: number, date: string, amountMinor: number, cat: Category, opts: Partial<Transaction> = {}): Transaction {
   return {
@@ -104,6 +122,12 @@ const row = (name: RegExp) => screen.getByRole('button', { name });
 const press = (name: string | RegExp) => fireEvent.press(screen.getByRole('button', { name }));
 
 describe('the list', () => {
+  it('dividers between rows are a whole pixel (regression: a hairline gap vanished on some Android screens, merging rows)', async () => {
+    await open();
+    const gap = StyleSheet.flatten(screen.getByTestId('spend-list').props.style).gap as number;
+    expect(Number.isInteger(gap) && gap >= 1).toBe(true);
+  });
+
   it('Date · Category · Cost, newest first, with a count and total', async () => {
     await open();
     expect(rowLabels()).toEqual([

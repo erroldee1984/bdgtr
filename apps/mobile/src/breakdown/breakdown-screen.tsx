@@ -212,7 +212,7 @@ export function BreakdownScreen() {
         </Card>
       ) : (
         <>
-          <View style={styles.list} role="list" aria-label="Spends">
+          <View style={styles.list} role="list" aria-label="Spends" testID="spend-list">
             {rows.map((r, i) => (
               <View key={r.tx.id} role="listitem">
                 {pinnedCount > 0 && (i === 0 || i === pinnedCount) ? (
@@ -314,7 +314,8 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: colors.onPrimary, fontSize: 11, lineHeight: 14 },
   list: {
-    gap: StyleSheet.hairlineWidth,
+    // A whole pixel: a hairline gap rounded to nothing on some Android screens, merging rows.
+    gap: 1,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: colors.border,

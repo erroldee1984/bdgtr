@@ -143,8 +143,12 @@ export function CategoriesManager() {
               </View>
             ) : (
               <View style={styles.list}>
-                {activeCats.map((c) => (
-                  <View key={c.id} style={styles.row} testID="category-row">
+                {activeCats.map((c, n) => (
+                  <View
+                    key={c.id}
+                    style={[styles.row, n === 0 && styles.firstRow, n === activeCats.length - 1 && styles.lastRow]}
+                    testID="category-row"
+                  >
                     <View style={styles.rowMain}>
                       <View style={[styles.iconDot, { borderColor: c.colour }]}>
                         <MaterialCommunityIcons name={c.icon} size={20} color={c.colour} aria-hidden />
@@ -208,8 +212,8 @@ export function CategoriesManager() {
                 onPress={() => setShowRemoved((v) => !v)}
               />
               {showRemoved
-                ? removed.map((c) => (
-                    <View key={c.id} style={styles.row}>
+                ? removed.map((c, n) => (
+                    <View key={c.id} style={[styles.row, n === 0 && styles.firstRow, n === removed.length - 1 && styles.lastRow]}>
                       <View style={styles.rowMain}>
                         <MaterialCommunityIcons name={c.icon} size={20} color={colors.textSecondary} aria-hidden />
                         <AppText tone="secondary" style={styles.flex}>
@@ -326,9 +330,12 @@ function CategoryEditor({
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.md },
+  // Rows are spaced by their own padding, so the gap above and below each divider is the same.
+  list: {},
   empty: { gap: spacing.md },
-  row: { gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  row: { gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  firstRow: { paddingTop: 0 },
+  lastRow: { borderBottomWidth: 0, paddingBottom: 0 },
   rowMain: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconDot: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
