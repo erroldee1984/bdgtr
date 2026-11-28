@@ -14,7 +14,8 @@ type State = {
 };
 let mockState: State;
 jest.mock('expo-updates', () => ({ useUpdates: () => mockState, reloadAsync: () => mockReload() }));
-jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '1.0.2' } } }));
+jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.2' }));
+jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '1.0.3' } } }));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 const METRICS = { frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };

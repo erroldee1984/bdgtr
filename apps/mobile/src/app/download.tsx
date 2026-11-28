@@ -6,13 +6,17 @@ import { AppText } from '@/components/app-text';
 import { Bullet, LegalPage, P, Section } from '@/components/legal-page';
 import { colors, MIN_TOUCH, radius, spacing } from '@/theme/tokens';
 
+import appJson from '../../app.json';
+
 /**
  * The APK lives on GitHub Releases (the repo is public): Cloudflare Pages
- * can't serve files over 25 MB. "latest/download/bdgtr.apk" always points to
- * the newest release, so this page doesn't change per release. Each release
- * must upload the file as exactly "bdgtr.apk".
+ * can't serve files over 25 MB. The page names the version in app.json and
+ * links to exactly that release's file, so what it says is what you get.
+ * Publish the GitHub release (tag v<version>, file named exactly "bdgtr.apk")
+ * before merging the version bump, or the link would 404 (PLAN §2a).
  */
-export const APK_URL = 'https://github.com/erroldee1984/bdgtr/releases/latest/download/bdgtr.apk';
+export const APK_VERSION: string = appJson.expo.version;
+export const APK_URL = `https://github.com/erroldee1984/bdgtr/releases/download/v${APK_VERSION}/bdgtr.apk`;
 export const RELEASES_URL = 'https://github.com/erroldee1984/bdgtr/releases';
 
 /** bdgtr.erroldee.com/download (docs/PLAN.md §2a): the Android app and how to install it. Public, no sign-in. */
@@ -24,11 +28,11 @@ export default function DownloadScreen() {
         the same account as this website.
       </P>
 
-      <Link href={APK_URL} style={styles.button} accessibilityLabel="Download bdgtr.apk, the Android app">
+      <Link href={APK_URL} style={styles.button} accessibilityLabel={`Download bdgtr ${APK_VERSION} for Android (bdgtr.apk)`}>
         <View style={styles.buttonInner}>
           <MaterialCommunityIcons name="download" size={22} color={colors.onPrimary} aria-hidden />
           <AppText variant="bodyStrong" style={styles.buttonText}>
-            Download bdgtr.apk
+            {`Download bdgtr ${APK_VERSION}`}
           </AppText>
         </View>
       </Link>
@@ -42,7 +46,7 @@ export default function DownloadScreen() {
       </AppText>
 
       <Section heading="Install it">
-        <Bullet marker="1.">Open this page on your Android phone and tap Download bdgtr.apk.</Bullet>
+        <Bullet marker="1.">Open this page on your Android phone and tap Download bdgtr.</Bullet>
         <Bullet marker="2.">
           When the download finishes, tap the file (or open it from Downloads). Android asks you to allow your browser to install apps: tap
           Settings, turn on Allow from this source, then go back.

@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -33,7 +34,12 @@ function NativeAppVersion() {
   return (
     <View style={styles.wrap}>
       <AppText variant="caption" tone="secondary">
-        {versionText(Constants.expoConfig?.version, currentlyRunning.isEmbeddedLaunch, currentlyRunning.createdAt)}
+        {versionText(
+          // The installed APK's own version: an update carries the newest app.json, which may name a newer APK.
+          Application.nativeApplicationVersion ?? Constants.expoConfig?.version,
+          currentlyRunning.isEmbeddedLaunch,
+          currentlyRunning.createdAt,
+        )}
       </AppText>
       {ready ? (
         <View style={styles.pending} role="status">

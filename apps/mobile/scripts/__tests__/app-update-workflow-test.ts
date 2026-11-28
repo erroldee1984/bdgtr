@@ -24,8 +24,11 @@ describe('Android app update workflow', () => {
     expect(workflow).toMatch(/native-fingerprint\.mjs check[\s\S]*if: steps\.guard\.outputs\.safe == 'true'/);
   });
 
-  it('the app takes updates from this project, matched by app version', () => {
+  it('the app takes updates from this project, matched by a fixed runtime version recorded with the released APK', () => {
     expect(app.updates.url).toBe(`https://u.expo.dev/${app.extra.eas.projectId}`);
-    expect(app.runtimeVersion).toEqual({ policy: 'appVersion' });
+    expect(typeof app.runtimeVersion).toBe('string');
+    const recorded = JSON.parse(readFileSync(join(root, 'native-fingerprint.json'), 'utf8'));
+    expect(recorded.runtimeVersion).toBe(app.runtimeVersion);
+    expect(recorded.version).toBe(app.version); // record again after each APK release
   });
 });
