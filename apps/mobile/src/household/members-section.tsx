@@ -95,12 +95,17 @@ export function MembersSection({
         <ActivityIndicator color={colors.primaryLight} accessibilityLabel="Loading members" />
       ) : (
         <View style={styles.list} role="list">
-          {members.map((m) => {
+          {members.map((m, n) => {
             const manageable = !m.isYou && canManageMember(me, m.role);
             const canTransfer = me === 'owner' && !m.isYou;
             const confirming = confirm?.member.userId === m.userId ? confirm.kind : null;
             return (
-              <View key={m.userId} style={styles.row} role="listitem" testID="member-row">
+              <View
+                key={m.userId}
+                style={[styles.row, n === 0 && styles.firstRow, n === members.length - 1 && styles.lastRow]}
+                role="listitem"
+                testID="member-row"
+              >
                 <View style={styles.who}>
                   <View style={styles.nameLine}>
                     <AppText variant="bodyStrong">{displayName(m)}</AppText>
@@ -116,9 +121,7 @@ export function MembersSection({
                     </AppText>
                   ) : null}
                   <View style={[styles.badge, m.role === 'owner' && styles.ownerBadge]}>
-                    {m.role === 'owner' ? (
-                      <MaterialCommunityIcons name="crown" size={16} color={colors.primaryLight} aria-hidden />
-                    ) : null}
+                    {m.role === 'owner' ? <MaterialCommunityIcons name="crown" size={16} color={colors.primaryLight} aria-hidden /> : null}
                     <AppText variant="caption">{ROLE_LABELS[m.role]}</AppText>
                   </View>
                 </View>
@@ -257,13 +260,15 @@ function LeaveHousehold({ household, members }: { household: Household; members:
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.md, marginTop: spacing.sm },
+  list: { marginTop: spacing.sm },
   row: {
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+  firstRow: { paddingTop: 0 },
+  lastRow: { borderBottomWidth: 0, paddingBottom: 0 },
   who: { gap: spacing.xs },
   nameLine: { flexDirection: 'row', gap: spacing.sm, alignItems: 'baseline', flexWrap: 'wrap' },
   badge: {

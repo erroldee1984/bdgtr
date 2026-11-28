@@ -77,7 +77,10 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
     if (!householdId) return () => {};
     let alive = true;
     const k = `${householdId}:${month}`;
-    Promise.all([withNetworkRetry(() => fetchFixed(token, householdId, month)), withNetworkRetry(() => fetchCategories(token, householdId))])
+    Promise.all([
+      withNetworkRetry(() => fetchFixed(token, householdId, month)),
+      withNetworkRetry(() => fetchCategories(token, householdId)),
+    ])
       .then(([items, categories]) => {
         if (!alive) return;
         setLoaded({ key: k, items, categories });
@@ -139,7 +142,10 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
         items: which.map((i) => ({ id: i.id, clientId: Crypto.randomUUID() })),
       });
       for (const a of alerts) toast.show({ level: a.level, title: a.title, body: a.body });
-      setMessage({ tone: 'success', text: `Added ${which.length} ${which.length === 1 ? 'transaction' : 'transactions'} on ${shortDate(date)}.` });
+      setMessage({
+        tone: 'success',
+        text: `Added ${which.length} ${which.length === 1 ? 'transaction' : 'transactions'} on ${shortDate(date)}.`,
+      });
       setSelecting(false);
       setSelected([]);
       load();
@@ -187,7 +193,9 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
           {canManage && !selecting && !editing ? (
             <View style={styles.actions}>
               <Button label="Add fixed transaction" icon="plus" compact onPress={() => (setEditing('new'), setMessage(null))} />
-              {items.length ? <Button label="Select to add" icon="checkbox-multiple-marked-outline" compact onPress={startSelecting} /> : null}
+              {items.length ? (
+                <Button label="Select to add" icon="checkbox-multiple-marked-outline" compact onPress={startSelecting} />
+              ) : null}
             </View>
           ) : null}
 
@@ -245,10 +253,14 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
                 const removedCat = !!cat?.isRemoved;
                 const on = selected.includes(item.id);
                 const posted = item.postedOn ? `Added ${shortDate(item.postedOn)}` : `Not added in ${monthLabel(month)}`;
-                const auto = item.autoPostEnabled ? (removedCat ? 'Not added automatically: its category was removed' : 'Added automatically') : 'Added by hand';
+                const auto = item.autoPostEnabled
+                  ? removedCat
+                    ? 'Not added automatically: its category was removed'
+                    : 'Added automatically'
+                  : 'Added by hand';
                 const summary = `${item.name}, ${formatPHP(item.amountMinor)}, ${cat?.name ?? 'Unknown category'}. ${scheduleText(item.dayOfMonth)}. ${auto}. ${posted}.`;
                 return (
-                  <View key={item.id} role="listitem" style={styles.row}>
+                  <View key={item.id} role="listitem" style={styles.row} testID="fixed-row">
                     {selecting ? (
                       <Pressable
                         role="checkbox"
@@ -316,7 +328,14 @@ export function FixedScreen({ now = () => new Date() }: { now?: () => Date }) {
           actions={
             <>
               <Button label="Cancel" compact disabled={removeBusy} onPress={() => setRemoving(null)} />
-              <Button label="Remove" icon="trash-can-outline" variant="danger" compact busy={removeBusy} onPress={() => void confirmRemove()} />
+              <Button
+                label="Remove"
+                icon="trash-can-outline"
+                variant="danger"
+                compact
+                busy={removeBusy}
+                onPress={() => void confirmRemove()}
+              />
             </>
           }
         >
@@ -363,8 +382,10 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  list: { gap: StyleSheet.hairlineWidth, borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.border },
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface },
+  // One card per item. (A hairline gap as the divider rounded to nothing on some
+  // Android screens, so some items looked like one card: regression, PLAN §11.)
+  list: { gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.card, overflow: 'hidden' },
   main: { flex: 1, minHeight: MIN_TOUCH + 16, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
   icon: { width: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.75 },

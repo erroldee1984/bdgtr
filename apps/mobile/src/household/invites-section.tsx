@@ -1,11 +1,4 @@
-import {
-  type AssignableRole,
-  CreateInviteInputSchema,
-  type Household,
-  type Invite,
-  inviteUrl,
-  ROLE_LABELS,
-} from '@bdgtr/shared';
+import { type AssignableRole, CreateInviteInputSchema, type Household, type Invite, inviteUrl, ROLE_LABELS } from '@bdgtr/shared';
 import { useAuth } from '@clerk/expo';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -129,9 +122,7 @@ export function InvitesSection({ household }: { household: Household }) {
   return (
     <Card>
       <AppText variant="title">Invite someone</AppText>
-      <AppText tone="secondary">
-        They&apos;ll get a link that works once, for 7 days, and only when they sign in with this email.
-      </AppText>
+      <AppText tone="secondary">They&apos;ll get a link that works once, for 7 days, and only when they sign in with this email.</AppText>
       <View style={styles.form}>
         <TextField
           label="Their email"
@@ -195,8 +186,8 @@ export function InvitesSection({ household }: { household: Household }) {
         <AppText tone="secondary">No pending invites.</AppText>
       ) : (
         <View role="list" style={styles.list}>
-          {invites.map((inv) => (
-            <View key={inv.id} role="listitem" style={styles.row}>
+          {invites.map((inv, n) => (
+            <View key={inv.id} role="listitem" style={[styles.row, n === 0 && styles.firstRow, n === invites.length - 1 && styles.lastRow]}>
               <AppText variant="bodyStrong">{inv.email}</AppText>
               <AppText variant="caption" tone="secondary">
                 {`${ROLE_LABELS[inv.role]} · expires ${DATE.format(new Date(inv.expiresAt))}`}
@@ -241,7 +232,9 @@ const styles = StyleSheet.create({
   linkBox: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.button, backgroundColor: colors.surfaceRaised },
   url: { color: colors.primaryLight },
   pendingTitle: { marginTop: spacing.md },
-  list: { gap: spacing.md },
-  row: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  list: {},
+  row: { gap: spacing.xs, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  firstRow: { paddingTop: 0 },
+  lastRow: { borderBottomWidth: 0, paddingBottom: 0 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
 });

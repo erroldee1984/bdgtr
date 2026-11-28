@@ -1,6 +1,7 @@
 /** More → Categories (docs/PLAN.md §6.4) against an in-memory fake server. */
 import { fireEvent, screen, within } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
+import { StyleSheet } from 'react-native';
 
 import { CategoriesManager } from '@/categories/categories-manager';
 import { ApiError } from '@/lib/api-error';
@@ -19,7 +20,17 @@ const mockScrollTo = jest.fn();
 jest.mock('@/components/screen', () => {
   const { View, Text } = jest.requireActual('react-native');
   return {
-    Screen: ({ title, subtitle, children, scrollRef }: { title: string; subtitle?: string; children: unknown; scrollRef?: { current: unknown } }) => {
+    Screen: ({
+      title,
+      subtitle,
+      children,
+      scrollRef,
+    }: {
+      title: string;
+      subtitle?: string;
+      children: unknown;
+      scrollRef?: { current: unknown };
+    }) => {
       if (scrollRef) scrollRef.current = { scrollTo: mockScrollTo };
       return (
         <View>
@@ -32,7 +43,16 @@ jest.mock('@/components/screen', () => {
   };
 });
 
-type C = { id: string; name: string; icon: string; colour: string; defaultBudgetMinor: number; isRemoved: boolean; recentUseCount: number; kind?: 'normal' | 'unbudgeted' };
+type C = {
+  id: string;
+  name: string;
+  icon: string;
+  colour: string;
+  defaultBudgetMinor: number;
+  isRemoved: boolean;
+  recentUseCount: number;
+  kind?: 'normal' | 'unbudgeted';
+};
 let mockDb: C[];
 let mockFailNext: unknown = null;
 const mockCalls: string[] = [];
@@ -73,7 +93,15 @@ beforeEach(() => {
   mockFailNext = null;
   mockCalls.length = 0;
   mockDb = [
-    { id: 'a'.repeat(24), name: 'Groceries', icon: 'cart', colour: '#4ADE80', defaultBudgetMinor: 1_000_000, isRemoved: false, recentUseCount: 0 },
+    {
+      id: 'a'.repeat(24),
+      name: 'Groceries',
+      icon: 'cart',
+      colour: '#4ADE80',
+      defaultBudgetMinor: 1_000_000,
+      isRemoved: false,
+      recentUseCount: 0,
+    },
     { id: 'b'.repeat(24), name: 'Transport', icon: 'car', colour: '#5A94FF', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0 },
     { id: 'c'.repeat(24), name: 'Old stuff', icon: 'gift', colour: '#F472B6', defaultBudgetMinor: 0, isRemoved: true, recentUseCount: 0 },
   ];
@@ -86,6 +114,20 @@ const open = async () => {
 const row = (name: string) => screen.getAllByTestId('category-row').find((r) => within(r).queryByText(name))!;
 
 describe('Categories (House Owner / Co-Owner)', () => {
+  it('each row is centred between its dividers (regression: 24px above, 8px below)', async () => {
+    await open();
+    const els = screen.getAllByTestId('category-row');
+    const rows = els.map((r) => StyleSheet.flatten(r.props.style));
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    const below = (r: (typeof rows)[number]) => r.paddingBottom ?? r.paddingVertical;
+    const above = (r: (typeof rows)[number]) => r.paddingTop ?? r.paddingVertical;
+    // Same space on both sides of each divider, and no extra gap between rows.
+    for (let n = 0; n < rows.length - 1; n++) expect(below(rows[n]!)).toBe(above(rows[n + 1]!));
+    expect(StyleSheet.flatten(els[0]!.parent!.props.style)?.gap ?? 0).toBe(0);
+    expect(rows[0]!.paddingTop).toBe(0); // the card's own padding is above it
+    expect(rows[rows.length - 1]).toMatchObject({ borderBottomWidth: 0, paddingBottom: 0 }); // no divider under the last
+  });
+
   it('lists active categories with their default budgets; removed ones are hidden until asked', async () => {
     await open();
     expect(within(row('Groceries')).getByText('Default budget ₱10,000.00')).toBeTruthy();
@@ -164,7 +206,16 @@ describe('Categories (House Owner / Co-Owner)', () => {
   it('the built-in Unbudgeted category: explained, with no Edit or Remove (it can’t be removed or renamed)', async () => {
     mockDb = [
       ...mockDb,
-      { id: 'u'.repeat(24), name: 'Unbudgeted', icon: 'dots-horizontal', colour: '#FF6B6B', defaultBudgetMinor: 0, isRemoved: false, recentUseCount: 0, kind: 'unbudgeted' },
+      {
+        id: 'u'.repeat(24),
+        name: 'Unbudgeted',
+        icon: 'dots-horizontal',
+        colour: '#FF6B6B',
+        defaultBudgetMinor: 0,
+        isRemoved: false,
+        recentUseCount: 0,
+        kind: 'unbudgeted',
+      },
     ];
     await open();
     expect(screen.getByText('Unbudgeted')).toBeTruthy();
@@ -228,5 +279,4 @@ describe('Categories (House Member)', () => {
     await fireEvent.press(screen.getByText('Show removed (1)'));
     expect(screen.queryByLabelText('Restore Old stuff')).toBeNull();
   });
-
 });
